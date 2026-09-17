@@ -1,3 +1,14 @@
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '#/components/ui/alert-dialog';
 import { Checkbox } from '#/components/ui/checkbox';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
@@ -132,15 +143,39 @@ function TodoItem({ todo }: { todo: Todo }) {
                         {todo.name}
                     </span>
                 </label>
-                <button
-                    type="button"
-                    onClick={() => remove.mutate({ id: todo.id })}
-                    disabled={remove.isPending}
-                    aria-label="Delete task"
-                    className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
-                >
-                    <Trash2 className="size-4" />
-                </button>
+                <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <button
+                            type="button"
+                            disabled={remove.isPending}
+                            aria-label="Delete task"
+                            className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                        >
+                            <Trash2 className="size-4" />
+                        </button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete task?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This task will be permanently deleted. This
+                                can&apos;t be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <div className="truncate rounded-md bg-muted px-3 py-2 text-sm font-medium">
+                            {todo.name}
+                        </div>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                variant="destructive"
+                                onClick={() => remove.mutate({ id: todo.id })}
+                            >
+                                Delete
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </li>
     );
