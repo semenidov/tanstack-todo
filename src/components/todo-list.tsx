@@ -1,14 +1,3 @@
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from '#/components/ui/alert-dialog';
 import { Checkbox } from '#/components/ui/checkbox';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
@@ -17,7 +6,7 @@ import { removeFromList, toggleInList } from '#/lib/todos';
 import { cn } from 'cn';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
+import { createServerFn, useServerFn } from '@tanstack/react-start';
 import { eq } from 'drizzle-orm';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,6 +14,8 @@ import z from 'zod';
 import type { InferSelectModel } from 'drizzle-orm';
 
 export type Todo = InferSelectModel<typeof todos>;
+
+const UNDO_WINDOW_MS = 5000;
 
 const toggleTodoServer = createServerFn({ method: 'POST' })
     .validator(z.object({ id: z.string(), isComplete: z.boolean() }))
@@ -76,44 +67,51 @@ const deleteTodoServer = createServerFn({ method: 'POST' })
         await db.delete(todos).where(eq(todos.id, data.id));
     });
 
-type DeleteVars = { id: string };
-type DeleteContext = { previous: Array<Todo> | undefined };
-
 function useDeleteTodo() {
     const queryClient = useQueryClient();
+    const deleteTodo = useServerFn(deleteTodoServer);
 
-    return useMutation<void, Error, DeleteVars, DeleteContext>({
-        mutationFn: (vars) => deleteTodoServer({ data: vars }),
-        onMutate: async (vars) => {
-            await queryClient.cancelQueries({
-                queryKey: todosQueryOptions.queryKey,
-            });
-            const previous = queryClient.getQueryData(
-                todosQueryOptions.queryKey,
-            );
-            queryClient.setQueryData(todosQueryOptions.queryKey, (old) =>
-                old ? removeFromList(old, vars.id) : old,
-            );
-            return { previous };
-        },
-        onError: (_error, _vars, context) => {
-            queryClient.setQueryData(
-                todosQueryOptions.queryKey,
-                context?.previous,
-            );
-            toast.error("Couldn't delete the task. Please try again.");
-        },
-        onSettled: () => {
-            queryClient.invalidateQueries({
-                queryKey: todosQueryOptions.queryKey,
-            });
-        },
-    });
+    return (todo: Todo) => {
+        const key = todosQueryOptions.queryKey;
+        const previous = queryClient.getQueryData(key);
+        queryClient.setQueryData(key, (old) =>
+            old ? removeFromList(old, todo.id) : old,
+        );
+
+        let settled = false;
+        const restore = () => queryClient.setQueryData(key, previous);
+
+        const commit = async () => {
+            if (settled) return;
+            settled = true;
+            try {
+                await deleteTodo({ data: { id: todo.id } });
+                queryClient.invalidateQueries({ queryKey: key });
+            } catch {
+                restore();
+                toast.error("Couldn't delete the task. Please try again.");
+            }
+        };
+
+        const undo = () => {
+            if (settled) return;
+            settled = true;
+            restore();
+        };
+
+        toast.warning(`Deleted "${todo.name}"`, {
+            icon: <Trash2 className="size-4" />,
+            action: { label: 'Undo', onClick: undo },
+            duration: UNDO_WINDOW_MS,
+            onAutoClose: commit,
+            onDismiss: commit,
+        });
+    };
 }
 
 function TodoItem({ todo }: { todo: Todo }) {
     const toggle = useToggleTodo();
-    const remove = useDeleteTodo();
+    const deleteTodo = useDeleteTodo();
 
     return (
         <li>
@@ -150,39 +148,14 @@ function TodoItem({ todo }: { todo: Todo }) {
                 >
                     {todo.name}
                 </Link>
-                <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                        <button
-                            type="button"
-                            disabled={remove.isPending}
-                            aria-label="Delete task"
-                            className="ml-1 shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
-                        >
-                            <Trash2 className="size-4" />
-                        </button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Delete task?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This task will be permanently deleted. This
-                                can&apos;t be undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <div className="truncate rounded-md bg-muted px-3 py-2 text-sm font-medium">
-                            {todo.name}
-                        </div>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                                variant="destructive"
-                                onClick={() => remove.mutate({ id: todo.id })}
-                            >
-                                Delete
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                <button
+                    type="button"
+                    onClick={() => deleteTodo(todo)}
+                    aria-label="Delete task"
+                    className="ml-1 shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive"
+                >
+                    <Trash2 className="size-4" />
+                </button>
             </div>
         </li>
     );

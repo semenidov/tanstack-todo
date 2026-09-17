@@ -7,7 +7,10 @@ import {
 import type { QueryClient } from '@tanstack/react-query';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
+import { MessageScreen } from '#/components/message-screen';
+import { Button } from '#/components/ui/button';
 import { Toaster } from '#/components/ui/sonner';
+import { ArrowLeftIcon, MapPinOffIcon } from 'lucide-react';
 
 import appCss from '../styles.css?url';
 
@@ -35,10 +38,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     shellComponent: RootDocument,
     notFoundComponent: () => {
         return (
-            <div>
-                <p>Not Found</p>
-                <Link to="/">Go Home</Link>
-            </div>
+            <MessageScreen
+                icon={<MapPinOffIcon className="size-8 text-muted-foreground" />}
+                title="Page not found"
+                description="The page you're looking for doesn't exist."
+                action={
+                    <Button asChild>
+                        <Link to="/">
+                            <ArrowLeftIcon />
+                            Back to list
+                        </Link>
+                    </Button>
+                }
+            />
         );
     },
 });

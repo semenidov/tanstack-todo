@@ -16,10 +16,11 @@ export const todosQueryOptions = queryOptions({
 
 export const getTodoServer = createServerFn({ method: 'GET' })
     .validator(z.string())
-    .handler(({ data: id }) => {
-        return db.query.todos.findFirst({
+    .handler(async ({ data: id }) => {
+        const todo = await db.query.todos.findFirst({
             where: (t, { eq }) => eq(t.id, id),
         });
+        return todo ?? null;
     });
 
 export const todoQueryOptions = (id: string) =>

@@ -1,14 +1,15 @@
+import { MessageScreen } from '#/components/message-screen';
 import { RouteError } from '#/components/route-error';
 import { TodoForm } from '#/components/todo-form';
 import { Button } from '#/components/ui/button';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
 import { todoQueryOptions, todosQueryOptions } from '#/lib/todos-query';
-import { useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { createServerFn, useServerFn } from '@tanstack/react-start';
 import { eq } from 'drizzle-orm';
-import { ArrowLeftIcon, CheckIcon } from 'lucide-react';
+import { ArrowLeftIcon, CheckIcon, SearchXIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import z from 'zod';
 
@@ -24,17 +25,41 @@ const updateTodoServer = createServerFn({ method: 'POST' })
 export const Route = createFileRoute('/edit/$todoId')({
     component: EditTodoPage,
     errorComponent: RouteError,
-    loader: ({ context, params }) => {
-        return context.queryClient.query({
+    notFoundComponent: TaskNotFound,
+    loader: async ({ context, params }) => {
+        if (!z.uuid().safeParse(params.todoId).success) {
+            throw notFound();
+        }
+        const todo = await context.queryClient.query({
             ...todoQueryOptions(params.todoId),
             staleTime: 'static',
         });
+        if (!todo) throw notFound();
+        return todo;
     },
 });
 
+function TaskNotFound() {
+    return (
+        <MessageScreen
+            icon={<SearchXIcon className="size-8 text-muted-foreground" />}
+            title="Task not found"
+            description="This task doesn't exist or was deleted."
+            action={
+                <Button asChild>
+                    <Link to="/">
+                        <ArrowLeftIcon />
+                        Back to list
+                    </Link>
+                </Button>
+            }
+        />
+    );
+}
+
 function EditTodoPage() {
     const { todoId } = Route.useParams();
-    const { data: todo } = useSuspenseQuery(todoQueryOptions(todoId));
+    const todo = Route.useLoaderData();
     const updateTodo = useServerFn(updateTodoServer);
     const queryClient = useQueryClient();
     const navigate = Route.useNavigate();
@@ -71,19 +96,13 @@ function EditTodoPage() {
                     Edit task
                 </h1>
 
-                {todo ? (
-                    <TodoForm
-                        defaultName={todo.name}
-                        submitLabel="Save"
-                        pendingLabel="Saving..."
-                        onSubmit={handleSubmit}
-                        icon={<CheckIcon />}
-                    />
-                ) : (
-                    <p className="text-sm text-muted-foreground">
-                        Task not found.
-                    </p>
-                )}
+                <TodoForm
+                    defaultName={todo.name}
+                    submitLabel="Save"
+                    pendingLabel="Saving..."
+                    onSubmit={handleSubmit}
+                    icon={<CheckIcon />}
+                />
             </div>
         </div>
     );
