@@ -9,27 +9,24 @@ import {
     EmptyMedia,
     EmptyTitle,
 } from '#/components/ui/empty';
-import { db } from '#/db';
 import { countCompleted } from '#/lib/todos';
+import { todosQueryOptions } from '#/lib/todos-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
-import { createServerFn } from '@tanstack/react-start';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { ListTodo, PlusIcon } from 'lucide-react';
-
-const serverLoader = createServerFn({ method: 'GET' }).handler(() => {
-    return db.query.todos.findMany({
-        orderBy: (t, { asc }) => asc(t.createdAt),
-    });
-});
 
 export const Route = createFileRoute('/')({
     component: RouteComponent,
-    loader: () => {
-        return serverLoader();
+    loader: ({ context }) => {
+        return context.queryClient.query({
+            ...todosQueryOptions,
+            staleTime: 'static',
+        });
     },
 });
 
 function RouteComponent() {
-    const todoList = Route.useLoaderData();
+    const { data: todoList } = useSuspenseQuery(todosQueryOptions);
     const totalCount = todoList.length;
     const completedCount = countCompleted(todoList);
 

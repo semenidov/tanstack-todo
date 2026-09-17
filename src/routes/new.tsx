@@ -3,8 +3,10 @@ import { Field, FieldError, FieldLabel } from '#/components/ui/field';
 import { Input } from '#/components/ui/input';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
+import { todosQueryOptions } from '#/lib/todos-query';
 import { useForm } from '@tanstack/react-form';
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { createServerFn, useServerFn } from '@tanstack/react-start';
 import { ArrowLeftIcon, PlusIcon } from 'lucide-react';
 import z from 'zod';
@@ -17,7 +19,6 @@ const addTodoServer = createServerFn({ method: 'POST' })
     .validator(z.string().min(1))
     .handler(async ({ data }) => {
         await db.insert(todos).values({ name: data, isComplete: false });
-        throw redirect({ href: '/' });
     });
 export const Route = createFileRoute('/new')({
     component: NewTodoPage,
@@ -25,11 +26,17 @@ export const Route = createFileRoute('/new')({
 
 function NewTodoPage() {
     const addTodo = useServerFn(addTodoServer);
+    const queryClient = useQueryClient();
+    const navigate = Route.useNavigate();
     const form = useForm({
         defaultValues: { name: '' },
         validators: { onChange: todoSchema },
         onSubmit: async ({ value }) => {
             await addTodo({ data: value.name });
+            await queryClient.invalidateQueries({
+                queryKey: todosQueryOptions.queryKey,
+            });
+            await navigate({ to: '/' });
         },
     });
 

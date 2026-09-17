@@ -1,18 +1,17 @@
 import { Checkbox } from '#/components/ui/checkbox';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
+import { todosQueryOptions } from '#/lib/todos-query';
+import { removeFromList, toggleInList } from '#/lib/todos';
 import { cn } from 'cn';
-import { useRouter } from '@tanstack/react-router';
-import { createServerFn, useServerFn } from '@tanstack/react-start';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { createServerFn } from '@tanstack/react-start';
 import { eq } from 'drizzle-orm';
-import { useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import z from 'zod';
+import type { InferSelectModel } from 'drizzle-orm';
 
-export interface Todo {
-    id: string;
-    name: string;
-    isComplete: boolean;
-}
+export type Todo = InferSelectModel<typeof todos>;
 
 const toggleTodoServer = createServerFn({ method: 'POST' })
     .validator(z.object({ id: z.string(), isComplete: z.boolean() }))
@@ -23,55 +22,126 @@ const toggleTodoServer = createServerFn({ method: 'POST' })
             .where(eq(todos.id, data.id));
     });
 
+type ToggleVars = { id: string; isComplete: boolean };
+type ToggleContext = { previous: Array<Todo> | undefined };
+
+function useToggleTodo() {
+    const queryClient = useQueryClient();
+
+    return useMutation<void, Error, ToggleVars, ToggleContext>({
+        mutationFn: (vars) => toggleTodoServer({ data: vars }),
+        onMutate: async (vars) => {
+            await queryClient.cancelQueries({
+                queryKey: todosQueryOptions.queryKey,
+            });
+            const previous = queryClient.getQueryData(
+                todosQueryOptions.queryKey,
+            );
+            queryClient.setQueryData(todosQueryOptions.queryKey, (old) =>
+                old ? toggleInList(old, vars.id, vars.isComplete) : old,
+            );
+            return { previous };
+        },
+        onError: (_error, _vars, context) => {
+            queryClient.setQueryData(
+                todosQueryOptions.queryKey,
+                context?.previous,
+            );
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({
+                queryKey: todosQueryOptions.queryKey,
+            });
+        },
+    });
+}
+
+const deleteTodoServer = createServerFn({ method: 'POST' })
+    .validator(z.object({ id: z.string() }))
+    .handler(async ({ data }) => {
+        await db.delete(todos).where(eq(todos.id, data.id));
+    });
+
+type DeleteVars = { id: string };
+type DeleteContext = { previous: Array<Todo> | undefined };
+
+function useDeleteTodo() {
+    const queryClient = useQueryClient();
+
+    return useMutation<void, Error, DeleteVars, DeleteContext>({
+        mutationFn: (vars) => deleteTodoServer({ data: vars }),
+        onMutate: async (vars) => {
+            await queryClient.cancelQueries({
+                queryKey: todosQueryOptions.queryKey,
+            });
+            const previous = queryClient.getQueryData(
+                todosQueryOptions.queryKey,
+            );
+            queryClient.setQueryData(todosQueryOptions.queryKey, (old) =>
+                old ? removeFromList(old, vars.id) : old,
+            );
+            return { previous };
+        },
+        onError: (_error, _vars, context) => {
+            queryClient.setQueryData(
+                todosQueryOptions.queryKey,
+                context?.previous,
+            );
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({
+                queryKey: todosQueryOptions.queryKey,
+            });
+        },
+    });
+}
+
 function TodoItem({ todo }: { todo: Todo }) {
-    const toggleTodo = useServerFn(toggleTodoServer);
-    const router = useRouter();
-    const [checked, setChecked] = useState(todo.isComplete);
-    const [pending, setPending] = useState(false);
-
-    useEffect(() => {
-        setChecked(todo.isComplete);
-    }, [todo.isComplete]);
-
-    async function handleChange(next: boolean) {
-        setChecked(next);
-        setPending(true);
-        try {
-            await toggleTodo({ data: { id: todo.id, isComplete: next } });
-            await router.invalidate();
-        } catch {
-            setChecked(todo.isComplete);
-        } finally {
-            setPending(false);
-        }
-    }
+    const toggle = useToggleTodo();
+    const remove = useDeleteTodo();
 
     return (
         <li>
-            <label
+            <div
                 className={cn(
-                    'group flex cursor-pointer items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm',
-                    'transition-all duration-200 hover:border-primary/40 hover:shadow-md active:scale-[0.99]',
-                    checked && 'bg-muted/50',
+                    'flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm',
+                    'transition-all duration-200 hover:border-primary/40 hover:shadow-md',
+                    todo.isComplete && 'bg-muted/50',
                 )}
             >
-                <Checkbox
-                    checked={checked}
-                    disabled={pending}
-                    onCheckedChange={(value) => handleChange(value === true)}
-                    className="cursor-pointer"
-                />
-                <span
-                    className={cn(
-                        'text-sm transition-colors',
-                        checked
-                            ? 'text-muted-foreground line-through'
-                            : 'text-foreground',
-                    )}
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                    <Checkbox
+                        checked={todo.isComplete}
+                        disabled={toggle.isPending}
+                        onCheckedChange={(value) =>
+                            toggle.mutate({
+                                id: todo.id,
+                                isComplete: value === true,
+                            })
+                        }
+                        className="cursor-pointer"
+                    />
+                    <span
+                        className={cn(
+                            'truncate text-sm transition-colors',
+                            todo.isComplete
+                                ? 'text-muted-foreground line-through'
+                                : 'text-foreground',
+                        )}
+                    >
+                        {todo.name}
+                    </span>
+                </label>
+                <button
+                    type="button"
+                    onClick={() => remove.mutate({ id: todo.id })}
+                    disabled={remove.isPending}
+                    aria-label="Delete task"
+                    className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
                 >
-                    {todo.name}
-                </span>
-            </label>
+                    <Trash2 className="size-4" />
+                </button>
+            </div>
         </li>
     );
 }
