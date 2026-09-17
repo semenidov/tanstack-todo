@@ -16,9 +16,11 @@ import { todosQueryOptions } from '#/lib/todos-query';
 import { removeFromList, toggleInList } from '#/lib/todos';
 import { cn } from 'cn';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import { createServerFn } from '@tanstack/react-start';
 import { eq } from 'drizzle-orm';
 import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import z from 'zod';
 import type { InferSelectModel } from 'drizzle-orm';
 
@@ -58,6 +60,7 @@ function useToggleTodo() {
                 todosQueryOptions.queryKey,
                 context?.previous,
             );
+            toast.error("Couldn't update the task. Please try again.");
         },
         onSettled: () => {
             queryClient.invalidateQueries({
@@ -98,6 +101,7 @@ function useDeleteTodo() {
                 todosQueryOptions.queryKey,
                 context?.previous,
             );
+            toast.error("Couldn't delete the task. Please try again.");
         },
         onSettled: () => {
             queryClient.invalidateQueries({
@@ -115,41 +119,44 @@ function TodoItem({ todo }: { todo: Todo }) {
         <li>
             <div
                 className={cn(
-                    'flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm',
+                    'relative flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm',
                     'transition-all duration-200 hover:border-primary/40 hover:shadow-md',
                     todo.isComplete && 'bg-muted/50',
                 )}
             >
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                    <Checkbox
-                        checked={todo.isComplete}
-                        disabled={toggle.isPending}
-                        onCheckedChange={(value) =>
-                            toggle.mutate({
-                                id: todo.id,
-                                isComplete: value === true,
-                            })
-                        }
-                        className="cursor-pointer"
-                    />
-                    <span
-                        className={cn(
-                            'truncate text-sm transition-colors',
-                            todo.isComplete
-                                ? 'text-muted-foreground line-through'
-                                : 'text-foreground',
-                        )}
-                    >
-                        {todo.name}
-                    </span>
-                </label>
+                <Checkbox
+                    checked={todo.isComplete}
+                    disabled={toggle.isPending}
+                    onCheckedChange={(value) =>
+                        toggle.mutate({
+                            id: todo.id,
+                            isComplete: value === true,
+                        })
+                    }
+                    aria-label={
+                        todo.isComplete ? 'Mark as not done' : 'Mark as done'
+                    }
+                    className="cursor-pointer"
+                />
+                <Link
+                    to="/edit/$todoId"
+                    params={{ todoId: todo.id }}
+                    className={cn(
+                        'min-w-0 flex-1 cursor-pointer truncate rounded-sm text-sm transition-colors',
+                        todo.isComplete
+                            ? 'text-muted-foreground line-through'
+                            : 'text-foreground',
+                    )}
+                >
+                    {todo.name}
+                </Link>
                 <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <button
                             type="button"
                             disabled={remove.isPending}
                             aria-label="Delete task"
-                            className="shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                            className="ml-1 shrink-0 cursor-pointer rounded-md p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
                         >
                             <Trash2 className="size-4" />
                         </button>

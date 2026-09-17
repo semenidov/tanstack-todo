@@ -9,6 +9,7 @@ import {
     EmptyMedia,
     EmptyTitle,
 } from '#/components/ui/empty';
+import { RouteError } from '#/components/route-error';
 import { countCompleted } from '#/lib/todos';
 import { todosQueryOptions } from '#/lib/todos-query';
 import { Link, createFileRoute } from '@tanstack/react-router';
@@ -17,6 +18,7 @@ import { ListTodo, PlusIcon } from 'lucide-react';
 
 export const Route = createFileRoute('/')({
     component: RouteComponent,
+    errorComponent: RouteError,
     loader: ({ context }) => {
         return context.queryClient.query({
             ...todosQueryOptions,
