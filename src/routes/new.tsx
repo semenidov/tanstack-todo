@@ -4,7 +4,7 @@ import { db } from '#/db';
 import { todos } from '#/db/schema';
 import { todosQueryOptions } from '#/lib/todos-query';
 import { useQueryClient } from '@tanstack/react-query';
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { createServerFn, useServerFn } from '@tanstack/react-start';
 import { ArrowLeftIcon, PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -18,6 +18,9 @@ const addTodoServer = createServerFn({ method: 'POST' })
 
 export const Route = createFileRoute('/new')({
     component: NewTodoPage,
+    beforeLoad: ({ context }) => {
+        if (!context.session) throw redirect({ to: '/login' });
+    },
 });
 
 function NewTodoPage() {

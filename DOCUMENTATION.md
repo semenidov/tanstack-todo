@@ -38,13 +38,22 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/lib/todos-query.ts` - серверные функции чтения (`getTodosServer`, `getTodoServer` → `null`) + `todosQueryOptions`, `todoQueryOptions(id)`.
 - `src/lib/todos.ts` - чистые функции: `countCompleted`, `toggleInList`, `removeFromList` (покрыты юнит-тестами).
 - `src/lib/utils.ts` - `cn` (но в компонентах фактически импортится `cn` из npm-пакета `cn`).
-- `src/db/schema.ts` - таблица `todos`.
+- `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет/URL из env).
+- `src/lib/auth-client.ts` - клиентский `createAuthClient` (`signIn/signUp/signOut`).
+- `src/lib/auth-server.ts` - `getSession` (server fn, `auth.api.getSession`).
+- `src/components/auth-form.tsx` - презентационная форма email+password (login/signup).
+- `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
+- `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
+- `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification`), сгенерены CLI; ре-экспортятся из `schema.ts`.
+- `src/db/schema.ts` - таблица `todos` + `export * from './auth-schema'`.
 - `src/db/index.ts` - drizzle-клиент (node-postgres, `DATABASE_URL`).
 - `src/test/setup.ts` - vitest + jest-dom + cleanup.
 
 ## Модель данных
 
 `todos`: `id` (uuid, pk, defaultRandom), `name` (text), `isComplete` (bool), `createdAt`, `updatedAt` (timestamptz).
+
+Auth (Better Auth): `user` (идентичность), `account` (учётки/провайдеры, 1:N; хеш пароля в `account.password`), `session` (серверные сессии), `verification` (одноразовые токены). Пока не связаны с `todos`.
 
 ## Роуты
 
@@ -62,6 +71,15 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - **Ошибки чтения:** `errorComponent` на дата-роутах → `RouteError` (Retry). Настоящие сбои идут сюда; notFound - отдельный канал роутера.
 - **Тосты:** sonner, `<Toaster richColors position="bottom-right" />` в root. success / error / warning (удаление - жёлтый + иконка корзины).
 - **Стили:** `cn` из пакета `cn`. Prettier: `semi`, `singleQuote`, `tabWidth: 4`, `trailingComma: all`. Тексты интерфейса - на английском.
+
+## Auth (Better Auth)
+
+- Метод: email + password. Сессии серверные, кука `better-auth.session_token` (HttpOnly, SameSite=Lax, `Secure` под HTTPS). `requireEmailVerification: false` (dev). CSRF/хеши - из коробки.
+- Схема таблиц генерится `npx @better-auth/cli generate --output src/db/auth-schema.ts`, применяется `npm run db:push`.
+- Эндпоинты под `/api/auth/*` (напр. `POST /api/auth/sign-up/email`, `GET /api/auth/ok`).
+- Сессию на сервере читать `auth.api.getSession({ headers })` (обёрнуто в `getSession`).
+- **Гварды:** root `beforeLoad` кладёт `session` в контекст роутера; защищённые роуты (`/`, `/new`, `/edit/$todoId`) в `beforeLoad` редиректят на `/login` если нет сессии; `/login` `/signup` редиректят на `/` если сессия есть. Sign out - в `TodoHeader` (`signOut` + `router.invalidate` + navigate). Гвард - это UX; настоящая проверка владельца будет в server fns (этап 4).
+- **Ещё не сделано (этап 4):** `todos.userId` + скоупинг всех server fns по владельцу (чтение/мутации фильтруют по текущему юзеру, проверка владельца). Сейчас список задач общий.
 
 ## Тесты
 

@@ -10,11 +10,16 @@ import { TanStackDevtools } from '@tanstack/react-devtools';
 import { MessageScreen } from '#/components/message-screen';
 import { Button } from '#/components/ui/button';
 import { Toaster } from '#/components/ui/sonner';
+import { getSession } from '#/lib/auth-server';
 import { ArrowLeftIcon, MapPinOffIcon } from 'lucide-react';
 
 import appCss from '../styles.css?url';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+    beforeLoad: async () => {
+        const session = await getSession();
+        return { session };
+    },
     head: () => ({
         meta: [
             {

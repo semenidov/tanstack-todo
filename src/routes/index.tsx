@@ -12,13 +12,16 @@ import {
 import { RouteError } from '#/components/route-error';
 import { countCompleted } from '#/lib/todos';
 import { todosQueryOptions } from '#/lib/todos-query';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { Link, createFileRoute, redirect } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { ListTodo, PlusIcon } from 'lucide-react';
 
 export const Route = createFileRoute('/')({
     component: RouteComponent,
     errorComponent: RouteError,
+    beforeLoad: ({ context }) => {
+        if (!context.session) throw redirect({ to: '/login' });
+    },
     loader: ({ context }) => {
         return context.queryClient.query({
             ...todosQueryOptions,

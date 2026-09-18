@@ -6,7 +6,12 @@ import { db } from '#/db';
 import { todos } from '#/db/schema';
 import { todoQueryOptions, todosQueryOptions } from '#/lib/todos-query';
 import { useQueryClient } from '@tanstack/react-query';
-import { createFileRoute, Link, notFound } from '@tanstack/react-router';
+import {
+    createFileRoute,
+    Link,
+    notFound,
+    redirect,
+} from '@tanstack/react-router';
 import { createServerFn, useServerFn } from '@tanstack/react-start';
 import { eq } from 'drizzle-orm';
 import { ArrowLeftIcon, CheckIcon, SearchXIcon } from 'lucide-react';
@@ -28,6 +33,9 @@ export const Route = createFileRoute('/edit/$todoId')({
     component: EditTodoPage,
     errorComponent: RouteError,
     notFoundComponent: TaskNotFound,
+    beforeLoad: ({ context }) => {
+        if (!context.session) throw redirect({ to: '/login' });
+    },
     loader: async ({ context, params }) => {
         if (!z.uuid().safeParse(params.todoId).success) {
             throw notFound();
