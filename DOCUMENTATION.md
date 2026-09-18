@@ -87,4 +87,12 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 
 ## Тесты
 
-Vitest + React Testing Library + jsdom. Сейчас - только юниты чистых функций в `src/lib/todos.test.ts` (`countCompleted`, `toggleInList`, `removeFromList`), 9 тестов. Компонентные тесты сознательно убраны как несостоятельные (слишком много моков из-за колокации server fns); осмысленный UI-охват - через E2E, если понадобится.
+Vitest + React Testing Library + jsdom. Слои по «трофею»:
+
+- **Unit** - чистые функции `src/lib/todos.test.ts` (`countCompleted`, `toggleInList`, `removeFromList`).
+- **Component** - `todo-list.test.tsx`, `todo-header.test.tsx`: рендер, `line-through`, edit-ссылка, клик-чек → вызов `toggleTodoServer`, delete → тост Undo + отложенный/отменённый коммит, бейдж, sign out. Границы мокаются: `vi.mock('#/server/todos')` (не тянет db/auth), `@tanstack/react-start` (`useServerFn`), `@tanstack/react-router` (`Link`/`useRouter`), `sonner`. БД не участвует.
+- **Component (формы)** - `todo-form.test.tsx`, `auth-form.test.tsx`: презентационные, моков нет. Валидация не с первого символа, ошибка по `onBlur`, `onSubmit(value)` при валидных данных, блокировка сабмита + ошибка при пустых. Ошибку ассертим по `role="alert"` / тексту (`FieldError`). Замечено: пустой сабмит `AuthForm` показывает только ошибку email (form-level onSubmit мапит на первое поле) - тест под фактическое поведение.
+- **Не покрыто (осознанно):** оркестрация submit в роутах (`new`/`edit`: invalidate+тост+navigate) - живёт внутри роут-компонента, тяжёлый шов; ляжет на вынос в функцию/хук либо на E2E.
+- **Ещё не сделано:** integration на скоуп/IDOR (реальная тест-БД + вынос `todos-repo.ts`), E2E (Playwright) на сквозные пути.
+
+Gotcha: vitest иногда падает с `Timeout waiting for worker to respond` (флап пула на старте) - это не падение тестов, повторный прогон проходит.

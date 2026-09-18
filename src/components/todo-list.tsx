@@ -1,4 +1,13 @@
+import { Button } from '#/components/ui/button';
 import { Checkbox } from '#/components/ui/checkbox';
+import {
+    Empty,
+    EmptyContent,
+    EmptyDescription,
+    EmptyHeader,
+    EmptyMedia,
+    EmptyTitle,
+} from '#/components/ui/empty';
 import { todosQueryOptions } from '#/lib/todos-query';
 import { removeFromList, toggleInList } from '#/lib/todos';
 import { deleteTodoServer, toggleTodoServer } from '#/server/todos';
@@ -7,7 +16,7 @@ import { cn } from 'cn';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
-import { Trash2 } from 'lucide-react';
+import { ListTodo, PlusIcon, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export type { Todo };
@@ -144,6 +153,30 @@ function TodoItem({ todo }: { todo: Todo }) {
 }
 
 export function TodoList({ todoList }: { todoList: Array<Todo> }) {
+    if (todoList.length === 0) {
+        return (
+            <Empty className="border bg-card">
+                <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                        <ListTodo />
+                    </EmptyMedia>
+                    <EmptyTitle>List is empty</EmptyTitle>
+                    <EmptyDescription>
+                        No tasks yet. Add your first one to get started.
+                    </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                    <Button asChild>
+                        <Link to="/new">
+                            <PlusIcon />
+                            Add task
+                        </Link>
+                    </Button>
+                </EmptyContent>
+            </Empty>
+        );
+    }
+
     return (
         <ul className="space-y-2">
             {todoList.map((todo) => (
