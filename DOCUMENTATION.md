@@ -17,7 +17,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 ## Команды
 
 - `npm run dev` - vite dev на :3000
-- `npm test` / `npm run test:watch` - vitest
+- `npm test` - все проекты; `test:unit` / `test:integration` - по отдельности; `test:watch`
+- `npm run db:push:test` - накатить схему на тест-базу (`.env.test` → `todo-test`; dev - `todo`)
 - `npm run build`, `npm run generate-routes` (tsr)
 - `npm run db:generate|push|pull|studio` (drizzle-kit)
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
@@ -35,7 +36,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
 - `src/components/ui/*` - shadcn (генерятся CLI; после `add` прогонять `npm run format`).
-- `src/server/todos.ts` - ВСЕ серверные функции над todos (`get/getOne/add/toggle/delete/update`) + тип `Todo` (`typeof todos.$inferSelect`). Каждая: `requireUserId` + скоуп по владельцу; мутации ещё и `checkRateLimit`.
+- `src/server/todos.ts` - server fns над todos (`get/getOne/add/toggle/delete/update`) + тип `Todo`. Тонкие обёртки: `requireUserId` (+ `checkRateLimit` на мутациях) → вызов `todos-repo`.
+- `src/server/todos-repo.ts` - чистый data-слой: функции с явным `userId` (`listTodos/getTodo/addTodo/toggleTodo/deleteTodo/updateTodo`), скоуп по владельцу в SQL. Тестируемый шов для integration; мутации возвращают `.returning()`.
 - `src/server/rate-limit.ts` - in-memory sliding-window лимитер (`checkRateLimit`); ограничение: память процесса, для многоинстанса нужен Redis.
 - `src/lib/todos-query.ts` - только `todosQueryOptions`, `todoQueryOptions(id)` (импортируют read-fns из `#/server/todos`).
 - `src/lib/todos.ts` - чистые функции: `countCompleted`, `toggleInList`, `removeFromList` (покрыты юнит-тестами).
@@ -48,7 +50,10 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification`), сгенерены CLI; ре-экспортятся из `schema.ts`.
 - `src/db/schema.ts` - таблица `todos` + `export * from './auth-schema'`.
 - `src/db/index.ts` - drizzle-клиент (node-postgres, `DATABASE_URL`).
-- `src/test/setup.ts` - vitest + jest-dom + cleanup.
+- `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
+- `src/test/setup.integration.ts` - integration setup: грузит `.env.test`, `truncate` в `beforeEach`, закрывает пул в `afterAll`.
+- `src/test/load-test-env.ts` - `dotenv` `.env.test` (импортится первым, до `#/db`).
+- `src/test/db.ts` - сид-хелперы `seedUser`/`seedTodo` (прямой insert).
 
 ## Модель данных
 
@@ -92,7 +97,9 @@ Vitest + React Testing Library + jsdom. Слои по «трофею»:
 - **Unit** - чистые функции `src/lib/todos.test.ts` (`countCompleted`, `toggleInList`, `removeFromList`).
 - **Component** - `todo-list.test.tsx`, `todo-header.test.tsx`: рендер, `line-through`, edit-ссылка, клик-чек → вызов `toggleTodoServer`, delete → тост Undo + отложенный/отменённый коммит, бейдж, sign out. Границы мокаются: `vi.mock('#/server/todos')` (не тянет db/auth), `@tanstack/react-start` (`useServerFn`), `@tanstack/react-router` (`Link`/`useRouter`), `sonner`. БД не участвует.
 - **Component (формы)** - `todo-form.test.tsx`, `auth-form.test.tsx`: презентационные, моков нет. Валидация не с первого символа, ошибка по `onBlur`, `onSubmit(value)` при валидных данных, блокировка сабмита + ошибка при пустых. Ошибку ассертим по `role="alert"` / тексту (`FieldError`). Замечено: пустой сабмит `AuthForm` показывает только ошибку email (form-level onSubmit мапит на первое поле) - тест под фактическое поведение.
+- **Integration** - `src/server/todos-repo.integration.test.ts` (проект `integration`, node + реальная тест-БД): скоуп/IDOR на настоящем SQL - `listTodos` отдаёт только свои; `getTodo`/`toggle`/`delete`/`update` для чужого id = `null`/no-op (0 строк, запись владельца цела); `addTodo` пишет `userId`; свои операции работают. Edge: пустой список, сортировка по `createdAt asc`, `null`/no-op на несуществующий id. Требует базу `todo-test` + `.env.test` + `npm run db:push:test`.
+- **Не покрыто на этом уровне (→ E2E):** валидация и auth-гейты обёрток `todos.ts` (zod-отказ на пустое/`>500`/не-uuid, `requireUserId`, `checkRateLimit`) - живут в `createServerFn`, в vitest напрямую не дёрнуть; проверяются в Playwright через реальный HTTP+сессию.
 - **Не покрыто (осознанно):** оркестрация submit в роутах (`new`/`edit`: invalidate+тост+navigate) - живёт внутри роут-компонента, тяжёлый шов; ляжет на вынос в функцию/хук либо на E2E.
-- **Ещё не сделано:** integration на скоуп/IDOR (реальная тест-БД + вынос `todos-repo.ts`), E2E (Playwright) на сквозные пути.
+- **Ещё не сделано:** E2E (Playwright) на сквозные пути.
 
 Gotcha: vitest иногда падает с `Timeout waiting for worker to respond` (флап пула на старте) - это не падение тестов, повторный прогон проходит.

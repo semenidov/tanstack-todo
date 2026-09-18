@@ -57,3 +57,11 @@ Todos - это серверные данные; Query даёт кэш, опти�
 ## 14. 2026-09-18 · Стратегия тестов - «трофей»
 
 Много unit+component (jsdom, мок `#/server/todos`, без БД) → немного integration на скоуп/IDOR (реальная тест-БД, мок не проверит корректность SQL) → мало E2E (Playwright). Тест-БД - отдельная локальная база (не Testcontainers) ради простоты; при нашем объёме прогон ~10-15с.
+
+## 15. 2026-09-18 · Data-слой вынесен в `src/server/todos-repo.ts`
+
+Чистые функции с явным `userId` (`list/get/add/toggle/delete/update`); server fns в `todos.ts` стали тонкими (`requireUserId` + `checkRateLimit` + вызов repo). Причина - тестируемый шов: сами server fns в vitest не дёрнуть (тянут `createServerFn`/auth/headers). Отвергнут мок `db` (не проверит реальный SQL/`where`, а ради этого и делаем integration). Мутации repo возвращают `.returning()` - тесты ассертят no-op по длине 0.
+
+## 16. 2026-09-18 · Инфраструктура integration-тестов
+
+Vitest `projects`: `unit` (jsdom, мок server) и `integration` (node, реальная БД); интеграционные - файлы `*.integration.test.ts`. Отдельная база `todo-test` в том же docker-PG (dev - `todo`; не dev-база - иначе truncate затрёт рабочие данные; не второй контейнер - хватает второй БД в инстансе). Имя базы в коде не зашито - берётся из `DATABASE_URL` в `.env.test`. Env - `.env.test` через `dotenv` (грузится первым импортом до `#/db`). Изоляция - `truncate ... cascade` в `beforeEach`; сиды - прямым `insert` (не через тестируемый `addTodo`). Схему на тест-базу катит `db:push:test` (`drizzle.config.test.ts`).

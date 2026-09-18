@@ -1,9 +1,8 @@
-import { db } from '#/db';
-import { todos } from '#/db/schema';
+import type { todos } from '#/db/schema';
 import { requireUserId } from '#/lib/auth-server';
 import { checkRateLimit } from '#/server/rate-limit';
+import * as repo from '#/server/todos-repo';
 import { createServerFn } from '@tanstack/react-start';
-import { and, eq } from 'drizzle-orm';
 import z from 'zod';
 
 export type Todo = typeof todos.$inferSelect;
@@ -11,10 +10,7 @@ export type Todo = typeof todos.$inferSelect;
 export const getTodosServer = createServerFn({ method: 'GET' }).handler(
     async () => {
         const userId = await requireUserId();
-        return db.query.todos.findMany({
-            where: (t) => eq(t.userId, userId),
-            orderBy: (t, { asc }) => asc(t.createdAt),
-        });
+        return repo.listTodos(userId);
     },
 );
 
@@ -22,10 +18,7 @@ export const getTodoServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())
     .handler(async ({ data: id }) => {
         const userId = await requireUserId();
-        const todo = await db.query.todos.findFirst({
-            where: (t) => and(eq(t.id, id), eq(t.userId, userId)),
-        });
-        return todo ?? null;
+        return repo.getTodo(userId, id);
     });
 
 export const addTodoServer = createServerFn({ method: 'POST' })
@@ -33,9 +26,7 @@ export const addTodoServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const userId = await requireUserId();
         checkRateLimit(userId);
-        await db
-            .insert(todos)
-            .values({ name: data, isComplete: false, userId });
+        await repo.addTodo(userId, data);
     });
 
 export const toggleTodoServer = createServerFn({ method: 'POST' })
@@ -43,10 +34,7 @@ export const toggleTodoServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const userId = await requireUserId();
         checkRateLimit(userId);
-        await db
-            .update(todos)
-            .set({ isComplete: data.isComplete })
-            .where(and(eq(todos.id, data.id), eq(todos.userId, userId)));
+        await repo.toggleTodo(userId, data.id, data.isComplete);
     });
 
 export const deleteTodoServer = createServerFn({ method: 'POST' })
@@ -54,9 +42,7 @@ export const deleteTodoServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const userId = await requireUserId();
         checkRateLimit(userId);
-        await db
-            .delete(todos)
-            .where(and(eq(todos.id, data.id), eq(todos.userId, userId)));
+        await repo.deleteTodo(userId, data.id);
     });
 
 export const updateTodoServer = createServerFn({ method: 'POST' })
@@ -66,8 +52,5 @@ export const updateTodoServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const userId = await requireUserId();
         checkRateLimit(userId);
-        await db
-            .update(todos)
-            .set({ name: data.name })
-            .where(and(eq(todos.id, data.id), eq(todos.userId, userId)));
+        await repo.updateTodo(userId, data.id, data.name);
     });
