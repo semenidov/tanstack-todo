@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import z from 'zod';
 
 const addTodoServer = createServerFn({ method: 'POST' })
-    .validator(z.string().min(1))
+    .validator(z.string().trim().min(1).max(500))
     .handler(async ({ data }) => {
         await db.insert(todos).values({ name: data, isComplete: false });
     });

@@ -6,7 +6,11 @@ import type { ReactNode } from 'react';
 import z from 'zod';
 
 const todoSchema = z.object({
-    name: z.string().min(1, 'write task name'),
+    name: z
+        .string()
+        .trim()
+        .min(1, 'write task name')
+        .max(500, 'Task name is too long (max 500 characters)'),
 });
 
 interface TodoFormProps {

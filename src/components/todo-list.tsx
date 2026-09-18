@@ -18,7 +18,7 @@ export type Todo = InferSelectModel<typeof todos>;
 const UNDO_WINDOW_MS = 5000;
 
 const toggleTodoServer = createServerFn({ method: 'POST' })
-    .validator(z.object({ id: z.string(), isComplete: z.boolean() }))
+    .validator(z.object({ id: z.uuid(), isComplete: z.boolean() }))
     .handler(async ({ data }) => {
         await db
             .update(todos)
@@ -62,7 +62,7 @@ function useToggleTodo() {
 }
 
 const deleteTodoServer = createServerFn({ method: 'POST' })
-    .validator(z.object({ id: z.string() }))
+    .validator(z.object({ id: z.uuid() }))
     .handler(async ({ data }) => {
         await db.delete(todos).where(eq(todos.id, data.id));
     });
