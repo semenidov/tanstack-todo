@@ -40,7 +40,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/lib/utils.ts` - `cn` (но в компонентах фактически импортится `cn` из npm-пакета `cn`).
 - `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет/URL из env).
 - `src/lib/auth-client.ts` - клиентский `createAuthClient` (`signIn/signUp/signOut`).
-- `src/lib/auth-server.ts` - `getSession` (server fn, `auth.api.getSession`).
+- `src/lib/auth-server.ts` - `getSession` и `requireUserId` (server fns над `auth.api.getSession`; `requireUserId` кидает при отсутствии сессии).
 - `src/components/auth-form.tsx` - презентационная форма email+password (login/signup).
 - `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
 - `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
@@ -53,7 +53,9 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 
 `todos`: `id` (uuid, pk, defaultRandom), `name` (text), `isComplete` (bool), `createdAt`, `updatedAt` (timestamptz).
 
-Auth (Better Auth): `user` (идентичность), `account` (учётки/провайдеры, 1:N; хеш пароля в `account.password`), `session` (серверные сессии), `verification` (одноразовые токены). Пока не связаны с `todos`.
+`todos.userId` (text, FK → `user.id`, notNull, cascade) - владелец задачи.
+
+Auth (Better Auth): `user` (идентичность), `account` (учётки/провайдеры, 1:N; хеш пароля в `account.password`), `session` (серверные сессии), `verification` (одноразовые токены).
 
 ## Роуты
 
@@ -79,7 +81,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 - Эндпоинты под `/api/auth/*` (напр. `POST /api/auth/sign-up/email`, `GET /api/auth/ok`).
 - Сессию на сервере читать `auth.api.getSession({ headers })` (обёрнуто в `getSession`).
 - **Гварды:** root `beforeLoad` кладёт `session` в контекст роутера; защищённые роуты (`/`, `/new`, `/edit/$todoId`) в `beforeLoad` редиректят на `/login` если нет сессии; `/login` `/signup` редиректят на `/` если сессия есть. Sign out - в `TodoHeader` (`signOut` + `router.invalidate` + navigate). Гвард - это UX; настоящая проверка владельца будет в server fns (этап 4).
-- **Ещё не сделано (этап 4):** `todos.userId` + скоупинг всех server fns по владельцу (чтение/мутации фильтруют по текущему юзеру, проверка владельца). Сейчас список задач общий.
+- **Скоупинг по владельцу:** все server fns над `todos` вызывают `requireUserId()` и фильтруют по нему - чтения `where eq(userId)`, мутации `where and(eq(id), eq(userId))` (чужой id = no-op, IDOR закрыт). `requireUserId` - это **серверная функция** (`createServerFn`), не обычная: обычная функция при импорте в клиентские модули тащит `better-auth` в клиентский бандл (ошибка `Buffer is not defined`); server fn оставляет на клиенте только fetch-стаб.
 
 ## Тесты
 

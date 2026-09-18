@@ -2,12 +2,13 @@ import { Checkbox } from '#/components/ui/checkbox';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
 import { todosQueryOptions } from '#/lib/todos-query';
+import { requireUserId } from '#/lib/auth-server';
 import { removeFromList, toggleInList } from '#/lib/todos';
 import { cn } from 'cn';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { createServerFn, useServerFn } from '@tanstack/react-start';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import z from 'zod';
@@ -20,10 +21,11 @@ const UNDO_WINDOW_MS = 5000;
 const toggleTodoServer = createServerFn({ method: 'POST' })
     .validator(z.object({ id: z.uuid(), isComplete: z.boolean() }))
     .handler(async ({ data }) => {
+        const userId = await requireUserId();
         await db
             .update(todos)
             .set({ isComplete: data.isComplete })
-            .where(eq(todos.id, data.id));
+            .where(and(eq(todos.id, data.id), eq(todos.userId, userId)));
     });
 
 type ToggleVars = { id: string; isComplete: boolean };
@@ -64,7 +66,10 @@ function useToggleTodo() {
 const deleteTodoServer = createServerFn({ method: 'POST' })
     .validator(z.object({ id: z.uuid() }))
     .handler(async ({ data }) => {
-        await db.delete(todos).where(eq(todos.id, data.id));
+        const userId = await requireUserId();
+        await db
+            .delete(todos)
+            .where(and(eq(todos.id, data.id), eq(todos.userId, userId)));
     });
 
 function useDeleteTodo() {

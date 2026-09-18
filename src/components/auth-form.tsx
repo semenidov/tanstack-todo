@@ -25,7 +25,7 @@ export function AuthForm({
 }: AuthFormProps) {
     const form = useForm({
         defaultValues: { email: '', password: '' },
-        validators: { onChange: authSchema },
+        validators: { onSubmit: authSchema },
         onSubmit: async ({ value }) => {
             await onSubmit(value);
         },
@@ -39,7 +39,10 @@ export function AuthForm({
             }}
             className="space-y-4"
         >
-            <form.Field name="email">
+            <form.Field
+                name="email"
+                validators={{ onBlur: authSchema.shape.email }}
+            >
                 {(field) => (
                     <Field data-invalid={field.state.meta.errors.length > 0}>
                         <FieldLabel htmlFor={field.name}>Email</FieldLabel>
@@ -59,7 +62,10 @@ export function AuthForm({
                 )}
             </form.Field>
 
-            <form.Field name="password">
+            <form.Field
+                name="password"
+                validators={{ onBlur: authSchema.shape.password }}
+            >
                 {(field) => (
                     <Field data-invalid={field.state.meta.errors.length > 0}>
                         <FieldLabel htmlFor={field.name}>Password</FieldLabel>

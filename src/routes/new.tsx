@@ -3,6 +3,7 @@ import { Button } from '#/components/ui/button';
 import { db } from '#/db';
 import { todos } from '#/db/schema';
 import { todosQueryOptions } from '#/lib/todos-query';
+import { requireUserId } from '#/lib/auth-server';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { createServerFn, useServerFn } from '@tanstack/react-start';
@@ -13,7 +14,8 @@ import z from 'zod';
 const addTodoServer = createServerFn({ method: 'POST' })
     .validator(z.string().trim().min(1).max(500))
     .handler(async ({ data }) => {
-        await db.insert(todos).values({ name: data, isComplete: false });
+        const userId = await requireUserId();
+        await db.insert(todos).values({ name: data, isComplete: false, userId });
     });
 
 export const Route = createFileRoute('/new')({

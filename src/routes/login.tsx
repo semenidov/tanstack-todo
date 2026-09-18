@@ -39,7 +39,11 @@ function LoginPage() {
                 />
                 <p className="text-center text-sm text-muted-foreground">
                     No account?{' '}
-                    <Link to="/signup" className="text-foreground underline">
+                    <Link
+                        to="/signup"
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="text-foreground underline"
+                    >
                         Sign up
                     </Link>
                 </p>

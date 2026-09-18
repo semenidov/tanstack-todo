@@ -42,7 +42,11 @@ function SignupPage() {
                 />
                 <p className="text-center text-sm text-muted-foreground">
                     Already have an account?{' '}
-                    <Link to="/login" className="text-foreground underline">
+                    <Link
+                        to="/login"
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="text-foreground underline"
+                    >
                         Sign in
                     </Link>
                 </p>
