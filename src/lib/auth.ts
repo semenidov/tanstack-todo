@@ -8,4 +8,12 @@ export const auth = betterAuth({
         enabled: true,
         requireEmailVerification: false,
     },
+    session: {
+        cookieCache: { enabled: true, maxAge: 5 * 60 },
+    },
+    rateLimit: {
+        enabled: true,
+        window: 60,
+        max: 100,
+    },
 });

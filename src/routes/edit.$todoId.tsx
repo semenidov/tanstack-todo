@@ -2,10 +2,8 @@ import { MessageScreen } from '#/components/message-screen';
 import { RouteError } from '#/components/route-error';
 import { TodoForm } from '#/components/todo-form';
 import { Button } from '#/components/ui/button';
-import { db } from '#/db';
-import { todos } from '#/db/schema';
 import { todoQueryOptions, todosQueryOptions } from '#/lib/todos-query';
-import { requireUserId } from '#/lib/auth-server';
+import { updateTodoServer } from '#/server/todos';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     createFileRoute,
@@ -13,23 +11,10 @@ import {
     notFound,
     redirect,
 } from '@tanstack/react-router';
-import { createServerFn, useServerFn } from '@tanstack/react-start';
-import { and, eq } from 'drizzle-orm';
+import { useServerFn } from '@tanstack/react-start';
 import { ArrowLeftIcon, CheckIcon, SearchXIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import z from 'zod';
-
-const updateTodoServer = createServerFn({ method: 'POST' })
-    .validator(
-        z.object({ id: z.uuid(), name: z.string().trim().min(1).max(500) }),
-    )
-    .handler(async ({ data }) => {
-        const userId = await requireUserId();
-        await db
-            .update(todos)
-            .set({ name: data.name })
-            .where(and(eq(todos.id, data.id), eq(todos.userId, userId)));
-    });
 
 export const Route = createFileRoute('/edit/$todoId')({
     component: EditTodoPage,

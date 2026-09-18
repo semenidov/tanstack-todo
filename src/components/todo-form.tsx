@@ -30,7 +30,7 @@ export function TodoForm({
 }: TodoFormProps) {
     const form = useForm({
         defaultValues: { name: defaultName },
-        validators: { onChange: todoSchema },
+        validators: { onSubmit: todoSchema },
         onSubmit: async ({ value }) => {
             await onSubmit(value.name);
         },
@@ -44,7 +44,10 @@ export function TodoForm({
             }}
             className="space-y-4"
         >
-            <form.Field name="name">
+            <form.Field
+                name="name"
+                validators={{ onBlur: todoSchema.shape.name }}
+            >
                 {(field) => (
                     <Field data-invalid={field.state.meta.errors.length > 0}>
                         <FieldLabel htmlFor={field.name}>Task name</FieldLabel>
