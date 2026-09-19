@@ -40,7 +40,7 @@ function NewTodoPage() {
                 <Button asChild variant="ghost" size="sm" className="-ml-2">
                     <Link to="/">
                         <ArrowLeftIcon />
-                        Back
+                        Back2
                     </Link>
                 </Button>
                 <h1 className="text-2xl font-semibold tracking-tight">
