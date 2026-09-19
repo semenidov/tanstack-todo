@@ -26,7 +26,7 @@ export function TodoHeader({ completedCount, totalCount }: TodoHeaderProps) {
                 </h1>
                 {totalCount > 0 && (
                     <Badge variant="secondary" className="tabular-nums">
-                        {completedCount} / {totalCount} don
+                        {completedCount} / {totalCount} done
                     </Badge>
                 )}
             </div>
