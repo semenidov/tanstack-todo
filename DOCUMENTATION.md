@@ -12,15 +12,15 @@
 
 ## Стек
 
-TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm.
+TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод-таргет: Vercel (serverless) + Neon (managed Postgres).
 
 ## Команды
 
-- `npm run dev` - vite dev на :3000
-- `npm test` - все проекты; `test:unit` / `test:integration` - по отдельности; `test:watch`
-- `npm run db:push:test` - накатить схему на тест-базу (`.env.test` → `todo-test`; dev - `todo`)
+- `npm run dev` - vite dev на :3000 (ходит в Neon по `.env`)
+- `npm test` - все проекты; `test:unit` (jsdom, офлайн) / `test:integration` (Neon-ветка `test`, по сети) - по отдельности; `test:watch`
+- `npm run db:push:test` - синхронизировать схему на тест-ветку (`.env.test`), если она отстала от main (обычно ветка наследует схему при создании)
 - `npm run build`, `npm run generate-routes` (tsr)
-- `npm run db:generate|push|pull|studio` (drizzle-kit)
+- Миграции: `db:generate` (сгенерить SQL-диф в `drizzle/`, коммитим) → `db:migrate` (накат на Neon; **direct**-строкой, не pooled). Прод - шагом в CI. `db:push` - только быстрая синхронизация схемы, без истории.
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
 - `npm run typecheck` - `tsc --noEmit`
 - Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
@@ -38,9 +38,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
 - `src/components/ui/*` - shadcn (генерятся CLI; после `add` прогонять `npm run format`).
-- `src/server/todos.ts` - server fns над todos (`get/getOne/add/toggle/delete/update`) + тип `Todo`. Тонкие обёртки: `requireUserId` (+ `checkRateLimit` на мутациях) → вызов `todos-repo`.
+- `src/server/todos.ts` - server fns над todos (`get/getOne/add/toggle/delete/update`) + тип `Todo`. Тонкие обёртки: `requireUserId` → вызов `todos-repo`.
 - `src/server/todos-repo.ts` - чистый data-слой: функции с явным `userId` (`listTodos/getTodo/addTodo/toggleTodo/deleteTodo/updateTodo`), скоуп по владельцу в SQL. Тестируемый шов для integration; мутации возвращают `.returning()`.
-- `src/server/rate-limit.ts` - in-memory sliding-window лимитер (`checkRateLimit`); ограничение: память процесса, для многоинстанса нужен Redis.
 - `src/lib/todos-query.ts` - только `todosQueryOptions`, `todoQueryOptions(id)` (импортируют read-fns из `#/server/todos`).
 - `src/lib/todos.ts` - чистые функции: `countCompleted`, `toggleInList`, `removeFromList` (покрыты юнит-тестами).
 - `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет/URL из env).
@@ -51,9 +50,9 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
 - `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification`), сгенерены CLI; ре-экспортятся из `schema.ts`.
 - `src/db/schema.ts` - таблица `todos` + `export * from './auth-schema'`.
-- `src/db/index.ts` - drizzle-клиент (node-postgres, `DATABASE_URL`).
+- `src/db/index.ts` - drizzle-клиент на `neon-http` (HTTP-драйвер Neon, работает и локально, и на Vercel). `DATABASE_URL` - pooled-строка Neon. Транзакций не используем.
 - `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
-- `src/test/setup.integration.ts` - integration setup: грузит `.env.test`, `truncate` в `beforeEach`, закрывает пул в `afterAll`.
+- `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (Neon-ветка `test`), `truncate` в `beforeEach`.
 - `src/test/load-test-env.ts` - `dotenv` `.env.test` (импортится первым, до `#/db`).
 - `src/test/db.ts` - сид-хелперы `seedUser`/`seedTodo` (прямой insert).
 
@@ -76,7 +75,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 - **Оптимистичные мутации:** `onMutate` = cancelQueries + snapshot + `setQueryData` (через чистую функцию из `lib`); `onError` = откат + `toast.error`; `onSettled` = invalidate. Дженерики `useMutation<void, Error, Vars, Ctx>` задаём явно (иначе ломается вывод типов).
 - **Удаление - стратегия A:** оптимистичное удаление + тост Undo (5с), реальный `DELETE` откладывается до `onAutoClose`/`onDismiss`, флаг `settled` защищает от двойного срабатывания. Ранний уход из окна = «воскрешение» (принято осознанно). Hard delete.
 - **Формы:** TanStack Form. Валидация: per-field `onBlur` (`schema.shape.<field>`) + form-level `onSubmit` (полная схема) - ошибка не зажигается с первого символа и не триггерит соседние поля. Так в `todo-form` и `auth-form`. Submit в `try/catch`: ошибка → `toast.error` без навигации; успех → `toast.success` + navigate. Валидаторы server fns - вторая линия. На ссылках-переходах внутри форм - `onMouseDown → preventDefault`, чтобы blur не срабатывал и клик не срывался.
-- **Rate limit:** мутации над todos зовут `checkRateLimit(userId)` (in-memory). Auth-роуты - встроенный лимитер Better Auth (`rateLimit` в конфиге).
+- **Rate limit:** только auth-роуты (встроенный лимитер Better Auth, `rateLimit` в конфиге). In-memory лимитер на мутациях todos убран (бесполезен на serverless/многоинстансе); при нужде - Upstash Redis.
 - **Гигиена ввода:** id во всех server fns - `z.uuid()` (отсекает мусор до БД); `name` - `.trim().min(1).max(500)` (сервер + клиентская схема формы).
 - **notFound:** `getTodoServer` возвращает `null` (Query запрещает `undefined`); лоадер edit валидирует `z.uuid()` и бросает `notFound()` для кривого/несуществующего id; `TaskNotFound` как `notFoundComponent` роута.
 - **Ошибки чтения:** `errorComponent` на дата-роутах → `RouteError` (Retry). Настоящие сбои идут сюда; notFound - отдельный канал роутера.
@@ -99,8 +98,8 @@ Vitest + React Testing Library + jsdom. Слои по «трофею»:
 - **Unit** - чистые функции `src/lib/todos.test.ts` (`countCompleted`, `toggleInList`, `removeFromList`).
 - **Component** - `todo-list.test.tsx`, `todo-header.test.tsx`: рендер, `line-through`, edit-ссылка, клик-чек → вызов `toggleTodoServer`, delete → тост Undo + отложенный/отменённый коммит, бейдж, sign out. Границы мокаются: `vi.mock('#/server/todos')` (не тянет db/auth), `@tanstack/react-start` (`useServerFn`), `@tanstack/react-router` (`Link`/`useRouter`), `sonner`. БД не участвует.
 - **Component (формы)** - `todo-form.test.tsx`, `auth-form.test.tsx`: презентационные, моков нет. Валидация не с первого символа, ошибка по `onBlur`, `onSubmit(value)` при валидных данных, блокировка сабмита + ошибка при пустых. Ошибку ассертим по `role="alert"` / тексту (`FieldError`). Замечено: пустой сабмит `AuthForm` показывает только ошибку email (form-level onSubmit мапит на первое поле) - тест под фактическое поведение.
-- **Integration** - `src/server/todos-repo.integration.test.ts` (проект `integration`, node + реальная тест-БД): скоуп/IDOR на настоящем SQL - `listTodos` отдаёт только свои; `getTodo`/`toggle`/`delete`/`update` для чужого id = `null`/no-op (0 строк, запись владельца цела); `addTodo` пишет `userId`; свои операции работают. Edge: пустой список, сортировка по `createdAt asc`, `null`/no-op на несуществующий id. Требует базу `todo-test` + `.env.test` + `npm run db:push:test`.
-- **Не покрыто на этом уровне (→ E2E):** валидация и auth-гейты обёрток `todos.ts` (zod-отказ на пустое/`>500`/не-uuid, `requireUserId`, `checkRateLimit`) - живут в `createServerFn`, в vitest напрямую не дёрнуть; проверяются в Playwright через реальный HTTP+сессию.
+- **Integration** - `src/server/todos-repo.integration.test.ts` (проект `integration`, node + **Neon-ветка `test`**): скоуп/IDOR на настоящем SQL - `listTodos` отдаёт только свои; `getTodo`/`toggle`/`delete`/`update` для чужого id = `null`/no-op (0 строк, запись владельца цела); `addTodo` пишет `userId`; свои операции работают. Edge: пустой список, сортировка по `createdAt asc`, `null`/no-op на несуществующий id. Требует `.env.test` на ветку `test` (не main - `truncate` в `beforeEach` сотрёт!) + маркер `TEST_DB=1` (предохранитель: без него сетап бросает и тесты не идут). По сети → медленнее (~26с) и возможны транзиентные `ECONNRESET` → `retry: 2` + таймауты 30с.
+- **Не покрыто на этом уровне (→ E2E):** валидация и auth-гейты обёрток `todos.ts` (zod-отказ на пустое/`>500`/не-uuid, `requireUserId`) - живут в `createServerFn`, в vitest напрямую не дёрнуть; проверяются в Playwright через реальный HTTP+сессию.
 - **Не покрыто (осознанно):** оркестрация submit в роутах (`new`/`edit`: invalidate+тост+navigate) - живёт внутри роут-компонента, тяжёлый шов; ляжет на вынос в функцию/хук либо на E2E.
 - **Ещё не сделано:** E2E (Playwright) на сквозные пути.
 

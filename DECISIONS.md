@@ -69,3 +69,31 @@ Vitest `projects`: `unit` (jsdom, мок server) и `integration` (node, реа�
 ## 17. 2026-09-19 · Local git hooks (husky + lint-staged)
 
 `pre-commit` - lint-staged (prettier+eslint по staged, быстро); `pre-push` - `typecheck` + `test:unit`. Integration в pre-push не берём: требует поднятый Postgres, падал бы не по вине кода - тяжёлое с БД уходит в CI. Хуки - удобство (обходимы `--no-verify`, локальны), настоящая гарантия будет на рубеже CI.
+
+## 18. 2026-09-19 · Прод-таргет - Vercel + Neon (serverless), не Railway/Render
+
+Для портфолио: бесплатно (Vercel Hobby + Neon free) и отзывчиво, +serverless в резюме. Railway отвергнут (нет free-tier, ~$5/мес), Render free - засыпает при простое (холодный старт 30-60с) и временная БД. Цена выбора Vercel - один архитектурный шаг: serverless-совместимый доступ к БД.
+
+## 19. 2026-09-19 · Драйвер БД по окружению (node-postgres / neon-http)
+
+`src/db/index.ts` выбирает драйвер по `process.env.VERCEL`: локально/CI - `node-postgres` (персистентный TCP-пул, быстрые локальные тесты), на Vercel - `neon-http` (запрос по HTTP, без TCP-сокета - иначе эфемерные serverless-инстансы взрывают число коннектов к Postgres). Тип приведён к `NodePgDatabase` (`as unknown as`) - общий query-API совпадает, транзакций не используем (у neon-http их нет). Альтернатива - pooled-URL Neon + node-postgres везде (тогда нужен pgbouncer-эндпоинт); выбран http-драйвер как минимальный.
+
+## 20. 2026-09-19 · In-memory rate-limit убран
+
+`checkRateLimit`/`rate-limit.ts` удалены: на serverless состояние в памяти процесса бессмысленно (эфемерные инстансы, scale-to-zero). Auth-роуты закрыты встроенным лимитером Better Auth. Общий лимит на мутации - позже через Upstash Redis (serverless-native), если появится нужда. Отменяет часть решения №12.
+
+## 21. 2026-09-19 · Прод-миграции через generate+migrate, dev/test - push
+
+Для прод-базы (Neon) - версионированные SQL-миграции: `drizzle-kit generate` (диф схемы в `drizzle/`, коммитим) + `drizzle-kit migrate` (накат, шагом в CI с `DATABASE_URL` на Neon). `push` для прода отвергнут - он сравнивает схему с живой БД и может дропнуть/переписать без истории и ревью. Локальный dev и тест-база остаются на `push`/`db:push:test` ради скорости (истории не ведут). Gotcha: БД, собранная через `push`, не имеет таблицы истории миграций - `migrate` по ней падает; миграции только для чистой БД (Neon).
+
+## 22. 2026-09-19 · Драйвер БД - neon-http всегда (отменяет №19)
+
+Убран условный выбор драйвера: теперь `src/db/index.ts` всегда `neon-http`. Причина - хотим Neon и локально (без docker-Postgres); HTTP-драйвер ходит и с localhost. node-postgres-путь и связанный каст `$client` убраны. Транзакций не используем - ограничение neon-http некритично.
+
+## 23. 2026-09-19 · Тест-изоляция через Neon-ветку `test` (отменяет часть №16)
+
+Локальная тест-база в docker убрана. Тесты идут на **Neon-ветку `test`** (copy-on-write копия main, отдельная строка в `.env.test`). `truncate` в `beforeEach` чистит ветку, main/прод не трогается - `.env.test` обязан смотреть на ветку `test`, иначе сотрёт прод. Следствия сети: прогон медленнее (~26с против ~5с локально) и возможны транзиентные `ECONNRESET`/`fetch failed` при пробуждении compute Neon → `retry: 2` + `hookTimeout/testTimeout: 30000` в integration-проекте. Локальный docker-Postgres для проекта больше не нужен.
+
+## 24. 2026-09-19 · Connection strings: app - pooled, миграции - direct
+
+`DATABASE_URL` приложения (прод, дев, `.env.test`) - **pooled** строка Neon (безопасный дефолт; с neon-http не мешает, страхует на будущее). `drizzle-kit migrate`/`push` - **direct** (unpooled): миграции спотыкаются о transaction-режим PgBouncer.

@@ -1,6 +1,5 @@
 import type { todos } from '#/db/schema';
 import { requireUserId } from '#/lib/auth-server';
-import { checkRateLimit } from '#/server/rate-limit';
 import * as repo from '#/server/todos-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
@@ -25,7 +24,6 @@ export const addTodoServer = createServerFn({ method: 'POST' })
     .validator(z.string().trim().min(1).max(500))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        checkRateLimit(userId);
         await repo.addTodo(userId, data);
     });
 
@@ -33,7 +31,6 @@ export const toggleTodoServer = createServerFn({ method: 'POST' })
     .validator(z.object({ id: z.uuid(), isComplete: z.boolean() }))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        checkRateLimit(userId);
         await repo.toggleTodo(userId, data.id, data.isComplete);
     });
 
@@ -41,7 +38,6 @@ export const deleteTodoServer = createServerFn({ method: 'POST' })
     .validator(z.object({ id: z.uuid() }))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        checkRateLimit(userId);
         await repo.deleteTodo(userId, data.id);
     });
 
@@ -51,6 +47,5 @@ export const updateTodoServer = createServerFn({ method: 'POST' })
     )
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        checkRateLimit(userId);
         await repo.updateTodo(userId, data.id, data.name);
     });
