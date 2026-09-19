@@ -97,3 +97,11 @@ Vitest `projects`: `unit` (jsdom, мок server) и `integration` (node, реа�
 ## 24. 2026-09-19 · Connection strings: app - pooled, миграции - direct
 
 `DATABASE_URL` приложения (прод, дев, `.env.test`) - **pooled** строка Neon (безопасный дефолт; с neon-http не мешает, страхует на будущее). `drizzle-kit migrate`/`push` - **direct** (unpooled): миграции спотыкаются о transaction-режим PgBouncer.
+
+## 25. 2026-09-19 · CI на GitHub Actions (три джобы)
+
+`.github/workflows/ci.yml`, триггеры `pull_request` + push в `master`, `concurrency` с отменой старого прогона. Три параллельные джобы = три status-check: `quality` (lint+typecheck), `unit` (`test:unit`), `integration` (`test:integration`). Node 24 (как локально), кэш npm. Integration ходит в **Neon-ветку `test`** через секрет `NEON_TEST_DATABASE_URL` + `TEST_DB=1` (postgres-контейнер в CI не нужен - мы на Neon). Caveat: параллельные прогоны на разных ref делят одну ветку `test` (truncate может пересечься); для соло-режима ок, на будущее - Neon branch-per-run. eslint игнорит билд-выхлоп (`.output`/`.nitro`/`.vercel`/`dist`), иначе линтит собранные js.
+
+## 26. 2026-09-19 · CI integration - эфемерная Neon-ветка на прогон (уточняет №25)
+
+Джоба `integration` создаёт ветку `ci-<run_id>` через `neondatabase/create-branch-action` (наследует схему от main, copy-on-write), гоняет тесты по её pooled-URL (+`TEST_DB=1`), удаляет ветку `delete-branch-action` с `if: always()`. Решает коллизию статичного `test`-бранча (CI и локаль больше не делят одну базу). Секреты: `NEON_API_KEY` + `NEON_PROJECT_ID` (вместо `NEON_TEST_DATABASE_URL`). Вариант с одноразовым Postgres-контейнером отвергнут: `neon-http` (решение №22) не ходит в обычный Postgres, пришлось бы возвращать второй драйвер. Минус - зависимость от Neon API и лимит веток free-tier (поэтому удаление обязательно `always()`). Локальные тесты остаются на статичном `test`-бранче.

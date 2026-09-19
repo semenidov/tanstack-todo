@@ -12,7 +12,7 @@
 
 ## Стек
 
-TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод-таргет: Vercel (serverless) + Neon (managed Postgres).
+TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод: Vercel (serverless) + Neon (managed Postgres) - https://todo-semenidov.vercel.app.
 
 ## Команды
 
@@ -24,6 +24,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
 - `npm run typecheck` - `tsc --noEmit`
 - Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
+- CI (`.github/workflows/ci.yml`): на PR и push в `master`, 3 джобы - `quality` (lint+typecheck), `unit`, `integration`. Integration создаёт **эфемерную Neon-ветку** `ci-<run_id>` (create/delete-branch-action, наследует схему от main, удаляется `if: always()`) и гоняет тесты по ней. Секреты: `NEON_API_KEY` + `NEON_PROJECT_ID`. Vercel деплоит из гита сам (отдельно от CI).
 
 ## Структура (файл → ответственность)
 
