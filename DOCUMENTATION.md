@@ -22,6 +22,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `npm run build`, `npm run generate-routes` (tsr)
 - `npm run db:generate|push|pull|studio` (drizzle-kit)
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
+- `npm run typecheck` - `tsc --noEmit`
+- Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
 
 ## Структура (файл → ответственность)
 

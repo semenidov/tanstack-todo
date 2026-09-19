@@ -65,3 +65,7 @@ Todos - это серверные данные; Query даёт кэш, опти�
 ## 16. 2026-09-18 · Инфраструктура integration-тестов
 
 Vitest `projects`: `unit` (jsdom, мок server) и `integration` (node, реальная БД); интеграционные - файлы `*.integration.test.ts`. Отдельная база `todo-test` в том же docker-PG (dev - `todo`; не dev-база - иначе truncate затрёт рабочие данные; не второй контейнер - хватает второй БД в инстансе). Имя базы в коде не зашито - берётся из `DATABASE_URL` в `.env.test`. Env - `.env.test` через `dotenv` (грузится первым импортом до `#/db`). Изоляция - `truncate ... cascade` в `beforeEach`; сиды - прямым `insert` (не через тестируемый `addTodo`). Схему на тест-базу катит `db:push:test` (`drizzle.config.test.ts`).
+
+## 17. 2026-09-19 · Local git hooks (husky + lint-staged)
+
+`pre-commit` - lint-staged (prettier+eslint по staged, быстро); `pre-push` - `typecheck` + `test:unit`. Integration в pre-push не берём: требует поднятый Postgres, падал бы не по вине кода - тяжёлое с БД уходит в CI. Хуки - удобство (обходимы `--no-verify`, локальны), настоящая гарантия будет на рубеже CI.
