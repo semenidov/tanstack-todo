@@ -53,7 +53,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
       - name: Integration tests
         env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url_pooled }}
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
           TEST_DB: '1'
         run: npm run test:integration
       - name: Delete ephemeral Neon branch
