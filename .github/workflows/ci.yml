@@ -63,3 +63,24 @@ jobs:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           branch: ci-${{ github.run_id }}
           api_key: ${{ secrets.NEON_API_KEY }}
+
+  migrate:
+    if: github.ref == 'refs/heads/master'
+    needs: [quality, unit, integration]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.NEON_MAIN_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Ensure migration DB url is set
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::NEON_MAIN_DATABASE_URL secret is missing or empty"
+            exit 1
+          fi
+      - run: npm run db:migrate

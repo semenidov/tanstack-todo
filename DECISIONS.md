@@ -105,3 +105,7 @@ Vitest `projects`: `unit` (jsdom, мок server) и `integration` (node, реа�
 ## 26. 2026-09-19 · CI integration - эфемерная Neon-ветка на прогон (уточняет №25)
 
 Джоба `integration` создаёт ветку `ci-<run_id>` через `neondatabase/create-branch-action` (наследует схему от main, copy-on-write), гоняет тесты по её pooled-URL (+`TEST_DB=1`), удаляет ветку `delete-branch-action` с `if: always()`. Решает коллизию статичного `test`-бранча (CI и локаль больше не делят одну базу). Секреты: `NEON_API_KEY` + `NEON_PROJECT_ID` (вместо `NEON_TEST_DATABASE_URL`). Вариант с одноразовым Postgres-контейнером отвергнут: `neon-http` (решение №22) не ходит в обычный Postgres, пришлось бы возвращать второй драйвер. Минус - зависимость от Neon API и лимит веток free-tier (поэтому удаление обязательно `always()`). Локальные тесты остаются на статичном `test`-бранче.
+
+## 27. 2026-09-19 · Авто-миграции на прод в CI
+
+Джоба `migrate`: только на push в `master`, `needs: [quality, unit, integration]` (не катим на красных), `drizzle-kit migrate` на Neon main через секрет `NEON_MAIN_DATABASE_URL` (**direct**, не pooled - решение №24). Идемпотентна: нет новых миграций - no-op. Закрывает разрыв «код на Vercel уехал, схема осталась старой». Нюанс: Vercel деплоит по git-событию параллельно с этой джобой (не координируем таймингом) - безопасно при обратно-совместимых (expand/contract) миграциях; разрушительные разбиваем на два релиза. Альтернатива (деплой внутри Actions с `needs: migrate`) отвергнута как лишняя работа для нашего масштаба.

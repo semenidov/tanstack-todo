@@ -24,7 +24,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
 - `npm run typecheck` - `tsc --noEmit`
 - Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
-- CI (`.github/workflows/ci.yml`): на PR и push в `master`, 3 джобы - `quality` (lint+typecheck), `unit`, `integration`. Integration создаёт **эфемерную Neon-ветку** `ci-<run_id>` (create/delete-branch-action, наследует схему от main, удаляется `if: always()`) и гоняет тесты по ней. Секреты: `NEON_API_KEY` + `NEON_PROJECT_ID`. Vercel деплоит из гита сам (отдельно от CI).
+- CI (`.github/workflows/ci.yml`): на PR и push в `master`. `quality` (lint+typecheck), `unit`, `integration` (эфемерная Neon-ветка `ci-<run_id>`: create/delete-branch-action, схема от main, удаление `if: always()`). `migrate` - только на push в `master`, `needs` все чеки, катит `db:migrate` на Neon main (direct-строка). Секреты: `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_MAIN_DATABASE_URL` (direct). Vercel деплоит из гита сам, параллельно (отдельно от CI).
 
 ## Структура (файл → ответственность)
 
