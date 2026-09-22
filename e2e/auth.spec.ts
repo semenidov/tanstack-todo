@@ -1,10 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { resetDb } from './helpers/db';
 import { login, signup, uniqueEmail } from './helpers/auth';
-
-test.beforeEach(async () => {
-    await resetDb();
-});
 
 test('redirects an unauthenticated visitor to login', async ({ page }) => {
     await page.goto('/');

@@ -1,10 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { resetDb } from './helpers/db';
 import { gotoHydrated, signup, uniqueEmail } from './helpers/auth';
-
-test.beforeEach(async () => {
-    await resetDb();
-});
 
 test('a user cannot see another user tasks', async ({ browser }) => {
     const ctxA = await browser.newContext();

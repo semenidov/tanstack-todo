@@ -19,8 +19,19 @@ export default defineConfig({
         trace: 'retain-on-failure',
     },
     projects: [
+        { name: 'setup', testMatch: /auth\.setup\.ts/ },
         {
-            name: 'chromium',
+            name: 'crud',
+            testMatch: /todos\.spec\.ts/,
+            dependencies: ['setup'],
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: 'e2e/.auth/user.json',
+            },
+        },
+        {
+            name: 'auth-flows',
+            testMatch: /(auth|isolation)\.spec\.ts/,
             use: { ...devices['Desktop Chrome'] },
         },
     ],

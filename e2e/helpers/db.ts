@@ -14,3 +14,7 @@ export async function resetDb() {
         sql`truncate table "todos", "user" restart identity cascade`,
     );
 }
+
+export async function resetTodos() {
+    await db.execute(sql`truncate table "todos" restart identity cascade`);
+}
