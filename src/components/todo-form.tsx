@@ -38,6 +38,7 @@ export function TodoForm({
 
     return (
         <form
+            method="post"
             onSubmit={(e) => {
                 e.preventDefault();
                 form.handleSubmit();
