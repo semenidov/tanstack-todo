@@ -5,6 +5,11 @@ dist-ssr
 *.local
 .env
 .env.test
+.env.e2e
+playwright-report
+test-results
+/playwright/.cache
+e2e/.auth
 .nitro
 .tanstack
 .wrangler

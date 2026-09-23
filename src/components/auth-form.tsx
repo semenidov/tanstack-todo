@@ -33,6 +33,7 @@ export function AuthForm({
 
     return (
         <form
+            method="post"
             onSubmit={(e) => {
                 e.preventDefault();
                 form.handleSubmit();

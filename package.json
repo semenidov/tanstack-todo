@@ -11,6 +11,8 @@
         "test:watch": "vitest",
         "test:unit": "vitest run --project unit",
         "test:integration": "vitest run --project integration",
+        "test:e2e": "playwright test",
+        "test:e2e:ui": "playwright test --ui",
         "generate-routes": "tsr generate",
         "build": "vite build",
         "preview": "vite preview",
@@ -65,6 +67,7 @@
         "zod": "^4.6.5"
     },
     "devDependencies": {
+        "@playwright/test": "^1.63.0",
         "@tailwindcss/typography": "^0.5.16",
         "@tanstack/devtools-vite": "latest",
         "@tanstack/eslint-config": "latest",
