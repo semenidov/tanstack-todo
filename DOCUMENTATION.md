@@ -24,7 +24,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
 - `npm run typecheck` - `tsc --noEmit`
 - Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
-- CI (`.github/workflows/ci.yml`): на PR и push в `master`. `quality` (lint+typecheck), `unit`, `integration` (эфемерная Neon-ветка `ci-<run_id>`: create/delete-branch-action, схема от main, удаление `if: always()`). `migrate` - только на push в `master`, `needs` все чеки, катит `db:migrate` на Neon main (direct-строка). Секреты: `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_MAIN_DATABASE_URL` (direct). Vercel деплоит из гита сам, параллельно (отдельно от CI).
+- CI (`.github/workflows/ci.yml`): на PR и push в `master`. `quality` (lint+typecheck), `unit`, `integration` (эфемерная Neon-ветка `ci-<run_id>`). `e2e` - `needs` все чеки, ставит Chromium (`playwright install --with-deps`), эфемерная ветка `e2e-<run_id>`, `npm run test:e2e`, при падении - артефакт `playwright-report`. `migrate` - только push в `master`, `needs` все чеки, `db:migrate` на Neon main (direct). Секреты: `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_MAIN_DATABASE_URL` (direct), `BETTER_AUTH_SECRET`. `create-branch-action@v5` требует вход `username` (роль Neon, у нас `neondb_owner`). Vercel деплоит из гита сам, параллельно.
 
 ## Структура (файл → ответственность)
 
@@ -103,6 +103,6 @@ Vitest + React Testing Library + jsdom. Слои по «трофею»:
 - **Не покрыто на этом уровне (→ E2E):** валидация и auth-гейты обёрток `todos.ts` (zod-отказ на пустое/`>500`/не-uuid, `requireUserId`) - живут в `createServerFn`, в vitest напрямую не дёрнуть; проверяются в Playwright через реальный HTTP+сессию.
 - **Не покрыто (осознанно):** оркестрация submit в роутах (`new`/`edit`: invalidate+тост+navigate) - живёт внутри роут-компонента, тяжёлый шов; ляжет на вынос в функцию/хук либо на E2E.
 - **E2E** - Playwright (`e2e/`, только Chromium, `workers: 1`). `webServer` поднимает app на `127.0.0.1:3100` против **Neon-ветки `e2e`** (`.env.e2e`, `DATABASE_URL` через `webServer.env`, не main). P0 `auth.spec`/`isolation.spec`: регистрация, вход/выход, редирект неавторизованного, юзер не видит чужие задачи. P1 `todos.spec`: create/toggle/edit/delete(+undo). Хелперы `e2e/helpers/*` (`gotoHydrated` ждёт `networkidle` перед действиями - иначе клик до гидрации = нативный сабмит формы). Запуск `npm run test:e2e` (UI-дебаг `test:e2e:ui`). Gotcha: `localhost` на Windows резолвится в `::1` → готовность webServer не ловится, поэтому `127.0.0.1`.
-- **Ещё не сделано:** P2 E2E (валидация/notFound), встроить E2E-джобу в CI (эфемерная ветка + установка браузера).
+- **Ещё не сделано:** P2 E2E (валидация/notFound).
 
 Gotcha: vitest иногда падает с `Timeout waiting for worker to respond` (флап пула на старте) - это не падение тестов, повторный прогон проходит.
