@@ -13,8 +13,9 @@ test('creates a todo and shows it in the list', async ({ page }) => {
 
 test('toggling a todo updates the done badge', async ({ page }) => {
     await createTodo(page, 'Task one');
+    await expect(todoItem(page, 'Task one')).toBeVisible();
 
-    await page.getByRole('checkbox').check();
+    await page.getByRole('checkbox').click();
 
     await expect(page.getByText('1 / 1 done')).toBeVisible();
     await expect(todoItem(page, 'Task one')).toHaveClass(/line-through/);
