@@ -9,13 +9,15 @@ import { nitro } from 'nitro/vite';
 
 const config = defineConfig({
     resolve: { tsconfigPaths: true },
-    plugins: [
-        devtools(),
-        nitro({ rollupConfig: { external: [/^@sentry\//] } }),
-        tailwindcss(),
-        tanstackStart(),
-        viteReact(),
-    ],
+    define: {
+        'import.meta.env.VITE_SENTRY_RELEASE': JSON.stringify(
+            process.env.VERCEL_GIT_COMMIT_SHA ?? '',
+        ),
+        'import.meta.env.VITE_SENTRY_ENVIRONMENT': JSON.stringify(
+            process.env.VERCEL_ENV ?? 'development',
+        ),
+    },
+    plugins: [devtools(), nitro(), tailwindcss(), tanstackStart(), viteReact()],
 });
 
 export default config;

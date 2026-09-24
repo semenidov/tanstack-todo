@@ -1,10 +1,17 @@
 import { MessageScreen } from '#/components/message-screen';
 import { Button } from '#/components/ui/button';
+import * as Sentry from '@sentry/tanstackstart-react';
 import { useRouter } from '@tanstack/react-router';
+import type { ErrorComponentProps } from '@tanstack/react-router';
 import { RotateCwIcon, TriangleAlertIcon } from 'lucide-react';
+import { useEffect } from 'react';
 
-export function RouteError({ reset }: { reset: () => void }) {
+export function RouteError({ error, reset }: ErrorComponentProps) {
     const router = useRouter();
+
+    useEffect(() => {
+        Sentry.captureException(error);
+    }, [error]);
 
     async function handleRetry() {
         reset();
