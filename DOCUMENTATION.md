@@ -29,6 +29,10 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 ## Структура (файл → ответственность)
 
 - `src/router.tsx` - `getRouter()`: создаёт `QueryClient`, кладёт в context роутера, `setupRouterSsrQueryIntegration`.
+- `src/client.tsx` - кастомная клиентская точка входа: первым импортом `instrument.client` (Sentry), затем гидрация `StartClient`.
+- `src/server.ts` - кастомная серверная точка входа: первым импортом `instrument.server`, `fetch` обёрнут `wrapFetchWithSentry`.
+- `src/start.ts` - `createStart`: глобальные Sentry-middleware (request + function) - ловят ошибки server fns; `createCsrfMiddleware` на все server fns (отбивает cross-site вызовы).
+- `src/instrument.client.ts` / `src/instrument.server.ts` - `Sentry.init` (DSN из env, без DSN - no-op; только ошибки). `src/lib/sentry.ts` - общий строгий `dataCollection` (без тел/кук/заголовков/данных БД/переменных стека).
 - `src/routes/__root.tsx` - корневой роут: html-shell, head, `<Toaster>`, `notFoundComponent` (404 через MessageScreen), тип контекста `{ queryClient }`.
 - `src/routes/index.tsx` - `/`: лоадер префетчит список, `useSuspenseQuery`, `TodoHeader` + `TodoList`/`Empty`, `errorComponent`.
 - `src/routes/new.tsx` - `/new`: `addTodoServer` + `TodoForm`, submit → invalidate + navigate + тосты.
@@ -80,6 +84,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 - **Гигиена ввода:** id во всех server fns - `z.uuid()` (отсекает мусор до БД); `name` - `.trim().min(1).max(500)` (сервер + клиентская схема формы).
 - **notFound:** `getTodoServer` возвращает `null` (Query запрещает `undefined`); лоадер edit валидирует `z.uuid()` и бросает `notFound()` для кривого/несуществующего id; `TaskNotFound` как `notFoundComponent` роута.
 - **Ошибки чтения:** `errorComponent` на дата-роутах → `RouteError` (Retry). Настоящие сбои идут сюда; notFound - отдельный канал роутера.
+- **Observability (Sentry):** ошибки сервера (server fns/SSR через middleware + `wrapFetchWithSentry`) и клиента (`RouteError` → `captureException`). `release` = git SHA, `environment` = `VERCEL_ENV` (клиенту через `define` в `vite.config.ts`). Env: `SENTRY_DSN` (сервер), `VITE_SENTRY_DSN` (клиент, DSN не секрет). Source maps: Vite-плагин `sentryTanstackStart` в `vite.config.ts` подключается только при `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) - это env билда на Vercel; генерит hidden-карты, грузит в Sentry и удаляет `.map` из сборки. Локально и в CI токена нет - плагин не работает. Gotcha: не возвращать `external: [/^@sentry\//]` в nitro - Sentry не попадёт в `.output`, прод упадёт на старте.
 - **Тосты:** sonner, `<Toaster richColors position="bottom-right" />` в root. success / error / warning (удаление - жёлтый + иконка корзины).
 - **Стили:** `cn` из пакета `cn`. Prettier: `semi`, `singleQuote`, `tabWidth: 4`, `trailingComma: all`. Тексты интерфейса - на английском.
 
