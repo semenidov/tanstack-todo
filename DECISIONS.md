@@ -137,3 +137,7 @@ Claude не запускает тесты/typecheck/lint после каждог
 ## 34. 2026-09-25 · CSRF-middleware на server fns
 
 В `src/start.ts` добавлен `createCsrfMiddleware({ filter: handlerType === 'serverFn' })` - server fns это same-origin RPC-эндпоинты, cross-site вызовы отбиваются. Раньше полагались только на куку сессии `SameSite=Lax` (она не уходит с cross-site POST) - это защищает, но одним слоем; middleware даёт второй, не зависящий от поведения браузера и настроек кук. Альтернатива - выключить предупреждение Start (`disableCsrfMiddlewareWarning`) - отвергнута: дешёвая защита, причин отказываться нет. Порядок: Sentry-middleware первым, чтобы оборачивать и CSRF-отказы.
+
+## 35. 2026-09-25 · Source maps в Sentry через Vite-плагин (Фаза 2)
+
+`sentryTanstackStart` в `vite.config.ts`: сам включает `build.sourcemap: 'hidden'`, после билда грузит карты в Sentry и удаляет `.map` из сборки - исходники не публикуются, а стеки в Sentry читаемые (`todo-list.tsx:42` вместо `index-x7f.js:1`). Плагин подключается только при наличии `SENTRY_AUTH_TOKEN` (секрет, env билда на Vercel вместе с `SENTRY_ORG`/`SENTRY_PROJECT`) - локально и в CI (там не собираем прод) ничего не грузится и сборка не ломается без токена. `autoInstrumentMiddleware: false` - плагин иначе переписывает массивы middleware в `start.ts` ради перф-трейсинга, а трейсинг выключен (`tracesSampleRate: 0`). Альтернатива - заливать карты из GitHub Actions через `sentry-cli` - отвергнута: прод собирает Vercel, грузить надо из того же билда.
