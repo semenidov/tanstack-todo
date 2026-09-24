@@ -129,3 +129,11 @@ Vitest `projects`: `unit` (jsdom, мок server) и `integration` (node, реа�
 ## 32. 2026-09-24 · Observability: Sentry для ошибок (Фаза 1)
 
 `@sentry/tanstackstart-react` (v11, бета). Только ошибки: `tracesSampleRate: 0`, без replay/feedback (квота + приватность). Точки входа: `src/instrument.client.ts` (импортится первым в `src/client.tsx`), `src/instrument.server.ts` (первым в `src/server.ts`, fetch обёрнут `wrapFetchWithSentry` - Vercel-вариант без `--import`), глобальные middleware в `src/start.ts` (ловят ошибки server fns), `captureException` в `RouteError`. DSN из env; без DSN SDK - no-op (dev/тесты/CI ничего не шлют). `release` = `VERCEL_GIT_COMMIT_SHA`, `environment` = `VERCEL_ENV`; клиенту прокинуты через `define` в `vite.config.ts` (Vercel отдаёт их только в env билда). PII: в v11 `sendDefaultPii` заменён на `dataCollection`, и дефолты шире (тела запросов, куки, заголовки, данные DB-запросов, локальные переменные стек-фреймов) - для нас это пароли/токены сессии, поэтому явно всё выключено (`src/lib/sentry.ts`). Gotcha: шаблонный `nitro({ rollupConfig: { external: [/^@sentry\//] } })` оставлял Sentry внешним, но Nitro не трассировал его в `.output` → на Vercel `Cannot find module` и лёг бы весь прод; `external` убран (он нужен только для режима `--import`). Отложено (Фаза 2): source maps (Vite-плагин + `SENTRY_AUTH_TOKEN`), `setUser({ id })`.
+
+## 33. 2026-09-24 · Проверки после правок не гоняем
+
+Claude не запускает тесты/typecheck/lint после каждого изменения - пользователь прогоняет их сам на commit/push (husky pre-commit/pre-push + CI). Запуск - только по явной просьбе или для диагностики конкретной ошибки. Причина - лишние прогоны тратят время; гарантию и так дают хуки и CI.
+
+## 34. 2026-09-25 · CSRF-middleware на server fns
+
+В `src/start.ts` добавлен `createCsrfMiddleware({ filter: handlerType === 'serverFn' })` - server fns это same-origin RPC-эндпоинты, cross-site вызовы отбиваются. Раньше полагались только на куку сессии `SameSite=Lax` (она не уходит с cross-site POST) - это защищает, но одним слоем; middleware даёт второй, не зависящий от поведения браузера и настроек кук. Альтернатива - выключить предупреждение Start (`disableCsrfMiddlewareWarning`) - отвергнута: дешёвая защита, причин отказываться нет. Порядок: Sentry-middleware первым, чтобы оборачивать и CSRF-отказы.

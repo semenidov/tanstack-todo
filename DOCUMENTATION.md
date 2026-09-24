@@ -31,7 +31,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/router.tsx` - `getRouter()`: создаёт `QueryClient`, кладёт в context роутера, `setupRouterSsrQueryIntegration`.
 - `src/client.tsx` - кастомная клиентская точка входа: первым импортом `instrument.client` (Sentry), затем гидрация `StartClient`.
 - `src/server.ts` - кастомная серверная точка входа: первым импортом `instrument.server`, `fetch` обёрнут `wrapFetchWithSentry`.
-- `src/start.ts` - `createStart`: глобальные Sentry-middleware (request + function) - ловят ошибки server fns.
+- `src/start.ts` - `createStart`: глобальные Sentry-middleware (request + function) - ловят ошибки server fns; `createCsrfMiddleware` на все server fns (отбивает cross-site вызовы).
 - `src/instrument.client.ts` / `src/instrument.server.ts` - `Sentry.init` (DSN из env, без DSN - no-op; только ошибки). `src/lib/sentry.ts` - общий строгий `dataCollection` (без тел/кук/заголовков/данных БД/переменных стека).
 - `src/routes/__root.tsx` - корневой роут: html-shell, head, `<Toaster>`, `notFoundComponent` (404 через MessageScreen), тип контекста `{ queryClient }`.
 - `src/routes/index.tsx` - `/`: лоадер префетчит список, `useSuspenseQuery`, `TodoHeader` + `TodoList`/`Empty`, `errorComponent`.

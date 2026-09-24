@@ -14,6 +14,10 @@ vi.mock('#/lib/auth-client', () => ({
     authClient: { signOut: signOutSpy },
 }));
 
+vi.mock('#/server/debug', () => ({
+    crashServerFn: vi.fn(() => Promise.resolve()),
+}));
+
 vi.mock('@tanstack/react-router', () => ({
     Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
         <a href={to} {...rest}>
