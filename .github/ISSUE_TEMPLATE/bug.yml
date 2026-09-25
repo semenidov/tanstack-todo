@@ -1,5 +1,5 @@
 name: Bug
-description: Something works incorrectly
+description: Something works incorrectly. Title in English, body in Russian.
 labels: [bug]
 body:
   - type: textarea
