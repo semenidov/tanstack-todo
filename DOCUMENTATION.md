@@ -40,7 +40,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/routes/new.tsx` - `/new`: `addTodoServer` + `TodoForm`, submit → invalidate + navigate + тосты.
 - `src/routes/edit.$todoId.tsx` - `/edit/$todoId`: в лоадере uuid-guard + `getTodo` (иначе `notFound`), `updateTodoServer`, `TodoForm`, `TaskNotFound` (notFoundComponent), `errorComponent`.
 - `src/components/todo-list.tsx` - `TodoList`/`TodoItem`: toggle (оптимистичная мутация) и delete (стратегия A); server fns берёт из `#/server/todos`, экспортит тип `Todo`.
-- `src/components/todo-header.tsx` - шапка + бейдж «X / Y done».
+- `src/components/todo-header.tsx` - шапка + бейдж «X / Y done». Тестовые кнопки Sentry (клиент/сервер) - только вне production (`VITE_SENTRY_ENVIRONMENT`).
+- `src/server/debug.ts` - `crashServerFn` (тестовая серверная ошибка для Sentry); на production (`VERCEL_ENV`) отвечает 404 без броска.
 - `src/components/todo-form.tsx` - презентационная форма для create/edit: `useForm` + zod; пропсы `defaultName/submitLabel/pendingLabel/onSubmit/icon`.
 - `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
@@ -48,6 +49,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/server/todos.ts` - server fns над todos (`get/getOne/add/toggle/delete/update`) + тип `Todo`. Тонкие обёртки: `requireUserId` → вызов `todos-repo`.
 - `src/server/todos-repo.ts` - чистый data-слой: функции с явным `userId` (`listTodos/getTodo/addTodo/toggleTodo/deleteTodo/updateTodo`), скоуп по владельцу в SQL. Тестируемый шов для integration; мутации возвращают `.returning()`.
 - `src/lib/todos-query.ts` - только `todosQueryOptions`, `todoQueryOptions(id)` (импортируют read-fns из `#/server/todos`).
+- `src/lib/seo.ts` - метаданные: `pageMeta(screen)` (title + `og:title` в формате `<Экран> · Todo List`), `siteMeta` (description, OG, twitter card), `siteLinks` (favicon, apple-touch-icon, manifest).
 - `src/lib/todos.ts` - чистые функции: `countCompleted`, `toggleInList`, `removeFromList` (покрыты юнит-тестами).
 - `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет из env). `baseURL` динамический: `allowedHosts` - прод-домен всегда, маска `tanstack-todo-*-ssemenidov.vercel.app` только при `VERCEL_ENV=preview`, `localhost:3000`/`127.0.0.1:3100` только вне Vercel; `protocol` https на Vercel, http локально. Хост запроса из списка становится baseURL и доверенным origin - превью логинятся без "Invalid origin". `BETTER_AUTH_URL` больше не используется.
 - `src/lib/auth-client.ts` - клиентский `createAuthClient` (`signIn/signUp/signOut`).
@@ -88,6 +90,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 - **Ошибки чтения:** `errorComponent` на дата-роутах → `RouteError` (Retry). Настоящие сбои идут сюда; notFound - отдельный канал роутера.
 - **Observability (Sentry):** ошибки сервера (server fns/SSR через middleware + `wrapFetchWithSentry`) и клиента (`RouteError` → `captureException`). `release` = git SHA, `environment` = `VERCEL_ENV` (клиенту через `define` в `vite.config.ts`). Env: `SENTRY_DSN` (сервер), `VITE_SENTRY_DSN` (клиент, DSN не секрет). Source maps: Vite-плагин `sentryTanstackStart` в `vite.config.ts` подключается только при `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) - это env билда на Vercel; генерит hidden-карты, грузит в Sentry и удаляет `.map` из сборки. Локально и в CI токена нет - плагин не работает. Gotcha: не возвращать `external: [/^@sentry\//]` в nitro - Sentry не попадёт в `.output`, прод упадёт на старте.
 - **Vercel Web Analytics + Speed Insights:** `<Analytics />` и `<SpeedInsights />` в `__root.tsx` (включены в дашборде Vercel). Без cookies. В dev не шлют. `beforeSend` = `normalizeAnalyticsUrl` (`src/lib/analytics.ts`): `/edit/<uuid>` → `/edit/[todoId]` - React-вариант без поддержки роутов, иначе каждая правка отдельной строкой и id задач уходят в Vercel.
+- **Метаданные страниц:** каждый роут задаёт `head: () => ({ meta: pageMeta('<Экран>') })`; общие мета и иконки - в `head` корня. TanStack берёт title и мета с тем же `name`/`property` из самого глубокого матча, поэтому экран переопределяет корень. 404: корень и `edit` проверяют `match.status === 'notFound' || match._notFound`. Статика в `public/`: `favicon.svg` (исходник), `favicon.ico` (16+32), `apple-touch-icon.png` (180), `icon-192/512.png`, `manifest.webmanifest`, `og-image.png` (1200×630) - заглушки на цветах токенов, PNG/ICO отрендерены из SVG. `og:image` абсолютный: `VITE_SITE_URL` в `vite.config.ts` из `VERCEL_PROJECT_PRODUCTION_URL` (прод) / `VERCEL_URL` (превью), локально пусто → относительный путь. Новый роут = добавить `head` с `pageMeta`.
 - **Тосты:** sonner, `<Toaster richColors position="bottom-right" />` в root. success / error / warning (удаление - жёлтый + иконка корзины).
 - **Стили:** `cn` из пакета `cn`. Prettier: `semi`, `singleQuote`, `tabWidth: 4`, `trailingComma: all`. Тексты интерфейса - на английском.
 

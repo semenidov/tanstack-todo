@@ -1,10 +1,17 @@
 import { AuthForm } from '#/components/auth-form';
 import { authClient } from '#/lib/auth-client';
-import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
+import { pageMeta } from '#/lib/seo';
+import {
+    createFileRoute,
+    Link,
+    redirect,
+    useRouter,
+} from '@tanstack/react-router';
 import { UserPlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/signup')({
+    head: () => ({ meta: pageMeta('Sign up') }),
     component: SignupPage,
     beforeLoad: ({ context }) => {
         if (context.session) throw redirect({ to: '/' });

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TodoHeader } from '#/components/todo-header';
 
 const { signOutSpy, invalidateSpy, navigateSpy } = vi.hoisted(() => ({
@@ -31,6 +31,10 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
+afterEach(() => {
+    vi.unstubAllEnvs();
+});
+
 describe('TodoHeader', () => {
     it('shows the completed / total badge', () => {
         render(<TodoHeader completedCount={2} totalCount={5} />);
@@ -58,5 +62,19 @@ describe('TodoHeader', () => {
         expect(signOutSpy).toHaveBeenCalled();
         expect(invalidateSpy).toHaveBeenCalled();
         expect(navigateSpy).toHaveBeenCalledWith({ to: '/login' });
+    });
+
+    it('shows the Sentry test buttons outside production', () => {
+        vi.stubEnv('VITE_SENTRY_ENVIRONMENT', 'preview');
+        render(<TodoHeader completedCount={0} totalCount={1} />);
+        expect(screen.getByLabelText('Crash test')).toBeInTheDocument();
+        expect(screen.getByLabelText('Server crash test')).toBeInTheDocument();
+    });
+
+    it('hides the Sentry test buttons in production', () => {
+        vi.stubEnv('VITE_SENTRY_ENVIRONMENT', 'production');
+        render(<TodoHeader completedCount={0} totalCount={1} />);
+        expect(screen.queryByLabelText('Crash test')).toBeNull();
+        expect(screen.queryByLabelText('Server crash test')).toBeNull();
     });
 });
