@@ -8,6 +8,14 @@ import tailwindcss from '@tailwindcss/vite';
 import { nitro } from 'nitro/vite';
 import { sentryTanstackStart } from '@sentry/tanstackstart-react/vite';
 
+function siteUrl() {
+    const host =
+        process.env.VERCEL_ENV === 'production'
+            ? process.env.VERCEL_PROJECT_PRODUCTION_URL
+            : process.env.VERCEL_URL;
+    return host ? `https://${host}` : '';
+}
+
 const config = defineConfig({
     resolve: { tsconfigPaths: true },
     define: {
@@ -17,6 +25,7 @@ const config = defineConfig({
         'import.meta.env.VITE_SENTRY_ENVIRONMENT': JSON.stringify(
             process.env.VERCEL_ENV ?? 'development',
         ),
+        'import.meta.env.VITE_SITE_URL': JSON.stringify(siteUrl()),
     },
     plugins: [
         devtools(),
