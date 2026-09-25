@@ -65,7 +65,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 
 ## Модель данных
 
-`todos`: `id` (uuid, pk, defaultRandom), `name` (text), `isComplete` (bool), `createdAt`, `updatedAt` (timestamptz).
+`todos`: `id` (uuid, pk, defaultRandom), `name` (text), `isComplete` (bool), `createdAt`, `updatedAt` (timestamptz). Индекс `todos_user_id_created_at_idx` на `(user_id, createdAt)` - все запросы идут по владельцу с сортировкой по дате.
 
 `todos.userId` (text, FK → `user.id`, notNull, cascade) - владелец задачи.
 
