@@ -7,6 +7,7 @@
 - Ветка от свежего `master`: `type/<issue>-short-slug` (`feat/12-todo-owner-index`).
 - Коммиты - Conventional Commits: `type(scope): summary` (feat, fix, refactor, test, docs, chore, perf, ci, build), повелительное наклонение, до ~72 символов. Сгенерированное (миграции, lock-файл) и механическое (переименования, форматирование) - отдельными коммитами. Порядок коммитов - для чтения: schema/migration → core → tests → docs.
 - PR: заголовок в формате Conventional Commit (при squash становится коммитом в `master`), `Closes #N`, шаблон `.github/pull_request_template.md` заполнен целиком: ручные действия перед мержем - в «Before merging», карта чтения файлов - в «Review guide», риски - в «Look closely at».
+- Мелкий PR (docs/chore/config, без логики, до ~50 строк) - сокращённое описание: `Closes`, «Before merging» (если есть), «Why», «What changed», «How to verify»; остальные разделы удаляются.
 - Один PR - одна задача, без «заодно». Ориентир до ~300 строк без сгенерированного, больше - режем на несколько PR.
 - PR открывается как draft, в «ready for review» - когда CI зелёный.
 - Inline-комментарии самоаннотации - только для нетривиальной логики, 3-5 штук одним ревью; иначе хватает «Review guide».

@@ -1,4 +1,5 @@
 <!-- Title: type(scope): summary  (Conventional Commits, becomes the squash commit) -->
+<!-- Small PR (docs/chore/config, no logic, < ~50 lines): keep only "Closes", "Before merging" (if any), "Why", "What changed", "How to verify"; delete the rest. -->
 
 Closes #
 
