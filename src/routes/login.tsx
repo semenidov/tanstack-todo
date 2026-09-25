@@ -1,10 +1,17 @@
 import { AuthForm } from '#/components/auth-form';
 import { authClient } from '#/lib/auth-client';
-import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
+import { pageMeta } from '#/lib/seo';
+import {
+    createFileRoute,
+    Link,
+    redirect,
+    useRouter,
+} from '@tanstack/react-router';
 import { LogInIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/login')({
+    head: () => ({ meta: pageMeta('Sign in') }),
     component: LoginPage,
     beforeLoad: ({ context }) => {
         if (context.session) throw redirect({ to: '/' });

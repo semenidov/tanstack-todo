@@ -2,6 +2,7 @@ import { MessageScreen } from '#/components/message-screen';
 import { RouteError } from '#/components/route-error';
 import { TodoForm } from '#/components/todo-form';
 import { Button } from '#/components/ui/button';
+import { pageMeta } from '#/lib/seo';
 import { todoQueryOptions, todosQueryOptions } from '#/lib/todos-query';
 import { updateTodoServer } from '#/server/todos';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,6 +35,13 @@ export const Route = createFileRoute('/edit/$todoId')({
         if (!todo) throw notFound();
         return todo;
     },
+    head: ({ match }) => ({
+        meta: pageMeta(
+            match.status === 'notFound' || match._notFound
+                ? 'Task not found'
+                : 'Edit task',
+        ),
+    }),
 });
 
 function TaskNotFound() {

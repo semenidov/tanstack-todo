@@ -3,10 +3,12 @@ import { TodoList } from '#/components/todo-list';
 import { RouteError } from '#/components/route-error';
 import { countCompleted } from '#/lib/todos';
 import { todosQueryOptions } from '#/lib/todos-query';
+import { pageMeta } from '#/lib/seo';
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useSuspenseQuery } from '@tanstack/react-query';
 
 export const Route = createFileRoute('/')({
+    head: () => ({ meta: pageMeta('Tasks') }),
     component: RouteComponent,
     errorComponent: RouteError,
     beforeLoad: ({ context }) => {

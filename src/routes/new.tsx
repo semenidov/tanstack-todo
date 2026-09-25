@@ -2,6 +2,7 @@ import { TodoForm } from '#/components/todo-form';
 import { Button } from '#/components/ui/button';
 import { todosQueryOptions } from '#/lib/todos-query';
 import { addTodoServer } from '#/server/todos';
+import { pageMeta } from '#/lib/seo';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, Link, redirect } from '@tanstack/react-router';
 import { useServerFn } from '@tanstack/react-start';
@@ -9,6 +10,7 @@ import { ArrowLeftIcon, PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const Route = createFileRoute('/new')({
+    head: () => ({ meta: pageMeta('New task') }),
     component: NewTodoPage,
     beforeLoad: ({ context }) => {
         if (!context.session) throw redirect({ to: '/login' });
