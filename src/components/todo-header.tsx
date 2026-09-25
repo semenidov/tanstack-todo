@@ -13,6 +13,8 @@ interface TodoHeaderProps {
 
 export function TodoHeader({ completedCount, totalCount }: TodoHeaderProps) {
     const router = useRouter();
+    const showDebugTools =
+        import.meta.env.VITE_SENTRY_ENVIRONMENT !== 'production';
 
     async function handleSignOut() {
         await authClient.signOut();
@@ -33,34 +35,38 @@ export function TodoHeader({ completedCount, totalCount }: TodoHeaderProps) {
                 )}
             </div>
             <div className="flex items-center gap-2">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                        throw new Error('Sentry crash test (client)');
-                    }}
-                    aria-label="Crash test"
-                    title="Crash test (Sentry)"
-                    className="text-muted-foreground hover:text-destructive"
-                >
-                    <BugIcon />
-                </Button>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={async () => {
-                        try {
-                            await crashServerFn();
-                        } catch {
-                            toast.error('Server crash sent to Sentry');
-                        }
-                    }}
-                    aria-label="Server crash test"
-                    title="Server crash test (Sentry)"
-                    className="text-muted-foreground hover:text-destructive"
-                >
-                    <ServerCrashIcon />
-                </Button>
+                {showDebugTools && (
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                throw new Error('Sentry crash test (client)');
+                            }}
+                            aria-label="Crash test"
+                            title="Crash test (Sentry)"
+                            className="text-muted-foreground hover:text-destructive"
+                        >
+                            <BugIcon />
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={async () => {
+                                try {
+                                    await crashServerFn();
+                                } catch {
+                                    toast.error('Server crash sent to Sentry');
+                                }
+                            }}
+                            aria-label="Server crash test"
+                            title="Server crash test (Sentry)"
+                            className="text-muted-foreground hover:text-destructive"
+                        >
+                            <ServerCrashIcon />
+                        </Button>
+                    </>
+                )}
                 <Button asChild size="sm">
                     <Link to="/new">
                         <PlusIcon />
