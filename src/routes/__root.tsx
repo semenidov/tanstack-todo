@@ -10,6 +10,9 @@ import { TanStackDevtools } from '@tanstack/react-devtools';
 import { MessageScreen } from '#/components/message-screen';
 import { Button } from '#/components/ui/button';
 import { Toaster } from '#/components/ui/sonner';
+import { normalizeAnalyticsUrl } from '#/lib/analytics';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { getSession } from '#/lib/auth-server';
 import { ArrowLeftIcon, MapPinOffIcon } from 'lucide-react';
 
@@ -69,6 +72,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             <body>
                 {children}
                 <Toaster richColors position="bottom-right" />
+                <Analytics beforeSend={normalizeAnalyticsUrl} />
+                <SpeedInsights beforeSend={normalizeAnalyticsUrl} />
                 <TanStackDevtools
                     config={{
                         position: 'bottom-right',

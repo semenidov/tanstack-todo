@@ -14,6 +14,8 @@
 
 TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод: Vercel (serverless) + Neon (managed Postgres) - https://todo-semenidov.vercel.app.
 
+Окружения Vercel: **Production** (merge в `master`) - статичный `DATABASE_URL` на Neon `main`; **Preview** (любая другая ветка/PR) - интеграция Neon-Managed подставляет `DATABASE_URL` (+`_UNPOOLED`) в каждый деплой сама (webhook → ветка `preview/<git-ветка>`), руками для Preview его не задавать. Ветка БД - снимок `main` на первом деплое git-ветки (копия прод-данных), дальше живёт отдельно; обновить - Reset from parent в Neon; удаляется после удаления git-ветки (при следующем preview-деплое). Development в Vercel не используем (локально `.env`). Секреты окружений раздельные (`BETTER_AUTH_SECRET` у Preview свой).
+
 ## Команды
 
 - `npm run dev` - vite dev на :3000 (ходит в Neon по `.env`)
@@ -85,6 +87,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 - **notFound:** `getTodoServer` возвращает `null` (Query запрещает `undefined`); лоадер edit валидирует `z.uuid()` и бросает `notFound()` для кривого/несуществующего id; `TaskNotFound` как `notFoundComponent` роута.
 - **Ошибки чтения:** `errorComponent` на дата-роутах → `RouteError` (Retry). Настоящие сбои идут сюда; notFound - отдельный канал роутера.
 - **Observability (Sentry):** ошибки сервера (server fns/SSR через middleware + `wrapFetchWithSentry`) и клиента (`RouteError` → `captureException`). `release` = git SHA, `environment` = `VERCEL_ENV` (клиенту через `define` в `vite.config.ts`). Env: `SENTRY_DSN` (сервер), `VITE_SENTRY_DSN` (клиент, DSN не секрет). Source maps: Vite-плагин `sentryTanstackStart` в `vite.config.ts` подключается только при `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) - это env билда на Vercel; генерит hidden-карты, грузит в Sentry и удаляет `.map` из сборки. Локально и в CI токена нет - плагин не работает. Gotcha: не возвращать `external: [/^@sentry\//]` в nitro - Sentry не попадёт в `.output`, прод упадёт на старте.
+- **Vercel Web Analytics + Speed Insights:** `<Analytics />` и `<SpeedInsights />` в `__root.tsx` (включены в дашборде Vercel). Без cookies. В dev не шлют. `beforeSend` = `normalizeAnalyticsUrl` (`src/lib/analytics.ts`): `/edit/<uuid>` → `/edit/[todoId]` - React-вариант без поддержки роутов, иначе каждая правка отдельной строкой и id задач уходят в Vercel.
 - **Тосты:** sonner, `<Toaster richColors position="bottom-right" />` в root. success / error / warning (удаление - жёлтый + иконка корзины).
 - **Стили:** `cn` из пакета `cn`. Prettier: `semi`, `singleQuote`, `tabWidth: 4`, `trailingComma: all`. Тексты интерфейса - на английском.
 
