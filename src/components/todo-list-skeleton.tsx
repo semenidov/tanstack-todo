@@ -26,7 +26,13 @@ export function TodoListSkeleton() {
                         <li key={width}>
                             <div className="relative flex items-center gap-3 rounded-xl border bg-card px-4 py-3 shadow-sm">
                                 <Skeleton className="size-4 shrink-0 rounded-[4px]" />
-                                <Skeleton className={`h-4 ${width}`} />
+                                <div className="min-w-0 flex-1">
+                                    <Skeleton className={`h-4 ${width}`} />
+                                </div>
+                                <div
+                                    className="ml-1 size-7 shrink-0"
+                                    aria-hidden="true"
+                                />
                             </div>
                         </li>
                     ))}
