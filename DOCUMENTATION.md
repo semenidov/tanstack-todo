@@ -47,7 +47,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/server/todos-repo.ts` - чистый data-слой: функции с явным `userId` (`listTodos/getTodo/addTodo/toggleTodo/deleteTodo/updateTodo`), скоуп по владельцу в SQL. Тестируемый шов для integration; мутации возвращают `.returning()`.
 - `src/lib/todos-query.ts` - только `todosQueryOptions`, `todoQueryOptions(id)` (импортируют read-fns из `#/server/todos`).
 - `src/lib/todos.ts` - чистые функции: `countCompleted`, `toggleInList`, `removeFromList` (покрыты юнит-тестами).
-- `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет/URL из env).
+- `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет из env). `baseURL` динамический: `allowedHosts` - прод-домен всегда, маска `tanstack-todo-*-ssemenidov.vercel.app` только при `VERCEL_ENV=preview`, `localhost:3000`/`127.0.0.1:3100` только вне Vercel; `protocol` https на Vercel, http локально. Хост запроса из списка становится baseURL и доверенным origin - превью логинятся без "Invalid origin". `BETTER_AUTH_URL` больше не используется.
 - `src/lib/auth-client.ts` - клиентский `createAuthClient` (`signIn/signUp/signOut`).
 - `src/lib/auth-server.ts` - `getSession` и `requireUserId` (server fns над `auth.api.getSession`; `requireUserId` кидает при отсутствии сессии).
 - `src/components/auth-form.tsx` - презентационная форма email+password (login/signup).
