@@ -1,5 +1,6 @@
 import { TodoHeader } from '#/components/todo-header';
 import { TodoList } from '#/components/todo-list';
+import { TodoListSkeleton } from '#/components/todo-list-skeleton';
 import { RouteError } from '#/components/route-error';
 import { countCompleted } from '#/lib/todos';
 import { todosQueryOptions } from '#/lib/todos-query';
@@ -11,6 +12,9 @@ export const Route = createFileRoute('/')({
     head: () => ({ meta: pageMeta('Tasks') }),
     component: RouteComponent,
     errorComponent: RouteError,
+    pendingComponent: TodoListSkeleton,
+    pendingMs: 200,
+    pendingMinMs: 300,
     beforeLoad: ({ context }) => {
         if (!context.session) throw redirect({ to: '/login' });
     },
