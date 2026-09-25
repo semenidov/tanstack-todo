@@ -14,7 +14,16 @@ export function pageMeta(screen?: string) {
 
 export const siteMeta = [
     { name: 'description', content: DESCRIPTION },
-    { name: 'theme-color', content: '#ffffff' },
+    {
+        name: 'theme-color',
+        content: '#ffffff',
+        media: '(prefers-color-scheme: light)',
+    },
+    {
+        name: 'theme-color',
+        content: '#09090b',
+        media: '(prefers-color-scheme: dark)',
+    },
     { property: 'og:type', content: 'website' },
     { property: 'og:site_name', content: APP_NAME },
     { property: 'og:description', content: DESCRIPTION },
