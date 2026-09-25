@@ -40,7 +40,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/routes/new.tsx` - `/new`: `addTodoServer` + `TodoForm`, submit → invalidate + navigate + тосты.
 - `src/routes/edit.$todoId.tsx` - `/edit/$todoId`: в лоадере uuid-guard + `getTodo` (иначе `notFound`), `updateTodoServer`, `TodoForm`, `TaskNotFound` (notFoundComponent), `errorComponent`.
 - `src/components/todo-list.tsx` - `TodoList`/`TodoItem`: toggle (оптимистичная мутация) и delete (стратегия A); server fns берёт из `#/server/todos`, экспортит тип `Todo`.
-- `src/components/todo-header.tsx` - шапка + бейдж «X / Y done».
+- `src/components/todo-header.tsx` - шапка + бейдж «X / Y done». Тестовые кнопки Sentry (клиент/сервер) - только вне production (`VITE_SENTRY_ENVIRONMENT`).
+- `src/server/debug.ts` - `crashServerFn` (тестовая серверная ошибка для Sentry); на production (`VERCEL_ENV`) отвечает 404 без броска.
 - `src/components/todo-form.tsx` - презентационная форма для create/edit: `useForm` + zod; пропсы `defaultName/submitLabel/pendingLabel/onSubmit/icon`.
 - `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
