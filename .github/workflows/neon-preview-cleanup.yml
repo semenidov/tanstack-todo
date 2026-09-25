@@ -1,0 +1,26 @@
+name: Neon preview cleanup
+
+on:
+    pull_request:
+        types: [closed]
+
+jobs:
+    delete-preview-branch:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: npm i -g neonctl@v2
+            - name: Delete Neon preview branch
+              env:
+                  NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+                  PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+                  BRANCH: preview/${{ github.head_ref }}
+              run: |
+                  if neonctl branches list --project-id "$PROJECT_ID" --output json \
+                      | jq -e --arg name "$BRANCH" 'any(.[]; .name == $name)' > /dev/null; then
+                      neonctl branches delete "$BRANCH" --project-id "$PROJECT_ID"
+                  else
+                      echo "Branch $BRANCH not found, nothing to delete"
+                  fi
