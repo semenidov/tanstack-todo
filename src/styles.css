@@ -113,6 +113,11 @@
     --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@theme {
+    --container-page: 28rem;
+    --container-auth: 24rem;
+}
+
 html,
 body,
 #app {

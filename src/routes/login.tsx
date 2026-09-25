@@ -1,6 +1,13 @@
 import { AuthForm } from '#/components/auth-form';
+import { PageShell } from '#/components/page-shell';
+import { PageTitle } from '#/components/page-title';
 import { authClient } from '#/lib/auth-client';
-import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
+import {
+    createFileRoute,
+    Link,
+    redirect,
+    useRouter,
+} from '@tanstack/react-router';
 import { LogInIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,28 +33,24 @@ function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-muted/30 p-4">
-            <div className="mx-auto max-w-sm space-y-6 py-16">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    Sign in
-                </h1>
-                <AuthForm
-                    submitLabel="Sign in"
-                    pendingLabel="Signing in..."
-                    onSubmit={handleSubmit}
-                    icon={<LogInIcon />}
-                />
-                <p className="text-center text-sm text-muted-foreground">
-                    No account?{' '}
-                    <Link
-                        to="/signup"
-                        onMouseDown={(e) => e.preventDefault()}
-                        className="text-foreground underline"
-                    >
-                        Sign up
-                    </Link>
-                </p>
-            </div>
-        </div>
+        <PageShell variant="auth">
+            <PageTitle>Sign in</PageTitle>
+            <AuthForm
+                submitLabel="Sign in"
+                pendingLabel="Signing in..."
+                onSubmit={handleSubmit}
+                icon={<LogInIcon />}
+            />
+            <p className="text-center text-sm text-muted-foreground">
+                No account?{' '}
+                <Link
+                    to="/signup"
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="text-foreground underline"
+                >
+                    Sign up
+                </Link>
+            </p>
+        </PageShell>
     );
 }

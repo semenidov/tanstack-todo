@@ -1,5 +1,7 @@
 import { MessageScreen } from '#/components/message-screen';
 import { RouteError } from '#/components/route-error';
+import { PageShell } from '#/components/page-shell';
+import { PageTitle } from '#/components/page-title';
 import { TodoForm } from '#/components/todo-form';
 import { Button } from '#/components/ui/button';
 import { todoQueryOptions, todosQueryOptions } from '#/lib/todos-query';
@@ -81,26 +83,22 @@ function EditTodoPage() {
     }
 
     return (
-        <div className="min-h-screen bg-muted/30 p-4">
-            <div className="mx-auto max-w-md space-y-6 py-6">
-                <Button asChild variant="ghost" size="sm" className="-ml-2">
-                    <Link to="/">
-                        <ArrowLeftIcon />
-                        Back
-                    </Link>
-                </Button>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    Edit task
-                </h1>
+        <PageShell>
+            <Button asChild variant="ghost" size="sm" className="-ml-2">
+                <Link to="/">
+                    <ArrowLeftIcon />
+                    Back
+                </Link>
+            </Button>
+            <PageTitle>Edit task</PageTitle>
 
-                <TodoForm
-                    defaultName={todo.name}
-                    submitLabel="Save"
-                    pendingLabel="Saving..."
-                    onSubmit={handleSubmit}
-                    icon={<CheckIcon />}
-                />
-            </div>
-        </div>
+            <TodoForm
+                defaultName={todo.name}
+                submitLabel="Save"
+                pendingLabel="Saving..."
+                onSubmit={handleSubmit}
+                icon={<CheckIcon />}
+            />
+        </PageShell>
     );
 }

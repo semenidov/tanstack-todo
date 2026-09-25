@@ -1,3 +1,4 @@
+import { PageTitle } from '#/components/page-title';
 import { Badge } from '#/components/ui/badge';
 import { Button } from '#/components/ui/button';
 import { authClient } from '#/lib/auth-client';
@@ -23,9 +24,7 @@ export function TodoHeader({ completedCount, totalCount }: TodoHeaderProps) {
     return (
         <header className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    Todo List
-                </h1>
+                <PageTitle>Todo List</PageTitle>
                 {totalCount > 0 && (
                     <Badge variant="secondary" className="tabular-nums">
                         {completedCount} / {totalCount} done

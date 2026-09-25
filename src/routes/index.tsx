@@ -1,3 +1,4 @@
+import { PageShell } from '#/components/page-shell';
 import { TodoHeader } from '#/components/todo-header';
 import { TodoList } from '#/components/todo-list';
 import { RouteError } from '#/components/route-error';
@@ -26,14 +27,12 @@ function RouteComponent() {
     const completedCount = countCompleted(todoList);
 
     return (
-        <div className="min-h-screen bg-muted/30 p-4">
-            <div className="mx-auto max-w-md space-y-6 py-6">
-                <TodoHeader
-                    completedCount={completedCount}
-                    totalCount={totalCount}
-                />
-                <TodoList todoList={todoList} />
-            </div>
-        </div>
+        <PageShell>
+            <TodoHeader
+                completedCount={completedCount}
+                totalCount={totalCount}
+            />
+            <TodoList todoList={todoList} />
+        </PageShell>
     );
 }

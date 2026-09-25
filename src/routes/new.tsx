@@ -1,3 +1,5 @@
+import { PageShell } from '#/components/page-shell';
+import { PageTitle } from '#/components/page-title';
 import { TodoForm } from '#/components/todo-form';
 import { Button } from '#/components/ui/button';
 import { todosQueryOptions } from '#/lib/todos-query';
@@ -35,26 +37,22 @@ function NewTodoPage() {
     }
 
     return (
-        <div className="min-h-screen bg-muted/30 p-4">
-            <div className="mx-auto max-w-md space-y-6 py-6">
-                <Button asChild variant="ghost" size="sm" className="-ml-2">
-                    <Link to="/">
-                        <ArrowLeftIcon />
-                        Back2
-                    </Link>
-                </Button>
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    Add task
-                </h1>
+        <PageShell>
+            <Button asChild variant="ghost" size="sm" className="-ml-2">
+                <Link to="/">
+                    <ArrowLeftIcon />
+                    Back2
+                </Link>
+            </Button>
+            <PageTitle>Add task</PageTitle>
 
-                <TodoForm
-                    defaultName=""
-                    submitLabel="Add"
-                    pendingLabel="Adding..."
-                    onSubmit={handleSubmit}
-                    icon={<PlusIcon />}
-                />
-            </div>
-        </div>
+            <TodoForm
+                defaultName=""
+                submitLabel="Add"
+                pendingLabel="Adding..."
+                onSubmit={handleSubmit}
+                icon={<PlusIcon />}
+            />
+        </PageShell>
     );
 }

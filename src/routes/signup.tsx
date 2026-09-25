@@ -1,6 +1,13 @@
 import { AuthForm } from '#/components/auth-form';
+import { PageShell } from '#/components/page-shell';
+import { PageTitle } from '#/components/page-title';
 import { authClient } from '#/lib/auth-client';
-import { createFileRoute, Link, redirect, useRouter } from '@tanstack/react-router';
+import {
+    createFileRoute,
+    Link,
+    redirect,
+    useRouter,
+} from '@tanstack/react-router';
 import { UserPlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -29,28 +36,24 @@ function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen bg-muted/30 p-4">
-            <div className="mx-auto max-w-sm space-y-6 py-16">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                    Create account
-                </h1>
-                <AuthForm
-                    submitLabel="Sign up"
-                    pendingLabel="Creating..."
-                    onSubmit={handleSubmit}
-                    icon={<UserPlusIcon />}
-                />
-                <p className="text-center text-sm text-muted-foreground">
-                    Already have an account?{' '}
-                    <Link
-                        to="/login"
-                        onMouseDown={(e) => e.preventDefault()}
-                        className="text-foreground underline"
-                    >
-                        Sign in
-                    </Link>
-                </p>
-            </div>
-        </div>
+        <PageShell variant="auth">
+            <PageTitle>Create account</PageTitle>
+            <AuthForm
+                submitLabel="Sign up"
+                pendingLabel="Creating..."
+                onSubmit={handleSubmit}
+                icon={<UserPlusIcon />}
+            />
+            <p className="text-center text-sm text-muted-foreground">
+                Already have an account?{' '}
+                <Link
+                    to="/login"
+                    onMouseDown={(e) => e.preventDefault()}
+                    className="text-foreground underline"
+                >
+                    Sign in
+                </Link>
+            </p>
+        </PageShell>
     );
 }
