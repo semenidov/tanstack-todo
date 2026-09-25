@@ -1,5 +1,6 @@
 import { Badge } from '#/components/ui/badge';
 import { Button } from '#/components/ui/button';
+import { ThemeToggle } from '#/components/theme-toggle';
 import { authClient } from '#/lib/auth-client';
 import { crashServerFn } from '#/server/debug';
 import { Link, useRouter } from '@tanstack/react-router';
@@ -73,6 +74,7 @@ export function TodoHeader({ completedCount, totalCount }: TodoHeaderProps) {
                         Add
                     </Link>
                 </Button>
+                <ThemeToggle />
                 <Button
                     variant="ghost"
                     size="icon"
