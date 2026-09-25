@@ -1,5 +1,5 @@
 name: Task
-description: A feature, improvement, refactor or chore
+description: A feature, improvement, refactor or chore. Title in English, body in Russian.
 body:
   - type: textarea
     id: context
