@@ -59,7 +59,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
 - `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
 - `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification`), сгенерены CLI; ре-экспортятся из `schema.ts`.
-- `src/db/schema.ts` - таблица `todos` + `export * from './auth-schema'`.
+- `src/db/schema.ts` - таблицы `todos`, `boards`, `lists`, `cards` + `export * from './auth-schema'`.
+- `src/db/backfill-boards.integration.test.ts` - перенос todo → boards/lists/cards, идемпотентность.
 - `src/db/index.ts` - drizzle-клиент на `neon-http` (HTTP-драйвер Neon, работает и локально, и на Vercel). `DATABASE_URL` - pooled-строка Neon. Транзакций не используем.
 - `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
 - `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (Neon-ветка `test`), `truncate` в `beforeEach`.
@@ -71,6 +72,8 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 `todos`: `id` (uuid, pk, defaultRandom), `name` (text), `isComplete` (bool), `createdAt`, `updatedAt` (timestamptz). Индекс `todos_user_id_created_at_idx` на `(user_id, createdAt)` - все запросы идут по владельцу с сортировкой по дате.
 
 `todos.userId` (text, FK → `user.id`, notNull, cascade) - владелец задачи.
+
+`boards`/`lists`/`cards` (фаза 0, UI и server functions пока не используют): `boards` (`ownerId` → `user.id`, cascade, `title`), `lists` (`boardId` → `boards.id`, cascade, `title`), `cards` (`listId` → `lists.id`, cascade, `title`, `legacyTodoId` - nullable unique uuid без FK, временная связь для идемпотентного переноса из `todos`, удаляется вместе с `todos`). Каждая таблица - `id`/`createdAt`/`updatedAt` как у `todos`. Индексы: `boards_owner_id_idx`, `lists_board_id_created_at_idx`, `cards_list_id_created_at_idx`. Миграция `drizzle/0004_backfill_boards_from_todos.sql` идемпотентно копирует существующие todo в доску «My tasks» (колонки «To do»/«Done» по `isComplete`) для пользователей без досок.
 
 Auth (Better Auth): `user` (идентичность), `account` (учётки/провайдеры, 1:N; хеш пароля в `account.password`), `session` (серверные сессии), `verification` (одноразовые токены).
 
