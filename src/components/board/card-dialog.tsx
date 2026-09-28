@@ -28,7 +28,7 @@ interface CardDialogProps {
     card: Card;
     list: ListWithCards;
     lists: Array<ListWithCards>;
-    onClose: () => void;
+    onClose: () => Promise<void> | void;
 }
 
 export function CardDialog({
@@ -66,9 +66,11 @@ export function CardDialog({
         setDescription(card.description ?? '');
     }
 
-    function handleDelete() {
+    async function handleDelete() {
+        // Leave the card route first: removing the card from the cache while
+        // the route is still mounted triggers its "Card not found" fallback.
+        await onClose();
         deleteWithUndo(card);
-        onClose();
     }
 
     return (
@@ -78,7 +80,7 @@ export function CardDialog({
                 if (!open) onClose();
             }}
         >
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                     {isEditingTitle ? (
                         // Mounted anew on every edit, so defaultValue always starts from the current title.
@@ -104,7 +106,7 @@ export function CardDialog({
                             <button
                                 type="button"
                                 onClick={() => setIsEditingTitle(true)}
-                                className="text-left"
+                                className="min-w-0 text-left [overflow-wrap:anywhere]"
                             >
                                 {card.title}
                             </button>
@@ -154,6 +156,7 @@ export function CardDialog({
                             value={description}
                             placeholder="Add a description…"
                             rows={5}
+                            className="max-h-60 overflow-y-auto"
                             onChange={(e) => setDescription(e.target.value)}
                         />
                         {description.trim() !== (card.description ?? '') && (
