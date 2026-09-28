@@ -1,5 +1,5 @@
 import { CardDialog } from '#/components/board/card-dialog';
-import { findCardInBoard } from '#/lib/boards';
+import { cardLinkId, findCardInBoard } from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
 import { pageMeta } from '#/lib/seo';
 import { useSuspenseQuery } from '@tanstack/react-query';
@@ -42,7 +42,12 @@ function CardRoute() {
             card={found.card}
             list={found.list}
             lists={data.lists}
-            onClose={() => navigate({ to: '/b/$boardId', params: { boardId } })}
+            onClose={async () => {
+                await navigate({ to: '/b/$boardId', params: { boardId } });
+                // The dialog is opened by navigation, not by a Radix trigger,
+                // so Radix has nothing to return focus to - do it explicitly.
+                document.getElementById(cardLinkId(cardId))?.focus();
+            }}
         />
     );
 }

@@ -9,7 +9,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu';
-import { isTempId } from '#/lib/boards';
+import { cardLinkId, isTempId } from '#/lib/boards';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon } from 'lucide-react';
@@ -31,6 +31,7 @@ export function CardItem({ boardId, card, otherLists }: CardItemProps) {
             <Link
                 to="/b/$boardId/c/$cardId"
                 params={{ boardId, cardId: card.id }}
+                id={cardLinkId(card.id)}
                 disabled={isSaving}
                 className="block truncate px-3 py-2 pr-8 text-sm"
             >

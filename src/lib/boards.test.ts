@@ -4,6 +4,7 @@ import {
     addListToBoard,
     createTempId,
     findCardInBoard,
+    cardLinkId,
     isTempId,
     moveCardInBoard,
     removeCardFromBoard,
@@ -202,5 +203,11 @@ describe('temp ids', () => {
 
     it('creates unique ids', () => {
         expect(createTempId()).not.toBe(createTempId());
+    });
+});
+
+describe('cardLinkId', () => {
+    it('builds a stable DOM id from the card id', () => {
+        expect(cardLinkId('abc')).toBe('card-abc');
     });
 });

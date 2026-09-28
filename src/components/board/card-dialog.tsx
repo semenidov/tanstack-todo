@@ -83,24 +83,32 @@ export function CardDialog({
             <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                     {isEditingTitle ? (
-                        // Mounted anew on every edit, so defaultValue always starts from the current title.
-                        <Input
-                            autoFocus
-                            defaultValue={card.title}
-                            aria-label="Card title"
-                            onFocus={(e) => e.currentTarget.select()}
-                            onBlur={(e) => commitTitle(e.currentTarget.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    commitTitle(e.currentTarget.value);
+                        <>
+                            {/* Keeps the dialog named for screen readers while the title is an input. */}
+                            <DialogTitle className="sr-only">
+                                {card.title}
+                            </DialogTitle>
+                            {/* Mounted anew on every edit, so defaultValue always starts from the current title. */}
+                            <Input
+                                autoFocus
+                                defaultValue={card.title}
+                                aria-label="Card title"
+                                onFocus={(e) => e.currentTarget.select()}
+                                onBlur={(e) =>
+                                    commitTitle(e.currentTarget.value)
                                 }
-                                if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setIsEditingTitle(false);
-                                }
-                            }}
-                        />
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        commitTitle(e.currentTarget.value);
+                                    }
+                                    if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setIsEditingTitle(false);
+                                    }
+                                }}
+                            />
+                        </>
                     ) : (
                         <DialogTitle asChild>
                             <button
