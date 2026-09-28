@@ -125,7 +125,7 @@ export function ListColumn({ boardId, list }: ListColumnProps) {
     }
 
     return (
-        <div className="flex max-h-full w-[85vw] shrink-0 snap-start flex-col rounded-lg border bg-card sm:w-72">
+        <div className="flex max-h-full w-[85vw] shrink-0 snap-center flex-col rounded-lg border bg-card sm:w-72 sm:snap-start">
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <ListTitle
                     title={list.title}

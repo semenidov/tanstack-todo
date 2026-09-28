@@ -4,6 +4,7 @@ import { ThemeToggle } from '#/components/theme-toggle';
 import { Button } from '#/components/ui/button';
 import {
     Empty,
+    EmptyContent,
     EmptyDescription,
     EmptyHeader,
     EmptyMedia,
@@ -54,13 +55,16 @@ export function BoardView({ board, lists }: BoardData) {
                                 Add your first list to get started.
                             </EmptyDescription>
                         </EmptyHeader>
+                        <EmptyContent>
+                            <AddList
+                                boardId={board.id}
+                                className="w-full max-w-72 sm:w-full"
+                            />
+                        </EmptyContent>
                     </Empty>
-                    <div className="mt-4">
-                        <AddList boardId={board.id} />
-                    </div>
                 </div>
             ) : (
-                <div className="flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto p-4">
+                <div className="flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4">
                     {lists.map((list) => (
                         <ListColumn
                             key={list.id}

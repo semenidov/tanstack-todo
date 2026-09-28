@@ -7,6 +7,7 @@ import { addListServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from 'cn';
 
 function useAddList(boardId: string) {
     const queryClient = useQueryClient();
@@ -42,7 +43,12 @@ function useAddList(boardId: string) {
     });
 }
 
-export function AddList({ boardId }: { boardId: string }) {
+interface AddListProps {
+    boardId: string;
+    className?: string;
+}
+
+export function AddList({ boardId, className }: AddListProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [value, setValue] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
@@ -69,7 +75,10 @@ export function AddList({ boardId }: { boardId: string }) {
         return (
             <Button
                 variant="outline"
-                className="h-10 w-[85vw] shrink-0 snap-start justify-start sm:w-72"
+                className={cn(
+                    'h-10 w-[85vw] shrink-0 snap-center justify-start sm:w-72 sm:snap-start',
+                    className,
+                )}
                 onClick={() => setIsEditing(true)}
             >
                 <PlusIcon />
@@ -79,7 +88,12 @@ export function AddList({ boardId }: { boardId: string }) {
     }
 
     return (
-        <div className="w-[85vw] shrink-0 snap-start sm:w-72">
+        <div
+            className={cn(
+                'w-[85vw] shrink-0 snap-center sm:w-72 sm:snap-start',
+                className,
+            )}
+        >
             <Input
                 ref={inputRef}
                 value={value}
