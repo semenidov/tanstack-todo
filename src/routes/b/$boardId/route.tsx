@@ -10,6 +10,7 @@ import {
     createFileRoute,
     Link,
     notFound,
+    Outlet,
     redirect,
 } from '@tanstack/react-router';
 import { ArrowLeftIcon, SearchXIcon } from 'lucide-react';
@@ -69,5 +70,10 @@ function BoardPage() {
 
     if (!data) return <BoardNotFound />;
 
-    return <BoardView board={data.board} lists={data.lists} />;
+    return (
+        <>
+            <BoardView board={data.board} lists={data.lists} />
+            <Outlet />
+        </>
+    );
 }
