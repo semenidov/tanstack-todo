@@ -64,7 +64,15 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/server/boards-repo.ts` - чистый data-слой досок: `getDefaultBoard/getBoard/addList/renameList/deleteList/addCard/updateCard/moveCard/deleteCard`, все с явным `userId`. Доступ проверяется самим запросом (join/`inArray`-подзапрос до `boards.owner_id = userId`), отдельной функции проверки нет; для инсертов (`addList/addCard`) - предварительный `findFirst` с проверкой владельца перед `insert`. `moveCard` требует, чтобы целевая колонка была на той же доске, что и текущая. Мутации над чужим/несуществующим id не меняют данные и возвращают `[]`/`null`.
 - `src/server/boards-repo.integration.test.ts` - ownership-скоуп для всех репо-функций досок, включая попытку `moveCard` на чужую доску того же владельца.
 - `src/server/boards.ts` - server fns над досками (`getDefaultBoardServer/getBoardServer/addListServer/renameListServer/deleteListServer/addCardServer/updateCardServer/moveCardServer/deleteCardServer`). Тонкие обёртки: `requireUserId` → вызов `boards-repo`, валидация zod (`z.uuid()`, название/описание с лимитами).
-- `src/lib/boards-query.ts` - `boardQueryOptions(boardId)`, `defaultBoardQueryOptions` (импортируют read-fns из `#/server/boards`).
+- `src/lib/boards-query.ts` - `boardQueryOptions(boardId)`, `defaultBoardQueryOptions` (импортируют read-fns из `#/server/boards`); экспортит типы `BoardData`/`ListWithCards`/`Card`, выведенные из возврата `getBoardServer`.
+- `src/lib/boards.ts` - чистые функции над `BoardData`: `addListToBoard/renameListInBoard/removeListFromBoard` (для оптимистичных правок кэша `['boards', boardId]`).
+- `src/routes/b.$boardId.tsx` - `/b/$boardId`: доска (фаза 1a, только колонки). Лоадер - uuid-guard + `boardQueryOptions` (иначе `notFound`), `pendingComponent: BoardSkeleton`, `notFoundComponent: BoardNotFound`, `errorComponent: RouteError`. `head` берёт название доски из `loaderData`.
+- `src/components/board/board-view.tsx` - `BoardView`: шапка (название доски, `ThemeToggle`, выход - без Add/бейджа) + горизонтальный ряд `ListColumn` + `AddList`; пустая доска - `Empty` + `AddList`.
+- `src/components/board/list-column.tsx` - `ListColumn`: колонка (`w-[85vw] sm:w-72`, `snap-start`, внутренний скролл), заголовок через `ListTitle`, меню `⋯` (Rename/Delete) через shadcn `DropdownMenu`. Мутации: `useRenameList` (оптимистичная, откат+тост, invalidate), `useDeleteList` - `deleteConfirmed` (после `DeleteListDialog`, для непустых колонок) и `deleteEmptyWithUndo` (пустая колонка - как удаление todo: тост Undo 5с, `settled`-флаг).
+- `src/components/board/list-title.tsx` - `ListTitle`: заголовок с инлайн-редактированием (Enter/blur - сохранить непустое и изменённое, Esc - отмена без сохранения), контролируется родителем (`isEditing` снаружи, чтобы пункт меню Rename тоже мог войти в режим правки).
+- `src/components/board/add-list.tsx` - `AddList`: кнопка → поле; Enter сохраняет и оставляет поле открытым (рефокус), Esc/blur закрывают. Оптимистичное добавление с временным `id` (`crypto.randomUUID()`), реальный id приходит через `onSettled` → invalidate (сервер не возвращает созданную запись).
+- `src/components/board/delete-list-dialog.tsx` - `DeleteListDialog`: shadcn `AlertDialog`, текст с числом карточек (ед./мн. число), фокус на Cancel (`autoFocus`, он первый в DOM).
+- `src/components/board/board-skeleton.tsx` - `BoardSkeleton`: шапка + 3 колонки-скелетона на `ui/skeleton`.
 - `src/db/index.ts` - drizzle-клиент на `neon-http` (HTTP-драйвер Neon, работает и локально, и на Vercel). `DATABASE_URL` - pooled-строка Neon. Транзакций не используем.
 - `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
 - `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (Neon-ветка `test`), `truncate` в `beforeEach`.
@@ -83,7 +91,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 
 ## Роуты
 
-`/` список · `/new` создать · `/edit/$todoId` редактировать · неизвестный URL → root `notFoundComponent`.
+`/` список · `/new` создать · `/edit/$todoId` редактировать · `/b/$boardId` доска (фаза 1a, `/` пока не переключена) · неизвестный URL → root `notFoundComponent`.
 
 ## Сквозные паттерны
 
