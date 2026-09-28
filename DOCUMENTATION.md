@@ -46,6 +46,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
 - `src/components/ui/*` - shadcn (генерятся CLI; после `add` прогонять `npm run format`).
+- `src/components/todo-list-skeleton.tsx` - `TodoListSkeleton`, повторяет вёрстку шапки и строк списка (`ui/skeleton.tsx`); используется как `pendingComponent` роута `/` (`pendingMs: 200`, `pendingMinMs: 300`) - без сдвига вёрстки при подмене на данные.
 - `src/server/todos.ts` - server fns над todos (`get/getOne/add/toggle/delete/update`) + тип `Todo`. Тонкие обёртки: `requireUserId` → вызов `todos-repo`.
 - `src/server/todos-repo.ts` - чистый data-слой: функции с явным `userId` (`listTodos/getTodo/addTodo/toggleTodo/deleteTodo/updateTodo`), скоуп по владельцу в SQL. Тестируемый шов для integration; мутации возвращают `.returning()`.
 - `src/lib/todos-query.ts` - только `todosQueryOptions`, `todoQueryOptions(id)` (импортируют read-fns из `#/server/todos`).
