@@ -26,18 +26,26 @@ export async function getDefaultBoard(userId: string) {
     });
     if (existing) return existing;
 
-    // neon-http has no session/socket to hold open across statements, so it
-    // doesn't support interactive transactions (unlike neon-serverless over
-    // a pool). This is therefore a sequential insert, not atomic: a race
-    // between two requests could create two default boards. Not handled -
-    // out of scope for the single-board phase.
-    const [board] = await db
-        .insert(boards)
-        .values({ ownerId: userId, title: 'My tasks' })
-        .returning();
-    for (const title of DEFAULT_LIST_TITLES) {
-        await db.insert(lists).values({ boardId: board.id, title });
-    }
+    // neon-http has no interactive transactions, but a batch runs in one
+    // transaction: the board is never left without its lists. The id is
+    // generated here because lists can't read the board insert's result.
+    // Explicit createdAt keeps list order stable (now() is equal inside a transaction).
+    const boardId = crypto.randomUUID();
+    const now = Date.now();
+    const [[board]] = await db.batch([
+        db
+            .insert(boards)
+            .values({ id: boardId, ownerId: userId, title: 'My tasks' })
+            .returning(),
+        db.insert(lists).values(
+            DEFAULT_LIST_TITLES.map((title, i) => ({
+                boardId,
+                title,
+                createdAt: new Date(now + i),
+            })),
+        ),
+    ]);
+
     return board;
 }
 

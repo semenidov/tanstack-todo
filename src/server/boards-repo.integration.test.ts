@@ -29,11 +29,9 @@ describe('getDefaultBoard', () => {
         const boardLists = await db
             .select()
             .from(lists)
-            .where(eq(lists.boardId, board.id));
-        expect(boardLists.map((l) => l.title).sort()).toEqual([
-            'Done',
-            'To do',
-        ]);
+            .where(eq(lists.boardId, board.id))
+            .orderBy(lists.createdAt);
+        expect(boardLists.map((l) => l.title)).toEqual(['To do', 'Done']);
     });
 
     it('returns the same board on a repeated call', async () => {
