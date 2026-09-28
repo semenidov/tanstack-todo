@@ -18,6 +18,7 @@ If the issue has no plan, or the plan is ambiguous or contradicts the code, stop
 - One issue per run. No "while I'm here" changes. If you notice something else, mention it in the PR under "Look closely at".
 - Read only the files named in the plan and what they directly import when needed. Read targeted ranges, not whole large files. Don't explore the codebase, don't read `DOCUMENTATION.md` or `DECISIONS.md` in full (grep the relevant section).
 - Follow `CONTRIBUTING.md` (branch `type/<issue>-slug` from fresh `master`, Conventional Commits, draft PR, `Closes #N`). Read it once with a grep for the rules you need.
+- Before writing code, read `CODING.md` in full and follow it. It is short on purpose.
 - Don't run tests, typecheck, lint or the dev server (DECISIONS #33). Git hooks run on commit/push; if a hook fails, fix only what it reports.
 - Don't generate binary assets (images, icons) or install dependencies unless the plan says so.
 - Don't merge, don't force-push, don't touch `.env*` files, never print secrets.
