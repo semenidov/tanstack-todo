@@ -1,0 +1,187 @@
+import { useState } from 'react';
+import {
+    useDeleteCard,
+    useMoveCard,
+    useUpdateCard,
+} from '#/components/board/card-mutations';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '#/components/ui/dialog';
+import { Button } from '#/components/ui/button';
+import { Input } from '#/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '#/components/ui/select';
+import { Textarea } from '#/components/ui/textarea';
+import type { Card, ListWithCards } from '#/lib/boards-query';
+import { Trash2Icon } from 'lucide-react';
+
+interface CardDialogProps {
+    boardId: string;
+    card: Card;
+    list: ListWithCards;
+    lists: Array<ListWithCards>;
+    onClose: () => void;
+}
+
+export function CardDialog({
+    boardId,
+    card,
+    list,
+    lists,
+    onClose,
+}: CardDialogProps) {
+    const [isEditingTitle, setIsEditingTitle] = useState(false);
+    const [description, setDescription] = useState(card.description ?? '');
+    const updateCard = useUpdateCard(boardId);
+    const moveCard = useMoveCard(boardId);
+    const { deleteWithUndo } = useDeleteCard(boardId);
+
+    function commitTitle(raw: string) {
+        const trimmed = raw.trim();
+        if (trimmed && trimmed !== card.title) {
+            updateCard.mutate({ cardId: card.id, title: trimmed });
+        }
+        setIsEditingTitle(false);
+    }
+
+    function saveDescription() {
+        const trimmed = description.trim();
+        if (trimmed !== (card.description ?? '')) {
+            updateCard.mutate({
+                cardId: card.id,
+                description: trimmed === '' ? null : trimmed,
+            });
+        }
+    }
+
+    function cancelDescription() {
+        setDescription(card.description ?? '');
+    }
+
+    function handleDelete() {
+        deleteWithUndo(card);
+        onClose();
+    }
+
+    return (
+        <Dialog
+            open
+            onOpenChange={(open) => {
+                if (!open) onClose();
+            }}
+        >
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    {isEditingTitle ? (
+                        // Mounted anew on every edit, so defaultValue always starts from the current title.
+                        <Input
+                            autoFocus
+                            defaultValue={card.title}
+                            aria-label="Card title"
+                            onFocus={(e) => e.currentTarget.select()}
+                            onBlur={(e) => commitTitle(e.currentTarget.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    commitTitle(e.currentTarget.value);
+                                }
+                                if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    setIsEditingTitle(false);
+                                }
+                            }}
+                        />
+                    ) : (
+                        <DialogTitle asChild>
+                            <button
+                                type="button"
+                                onClick={() => setIsEditingTitle(true)}
+                                className="text-left"
+                            >
+                                {card.title}
+                            </button>
+                        </DialogTitle>
+                    )}
+                </DialogHeader>
+
+                <div className="space-y-4">
+                    <div className="space-y-1.5">
+                        <label
+                            htmlFor="card-list"
+                            className="text-sm font-medium"
+                        >
+                            List
+                        </label>
+                        <Select
+                            value={list.id}
+                            onValueChange={(toListId) =>
+                                moveCard.mutate({
+                                    cardId: card.id,
+                                    toListId,
+                                })
+                            }
+                        >
+                            <SelectTrigger id="card-list" className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {lists.map((l) => (
+                                    <SelectItem key={l.id} value={l.id}>
+                                        {l.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <label
+                            htmlFor="card-description"
+                            className="text-sm font-medium"
+                        >
+                            Description
+                        </label>
+                        <Textarea
+                            id="card-description"
+                            value={description}
+                            placeholder="Add a description…"
+                            rows={5}
+                            onChange={(e) => setDescription(e.target.value)}
+                        />
+                        {description.trim() !== (card.description ?? '') && (
+                            <div className="flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={cancelDescription}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button size="sm" onClick={saveDescription}>
+                                    Save
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        className="w-full"
+                    >
+                        <Trash2Icon />
+                        Delete card
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
