@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
-import { addListToBoard } from '#/lib/boards';
+import { addListToBoard, createTempId } from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
 import { addListServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,7 +21,7 @@ function useAddList(boardId: string) {
             queryClient.setQueryData(key, (old) =>
                 old
                     ? addListToBoard(old, {
-                          id: crypto.randomUUID(),
+                          id: createTempId(),
                           boardId,
                           title,
                           createdAt: new Date(),
