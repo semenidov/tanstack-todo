@@ -7,6 +7,7 @@ import {
 import type { QueryClient } from '@tanstack/react-query';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
+import { ThemeProvider } from 'next-themes';
 import { MessageScreen } from '#/components/message-screen';
 import { Button } from '#/components/ui/button';
 import { Toaster } from '#/components/ui/sonner';
@@ -74,15 +75,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootDocument({ children }: { children: React.ReactNode }) {
     return (
-        <html lang="en">
+        <html lang="en" suppressHydrationWarning>
             <head>
                 <HeadContent />
             </head>
             <body>
-                {children}
-                <Toaster richColors position="bottom-right" />
-                <Analytics beforeSend={normalizeAnalyticsUrl} />
-                <SpeedInsights beforeSend={normalizeAnalyticsUrl} />
+                <ThemeProvider
+                    attribute="class"
+                    defaultTheme="system"
+                    enableSystem
+                    disableTransitionOnChange
+                >
+                    {children}
+                    <Toaster richColors position="bottom-right" />
+                    <Analytics beforeSend={normalizeAnalyticsUrl} />
+                    <SpeedInsights beforeSend={normalizeAnalyticsUrl} />
+                </ThemeProvider>
                 <TanStackDevtools
                     config={{
                         position: 'bottom-right',
