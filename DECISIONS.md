@@ -181,3 +181,7 @@ Claude не запускает тесты/typecheck/lint после каждог
 ## 46. 2026-09-28 · Boards/lists/cards как фаза 0: только модель данных (#31)
 
 Расширение в сторону Trello вводится expand/contract: сначала схема (`boards`/`lists`/`cards`) и идемпотентный перенос существующих `todos` (миграция `drizzle/0004_backfill_boards_from_todos.sql`, по `legacyTodoId`), UI и server functions продолжают работать на `todos` до фазы 1 (когда `/` станет доской «My tasks», `isComplete` заменится колонкой «Done»). Перенос идемпотентен через `NOT EXISTS`/`legacyTodoId` (unique, без FK - временная связь, удаляется вместе с `todos` в конце миграции), поэтому его можно безопасно повторять для новых todo вплоть до фазы 1. `position`/drag-and-drop, роли и архив - отложены до фазы 2, доска для новых пользователей без todo - тоже отложена (не создаётся сейчас).
+
+## 47. 2026-09-28 · Миграции на preview-деплоях через vercel-build (уточняет №37)
+
+Превью PR фазы 1 падали бы на новых таблицах/колонках - миграции на них раньше не применялись. `scripts/vercel-build.mjs` (новый скрипт `package.json`: `vercel-build`) при `VERCEL_ENV=preview` катит `drizzle-kit migrate` на `DATABASE_URL_UNPOOLED` (её подставляет Neon-интеграция, прямое подключение - см. №24) перед `vite build`; падение миграции валит сборку. На production скрипт не используется - там миграции остаются за CI-джобой `migrate` (№27), `build`/`drizzle.config.ts` не тронуты.
