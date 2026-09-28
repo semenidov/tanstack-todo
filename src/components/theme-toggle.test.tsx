@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ThemeProvider } from 'next-themes';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ThemeToggle } from '#/components/theme-toggle';
+import { Theme, ThemeToggle } from '#/components/theme-toggle';
 
 beforeEach(() => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -19,7 +19,11 @@ beforeEach(() => {
 
 function renderToggle() {
     return render(
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <ThemeProvider
+            attribute="class"
+            defaultTheme={Theme.Light}
+            enableSystem
+        >
             <ThemeToggle />
         </ThemeProvider>,
     );
