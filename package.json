@@ -15,6 +15,7 @@
         "test:e2e:ui": "playwright test --ui",
         "generate-routes": "tsr generate",
         "build": "vite build",
+        "vercel-build": "node scripts/vercel-build.mjs",
         "preview": "vite preview",
         "lint": "eslint",
         "typecheck": "tsc --noEmit",
