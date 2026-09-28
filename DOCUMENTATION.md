@@ -14,7 +14,7 @@
 
 TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод: Vercel (serverless) + Neon (managed Postgres) - https://todo-semenidov.vercel.app.
 
-Окружения Vercel: **Production** (merge в `master`) - статичный `DATABASE_URL` на Neon `main`; **Preview** (любая другая ветка/PR) - интеграция Neon-Managed подставляет `DATABASE_URL` (+`_UNPOOLED`) в каждый деплой сама (webhook → ветка `preview/<git-ветка>`), руками для Preview его не задавать. Ветка БД - снимок `main` на первом деплое git-ветки (копия прод-данных), дальше живёт отдельно; обновить - Reset from parent в Neon; удаляется после удаления git-ветки (при следующем preview-деплое). Development в Vercel не используем (локально `.env`). Секреты окружений раздельные (`BETTER_AUTH_SECRET` у Preview свой).
+Окружения Vercel: **Production** (merge в `master`) - статичный `DATABASE_URL` на Neon `main`; **Preview** (любая другая ветка/PR) - интеграция Neon-Managed подставляет `DATABASE_URL` (+`_UNPOOLED`) в каждый деплой сама (webhook → ветка `preview/<git-ветка>`), руками для Preview его не задавать. Ветка БД - снимок `main` на первом деплое git-ветки (копия прод-данных), дальше живёт отдельно; обновить - Reset from parent в Neon; удаляется после удаления git-ветки (при следующем preview-деплое). Development в Vercel не используем (локально `.env`). Секреты окружений раздельные (`BETTER_AUTH_SECRET` у Preview свой). Сборка идёт через `npm run vercel-build` (`scripts/vercel-build.mjs`): на Preview перед `vite build` катит `drizzle-kit migrate` на свою Neon-ветку, на Production - только `vite build`.
 
 ## Команды
 
