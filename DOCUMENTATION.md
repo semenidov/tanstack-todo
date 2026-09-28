@@ -59,8 +59,12 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
 - `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
 - `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification`), сгенерены CLI; ре-экспортятся из `schema.ts`.
-- `src/db/schema.ts` - таблицы `todos`, `boards`, `lists`, `cards` + `export * from './auth-schema'`.
+- `src/db/schema.ts` - таблицы `todos`, `boards`, `lists`, `cards` (`cards.description` nullable) + `relations` для `boards/lists/cards` (нужны для relational `getBoard`) + `export * from './auth-schema'`.
 - `src/db/backfill-boards.integration.test.ts` - перенос todo → boards/lists/cards, идемпотентность.
+- `src/server/boards-repo.ts` - чистый data-слой досок: `getDefaultBoard/getBoard/addList/renameList/deleteList/addCard/updateCard/moveCard/deleteCard`, все с явным `userId`. Доступ проверяется самим запросом (join/`inArray`-подзапрос до `boards.owner_id = userId`), отдельной функции проверки нет; для инсертов (`addList/addCard`) - предварительный `findFirst` с проверкой владельца перед `insert`. `moveCard` требует, чтобы целевая колонка была на той же доске, что и текущая. Мутации над чужим/несуществующим id не меняют данные и возвращают `[]`/`null`.
+- `src/server/boards-repo.integration.test.ts` - ownership-скоуп для всех репо-функций досок, включая попытку `moveCard` на чужую доску того же владельца.
+- `src/server/boards.ts` - server fns над досками (`getDefaultBoardServer/getBoardServer/addListServer/renameListServer/deleteListServer/addCardServer/updateCardServer/moveCardServer/deleteCardServer`). Тонкие обёртки: `requireUserId` → вызов `boards-repo`, валидация zod (`z.uuid()`, название/описание с лимитами).
+- `src/lib/boards-query.ts` - `boardQueryOptions(boardId)`, `defaultBoardQueryOptions` (импортируют read-fns из `#/server/boards`).
 - `src/db/index.ts` - drizzle-клиент на `neon-http` (HTTP-драйвер Neon, работает и локально, и на Vercel). `DATABASE_URL` - pooled-строка Neon. Транзакций не используем.
 - `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
 - `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (Neon-ветка `test`), `truncate` в `beforeEach`.
