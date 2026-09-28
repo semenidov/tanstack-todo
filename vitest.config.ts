@@ -26,6 +26,8 @@ export default defineConfig({
                     name: 'integration',
                     environment: 'node',
                     setupFiles: ['./src/test/setup.integration.ts'],
+                    // One shared DB and a global truncate in beforeEach: files must not run in parallel.
+                    fileParallelism: false,
                     include: ['src/**/*.integration.{test,spec}.{ts,tsx}'],
                     hookTimeout: 30000,
                     testTimeout: 30000,
