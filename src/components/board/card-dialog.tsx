@@ -164,7 +164,7 @@ export function CardDialog({
                             value={description}
                             placeholder="Add a description…"
                             rows={5}
-                            className="max-h-60 overflow-y-auto"
+                            className="h-40 resize-none overflow-y-auto field-sizing-fixed"
                             onChange={(e) => setDescription(e.target.value)}
                         />
                         {description.trim() !== (card.description ?? '') && (
