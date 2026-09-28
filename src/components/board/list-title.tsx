@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { Badge } from '#/components/ui/badge';
 import { Input } from '#/components/ui/input';
 
@@ -21,19 +20,8 @@ export function ListTitle({
     onCancelEditing,
     onSave,
 }: ListTitleProps) {
-    const [value, setValue] = useState(title);
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (isEditing) {
-            setValue(title);
-            inputRef.current?.focus();
-            inputRef.current?.select();
-        }
-    }, [isEditing, title]);
-
-    function commit() {
-        const trimmed = value.trim();
+    function commit(raw: string) {
+        const trimmed = raw.trim();
         if (trimmed && trimmed !== title) {
             onSave(trimmed);
         }
@@ -41,18 +29,19 @@ export function ListTitle({
     }
 
     if (isEditing) {
+        // Mounted anew on every edit, so defaultValue always starts from the current title.
         return (
             <Input
-                ref={inputRef}
-                value={value}
+                autoFocus
+                defaultValue={title}
                 aria-label="List title"
                 className="h-7 min-w-0 flex-1 px-2 text-sm font-medium"
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={commit}
+                onFocus={(e) => e.currentTarget.select()}
+                onBlur={(e) => commit(e.currentTarget.value)}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        commit();
+                        commit(e.currentTarget.value);
                     }
                     if (e.key === 'Escape') {
                         e.preventDefault();
