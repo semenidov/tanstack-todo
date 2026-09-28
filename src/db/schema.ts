@@ -1,3 +1,4 @@
+import { relations } from 'drizzle-orm';
 import {
     boolean,
     index,
@@ -70,6 +71,7 @@ export const cards = pgTable(
             .notNull()
             .references(() => lists.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
+        description: text('description'),
         // Temporary link for idempotent backfill from `todos`; removed together with `todos`.
         legacyTodoId: uuid('legacy_todo_id').unique(),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
@@ -80,3 +82,22 @@ export const cards = pgTable(
     },
     (t) => [index('cards_list_id_created_at_idx').on(t.listId, t.createdAt)],
 );
+
+export const boardsRelations = relations(boards, ({ many }) => ({
+    lists: many(lists),
+}));
+
+export const listsRelations = relations(lists, ({ one, many }) => ({
+    board: one(boards, {
+        fields: [lists.boardId],
+        references: [boards.id],
+    }),
+    cards: many(cards),
+}));
+
+export const cardsRelations = relations(cards, ({ one }) => ({
+    list: one(lists, {
+        fields: [cards.listId],
+        references: [lists.id],
+    }),
+}));
