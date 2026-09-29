@@ -9,20 +9,25 @@ import { PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from 'cn';
 
+interface AddListVars {
+    title: string;
+    tempId: string;
+}
+
 function useAddList(boardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
 
     return useMutation({
-        mutationFn: (title: string) =>
+        mutationFn: ({ title }: AddListVars) =>
             addListServer({ data: { boardId, title } }),
-        onMutate: async (title) => {
+        onMutate: async ({ title, tempId }) => {
             await queryClient.cancelQueries({ queryKey: key });
             const previous = queryClient.getQueryData(key);
             queryClient.setQueryData(key, (old) =>
                 old
                     ? addListToBoard(old, {
-                          id: createTempId(),
+                          id: tempId,
                           boardId,
                           title,
                           createdAt: new Date(),
@@ -31,9 +36,19 @@ function useAddList(boardId: string) {
                       })
                     : old,
             );
+            requestAnimationFrame(() => {
+                document
+                    .querySelector(`[data-list-id="${tempId}"]`)
+                    ?.scrollIntoView({
+                        behavior: 'smooth',
+                        inline: 'center',
+                        block: 'nearest',
+                    });
+            });
+
             return { previous };
         },
-        onError: (_error, _title, context) => {
+        onError: (_error, _vars, context) => {
             queryClient.setQueryData(key, context?.previous);
             toast.error("Couldn't add the list. Please try again.");
         },
@@ -66,7 +81,7 @@ export function AddList({ boardId, className }: AddListProps) {
     function handleSubmit() {
         const trimmed = value.trim();
         if (!trimmed) return;
-        addList.mutate(trimmed);
+        addList.mutate({ title: trimmed, tempId: createTempId() });
         setValue('');
         inputRef.current?.focus();
     }
