@@ -11,7 +11,5 @@ if (process.env.TEST_DB !== '1') {
 }
 
 beforeEach(async () => {
-    await db.execute(
-        sql`truncate table "todos", "user" restart identity cascade`,
-    );
+    await db.execute(sql`truncate table "user" restart identity cascade`);
 });
