@@ -61,7 +61,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
                     description="The page you're looking for doesn't exist."
                     action={
                         <Button asChild>
-                            <Link to="/">
+                            <Link to="/boards">
                                 <ArrowLeftIcon />
                                 Back to list
                             </Link>

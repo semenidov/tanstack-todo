@@ -211,3 +211,7 @@ Claude не запускает тесты/typecheck/lint после каждог
 ## 53. 2026-09-29 · Contract: таблица todos и cards.legacy_todo_id удалены (#44)
 
 Шаг contract expand/contract-переноса на доски (expand #31 → switch #36, #37 → contract #44) завершён: таблица `todos` и временная колонка `cards.legacy_todo_id` удалены из схемы и БД (миграция `drizzle/0006_good_colossus.sql` - `DROP TABLE "todos" CASCADE`, `DROP CONSTRAINT "cards_legacy_todo_id_unique"`, `DROP COLUMN "legacy_todo_id"`). Интеграционный тест переноса `backfill-boards.integration.test.ts` удалён вместе с таблицей, которую он переносил. Миграция необратима - данные `todos`, не скопированные в `boards` до мержа, теряются безвозвратно.
+
+## 54. 2026-09-29 · `/` ведёт на `/boards`, доска по умолчанию убрана (#46, отменяет часть №48)
+
+`/` теперь редиректит на список досок `/boards`; `getDefaultBoard` и ленивое создание «My tasks» удалены - новый пользователь видит пустой список и создаёт доску сам (`createBoard`: доска + колонки «To do»/«Done» одним `db.batch`, как раньше). Существующие пользователи видят свою прежнюю доску в списке. `listBoards` отдаёт `listCount`/`cardCount` подзапросами `count` (0 для пустой доски). Удаление доски - навсегда (каскад до колонок и карточек); мягкое удаление - в #49. Ключ `['boards']` содержит `['boards', boardId]`: инвалидация списка затрагивает и доски. Остальная часть №48 (доступ через join в каждом запросе, `db.batch`) в силе.

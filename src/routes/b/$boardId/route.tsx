@@ -54,7 +54,7 @@ function BoardNotFound() {
             description="This board doesn't exist or you don't have access to it."
             action={
                 <Button asChild>
-                    <Link to="/">
+                    <Link to="/boards">
                         <ArrowLeftIcon />
                         Back
                     </Link>

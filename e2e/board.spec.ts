@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { CRUD_EMAIL } from './helpers/auth';
 import { resetBoards } from './helpers/db';
 import {
     addCard,
@@ -10,10 +11,10 @@ import {
 
 test.beforeEach(async ({ page }) => {
     await resetBoards();
-    await gotoBoard(page);
+    await gotoBoard(page, CRUD_EMAIL);
 });
 
-test('shows the default board with its lists', async ({ page }) => {
+test('shows a board with its lists', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'My tasks' })).toBeVisible();
     await expect(listColumn(page, 'To do')).toBeVisible();
     await expect(listColumn(page, 'Done')).toBeVisible();

@@ -7,6 +7,9 @@ export function uniqueEmail(prefix = 'user') {
 
 const PASSWORD = 'password123';
 
+/** Fixed email of the shared user from `auth.setup.ts` (the db is reset before it). */
+export const CRUD_EMAIL = 'crud@example.com';
+
 export async function gotoHydrated(page: Page, path: string) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
@@ -23,8 +26,8 @@ export async function signup(page: Page, email: string, password = PASSWORD) {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
     await page.getByRole('button', { name: 'Sign up' }).click();
-    // `/` redirects to the default board; wait for where the user lands.
-    await page.waitForURL(/\/b\/[^/]+$/);
+    // `/` redirects to `/boards`; wait for where the user lands.
+    await page.waitForURL(/\/boards$/);
 }
 
 export async function login(page: Page, email: string, password = PASSWORD) {
@@ -32,6 +35,6 @@ export async function login(page: Page, email: string, password = PASSWORD) {
     await page.getByLabel('Email').fill(email);
     await page.getByLabel('Password').fill(password);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    // `/` redirects to the default board; wait for where the user lands.
-    await page.waitForURL(/\/b\/[^/]+$/);
+    // `/` redirects to `/boards`; wait for where the user lands.
+    await page.waitForURL(/\/boards$/);
 }
