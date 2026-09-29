@@ -23,10 +23,12 @@ If the issue has no plan, or the plan is ambiguous or contradicts the code, stop
 - Don't generate binary assets (images, icons) or install dependencies unless the plan says so.
 - Don't merge, don't force-push, don't touch `.env*` files, never print secrets.
 - Update `DOCUMENTATION.md` / `DECISIONS.md` only as the plan specifies, briefly.
+- Cover every edge case marked "тест" in the plan with a test.
+- Honesty: in the PR and the final report, a claim is "verified" only if a test or CI proves it. Everything else is written as "not verified" (and preview items go to How to verify). Check git/repo state with a command before stating it.
 
 ## PR description
 
-Use `.github/pull_request_template.md`, short: Why (1-2 sentences), What changed (bullets), Review guide (file order), Look closely at (only real risks or deviations from the plan), How to verify (preview steps), Testing (what was not run). No restating the issue.
+Title in English (Conventional Commit); body in Russian. Use `.github/pull_request_template.md`, short: Why (1-2 sentences), What changed (bullets), Review guide (file order), Look closely at (only real risks or deviations from the plan), How to verify (preview steps), Testing (what was not run). No restating the issue.
 
 ## Final report
 
