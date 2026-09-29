@@ -11,10 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root';
 import { Route as IndexRouteImport } from './routes/index';
 import { Route as LoginRouteImport } from './routes/login';
-import { Route as NewRouteImport } from './routes/new';
 import { Route as SignupRouteImport } from './routes/signup';
 import { Route as BBoardIdRouteRouteImport } from './routes/b/$boardId/route';
-import { Route as EditTodoIdRouteImport } from './routes/edit.$todoId';
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$';
 import { Route as BBoardIdCCardIdRouteImport } from './routes/b/$boardId/c/$cardId';
 
@@ -28,11 +26,6 @@ const LoginRoute = LoginRouteImport.update({
     path: '/login',
     getParentRoute: () => rootRouteImport,
 } as any);
-const NewRoute = NewRouteImport.update({
-    id: '/new',
-    path: '/new',
-    getParentRoute: () => rootRouteImport,
-} as any);
 const SignupRoute = SignupRouteImport.update({
     id: '/signup',
     path: '/signup',
@@ -41,11 +34,6 @@ const SignupRoute = SignupRouteImport.update({
 const BBoardIdRouteRoute = BBoardIdRouteRouteImport.update({
     id: '/b/$boardId',
     path: '/b/$boardId',
-    getParentRoute: () => rootRouteImport,
-} as any);
-const EditTodoIdRoute = EditTodoIdRouteImport.update({
-    id: '/edit/$todoId',
-    path: '/edit/$todoId',
     getParentRoute: () => rootRouteImport,
 } as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -62,20 +50,16 @@ const BBoardIdCCardIdRoute = BBoardIdCCardIdRouteImport.update({
 export interface FileRoutesByFullPath {
     '/': typeof IndexRoute;
     '/login': typeof LoginRoute;
-    '/new': typeof NewRoute;
     '/signup': typeof SignupRoute;
     '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
-    '/edit/$todoId': typeof EditTodoIdRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
     '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
 export interface FileRoutesByTo {
     '/': typeof IndexRoute;
     '/login': typeof LoginRoute;
-    '/new': typeof NewRoute;
     '/signup': typeof SignupRoute;
     '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
-    '/edit/$todoId': typeof EditTodoIdRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
     '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
@@ -83,10 +67,8 @@ export interface FileRoutesById {
     __root__: typeof rootRouteImport;
     '/': typeof IndexRoute;
     '/login': typeof LoginRoute;
-    '/new': typeof NewRoute;
     '/signup': typeof SignupRoute;
     '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
-    '/edit/$todoId': typeof EditTodoIdRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
     '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
@@ -95,30 +77,24 @@ export interface FileRouteTypes {
     fullPaths:
         | '/'
         | '/login'
-        | '/new'
         | '/signup'
         | '/b/$boardId'
-        | '/edit/$todoId'
         | '/api/auth/$'
         | '/b/$boardId/c/$cardId';
     fileRoutesByTo: FileRoutesByTo;
     to:
         | '/'
         | '/login'
-        | '/new'
         | '/signup'
         | '/b/$boardId'
-        | '/edit/$todoId'
         | '/api/auth/$'
         | '/b/$boardId/c/$cardId';
     id:
         | '__root__'
         | '/'
         | '/login'
-        | '/new'
         | '/signup'
         | '/b/$boardId'
-        | '/edit/$todoId'
         | '/api/auth/$'
         | '/b/$boardId/c/$cardId';
     fileRoutesById: FileRoutesById;
@@ -126,10 +102,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
     IndexRoute: typeof IndexRoute;
     LoginRoute: typeof LoginRoute;
-    NewRoute: typeof NewRoute;
     SignupRoute: typeof SignupRoute;
     BBoardIdRouteRoute: typeof BBoardIdRouteRouteWithChildren;
-    EditTodoIdRoute: typeof EditTodoIdRoute;
     ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
 }
 
@@ -149,13 +123,6 @@ declare module '@tanstack/react-router' {
             preLoaderRoute: typeof LoginRouteImport;
             parentRoute: typeof rootRouteImport;
         };
-        '/new': {
-            id: '/new';
-            path: '/new';
-            fullPath: '/new';
-            preLoaderRoute: typeof NewRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
         '/signup': {
             id: '/signup';
             path: '/signup';
@@ -168,13 +135,6 @@ declare module '@tanstack/react-router' {
             path: '/b/$boardId';
             fullPath: '/b/$boardId';
             preLoaderRoute: typeof BBoardIdRouteRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/edit/$todoId': {
-            id: '/edit/$todoId';
-            path: '/edit/$todoId';
-            fullPath: '/edit/$todoId';
-            preLoaderRoute: typeof EditTodoIdRouteImport;
             parentRoute: typeof rootRouteImport;
         };
         '/api/auth/$': {
@@ -209,10 +169,8 @@ const BBoardIdRouteRouteWithChildren = BBoardIdRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
     IndexRoute: IndexRoute,
     LoginRoute: LoginRoute,
-    NewRoute: NewRoute,
     SignupRoute: SignupRoute,
     BBoardIdRouteRoute: BBoardIdRouteRouteWithChildren,
-    EditTodoIdRoute: EditTodoIdRoute,
     ApiAuthSplatRoute: ApiAuthSplatRoute,
 };
 export const routeTree = rootRouteImport
