@@ -35,7 +35,6 @@ export function useAddCard(boardId: string, listId: string) {
                 listId,
                 title,
                 description: null,
-                legacyTodoId: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             };
