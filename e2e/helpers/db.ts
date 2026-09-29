@@ -11,10 +11,11 @@ const db = drizzle(neon(url));
 
 export async function resetDb() {
     await db.execute(
-        sql`truncate table "todos", "user" restart identity cascade`,
+        sql`truncate table "todos", "boards", "user" restart identity cascade`,
     );
 }
 
-export async function resetTodos() {
-    await db.execute(sql`truncate table "todos" restart identity cascade`);
+export async function resetBoards() {
+    // Cascades to the board's lists and cards.
+    await db.execute(sql`truncate table "boards" restart identity cascade`);
 }

@@ -1,25 +1,24 @@
 import { expect, test } from '@playwright/test';
-import { gotoHydrated, signup, uniqueEmail } from './helpers/auth';
+import { signup, uniqueEmail } from './helpers/auth';
 
-// Legacy todo list UI; rewritten for boards in #37.
-test.describe.skip('isolation (legacy todo list, rewritten in #37)', () => {
-    test('a user cannot see another user tasks', async ({ browser }) => {
-        const ctxA = await browser.newContext();
-        const pageA = await ctxA.newPage();
-        await signup(pageA, uniqueEmail('a'));
-        await gotoHydrated(pageA, '/new');
-        await pageA.getByLabel('Task name').fill('A secret task');
-        await pageA.getByRole('button', { name: 'Add' }).click();
-        await pageA.waitForURL('/');
-        await expect(pageA.getByText('A secret task')).toBeVisible();
+test('a user cannot see another user board', async ({ browser }) => {
+    const ctxA = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    await signup(pageA, uniqueEmail('a'));
+    await expect(
+        pageA.getByRole('heading', { name: 'My tasks' }),
+    ).toBeVisible();
+    const boardUrlA = pageA.url();
 
-        const ctxB = await browser.newContext();
-        const pageB = await ctxB.newPage();
-        await signup(pageB, uniqueEmail('b'));
-        await expect(pageB.getByText('List is empty')).toBeVisible();
-        await expect(pageB.getByText('A secret task')).toHaveCount(0);
+    const ctxB = await browser.newContext();
+    const pageB = await ctxB.newPage();
+    await signup(pageB, uniqueEmail('b'));
 
-        await ctxA.close();
-        await ctxB.close();
-    });
+    await pageB.goto(boardUrlA);
+    await expect(
+        pageB.getByRole('heading', { name: 'Board not found' }),
+    ).toBeVisible();
+
+    await ctxA.close();
+    await ctxB.close();
 });
