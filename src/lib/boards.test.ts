@@ -20,7 +20,6 @@ function makeCard(id: string, title = id): Card {
         listId: 'list-1',
         title,
         description: null,
-        legacyTodoId: null,
         createdAt: new Date(0),
         updatedAt: new Date(0),
     };
