@@ -1,4 +1,4 @@
-import { getBoardServer, getDefaultBoardServer } from '#/server/boards';
+import { getBoardServer, listBoardsServer } from '#/server/boards';
 import { queryOptions } from '@tanstack/react-query';
 
 export const boardQueryOptions = (boardId: string) =>
@@ -7,9 +7,9 @@ export const boardQueryOptions = (boardId: string) =>
         queryFn: () => getBoardServer({ data: boardId }),
     });
 
-export const defaultBoardQueryOptions = queryOptions({
-    queryKey: ['boards', 'default'] as const,
-    queryFn: () => getDefaultBoardServer(),
+export const boardsListQueryOptions = queryOptions({
+    queryKey: ['boards'] as const,
+    queryFn: () => listBoardsServer(),
 });
 
 export type BoardData = NonNullable<Awaited<ReturnType<typeof getBoardServer>>>;

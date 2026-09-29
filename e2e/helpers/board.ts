@@ -1,11 +1,13 @@
 import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { gotoHydrated } from './auth';
+import { seedBoard } from './db';
 
-/** Goes to `/`, follows the redirect to the user's default board. */
-export async function gotoBoard(page: Page) {
-    await gotoHydrated(page, '/');
-    await page.waitForURL(/\/b\/[^/]+$/);
+/** Seeds a board for the user with `email` and opens it. */
+export async function gotoBoard(page: Page, email: string) {
+    const boardId = await seedBoard(email);
+    await gotoHydrated(page, `/b/${boardId}`);
+    return boardId;
 }
 
 /** The list column containing `listTitle`, scoped for actions within it. */

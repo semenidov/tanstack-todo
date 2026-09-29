@@ -1,8 +1,6 @@
 import { db } from '#/db';
 import { boards, cards, lists } from '#/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
-
-const DEFAULT_LIST_TITLES = ['To do', 'Done'];
+import { and, asc, count, countDistinct, eq, inArray } from 'drizzle-orm';
 
 function ownedBoardIds(userId: string) {
     return db
@@ -19,34 +17,46 @@ function ownedListIds(userId: string) {
         .where(eq(boards.ownerId, userId));
 }
 
-export async function getDefaultBoard(userId: string) {
-    const existing = await db.query.boards.findFirst({
-        where: (b) => eq(b.ownerId, userId),
-        orderBy: (b, { asc }) => asc(b.createdAt),
-    });
-    if (existing) return existing;
+export function listBoards(userId: string) {
+    // Left joins keep boards without lists/cards; counting non-null ids gives 0 for them.
+    // A card belongs to one list, so count(cards.id) has no duplicates; lists repeat
+    // once per card, hence countDistinct.
+    return db
+        .select({
+            id: boards.id,
+            title: boards.title,
+            listCount: countDistinct(lists.id),
+            cardCount: count(cards.id),
+        })
+        .from(boards)
+        .leftJoin(lists, eq(lists.boardId, boards.id))
+        .leftJoin(cards, eq(cards.listId, lists.id))
+        .where(eq(boards.ownerId, userId))
+        .groupBy(boards.id)
+        .orderBy(asc(boards.createdAt));
+}
 
-    // neon-http has no interactive transactions, but a batch runs in one
-    // transaction: the board is never left without its lists. The id is
-    // generated here because lists can't read the board insert's result.
-    // Explicit createdAt keeps list order stable (now() is equal inside a transaction).
-    const boardId = crypto.randomUUID();
-    const now = Date.now();
-    const [[board]] = await db.batch([
-        db
-            .insert(boards)
-            .values({ id: boardId, ownerId: userId, title: 'My tasks' })
-            .returning(),
-        db.insert(lists).values(
-            DEFAULT_LIST_TITLES.map((title, i) => ({
-                boardId,
-                title,
-                createdAt: new Date(now + i),
-            })),
-        ),
-    ]);
-
+export async function createBoard(userId: string, title: string) {
+    const [board] = await db
+        .insert(boards)
+        .values({ ownerId: userId, title })
+        .returning();
     return board;
+}
+
+export function renameBoard(userId: string, boardId: string, title: string) {
+    return db
+        .update(boards)
+        .set({ title })
+        .where(and(eq(boards.id, boardId), eq(boards.ownerId, userId)))
+        .returning();
+}
+
+export function deleteBoard(userId: string, boardId: string) {
+    return db
+        .delete(boards)
+        .where(and(eq(boards.id, boardId), eq(boards.ownerId, userId)))
+        .returning();
 }
 
 export async function getBoard(userId: string, boardId: string) {
@@ -54,7 +64,7 @@ export async function getBoard(userId: string, boardId: string) {
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
         with: {
             lists: {
-                orderBy: (l, { asc }) => asc(l.createdAt),
+                orderBy: (l) => asc(l.createdAt),
                 with: {
                     cards: {
                         orderBy: (c, { desc }) => desc(c.createdAt),

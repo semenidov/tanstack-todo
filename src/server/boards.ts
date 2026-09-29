@@ -6,12 +6,33 @@ import z from 'zod';
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().max(5000);
 
-export const getDefaultBoardServer = createServerFn({ method: 'GET' }).handler(
+export const listBoardsServer = createServerFn({ method: 'GET' }).handler(
     async () => {
         const userId = await requireUserId();
-        return repo.getDefaultBoard(userId);
+        return repo.listBoards(userId);
     },
 );
+
+export const createBoardServer = createServerFn({ method: 'POST' })
+    .validator(z.object({ title: titleSchema }))
+    .handler(async ({ data }) => {
+        const userId = await requireUserId();
+        return repo.createBoard(userId, data.title);
+    });
+
+export const renameBoardServer = createServerFn({ method: 'POST' })
+    .validator(z.object({ boardId: z.uuid(), title: titleSchema }))
+    .handler(async ({ data }) => {
+        const userId = await requireUserId();
+        await repo.renameBoard(userId, data.boardId, data.title);
+    });
+
+export const deleteBoardServer = createServerFn({ method: 'POST' })
+    .validator(z.object({ boardId: z.uuid() }))
+    .handler(async ({ data }) => {
+        const userId = await requireUserId();
+        await repo.deleteBoard(userId, data.boardId);
+    });
 
 export const getBoardServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())

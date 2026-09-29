@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as SignupRouteImport } from './routes/signup';
 import { Route as BBoardIdRouteRouteImport } from './routes/b/$boardId/route';
+import { Route as BoardsIndexRouteImport } from './routes/boards/index';
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$';
 import { Route as BBoardIdCCardIdRouteImport } from './routes/b/$boardId/c/$cardId';
 
@@ -36,6 +37,11 @@ const BBoardIdRouteRoute = BBoardIdRouteRouteImport.update({
     path: '/b/$boardId',
     getParentRoute: () => rootRouteImport,
 } as any);
+const BoardsIndexRoute = BoardsIndexRouteImport.update({
+    id: '/boards/',
+    path: '/boards/',
+    getParentRoute: () => rootRouteImport,
+} as any);
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
     id: '/api/auth/$',
     path: '/api/auth/$',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
     '/login': typeof LoginRoute;
     '/signup': typeof SignupRoute;
     '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
+    '/boards/': typeof BoardsIndexRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
     '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
     '/login': typeof LoginRoute;
     '/signup': typeof SignupRoute;
     '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
+    '/boards': typeof BoardsIndexRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
     '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
     '/login': typeof LoginRoute;
     '/signup': typeof SignupRoute;
     '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
+    '/boards/': typeof BoardsIndexRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
     '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
         | '/login'
         | '/signup'
         | '/b/$boardId'
+        | '/boards/'
         | '/api/auth/$'
         | '/b/$boardId/c/$cardId';
     fileRoutesByTo: FileRoutesByTo;
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
         | '/login'
         | '/signup'
         | '/b/$boardId'
+        | '/boards'
         | '/api/auth/$'
         | '/b/$boardId/c/$cardId';
     id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
         | '/login'
         | '/signup'
         | '/b/$boardId'
+        | '/boards/'
         | '/api/auth/$'
         | '/b/$boardId/c/$cardId';
     fileRoutesById: FileRoutesById;
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
     LoginRoute: typeof LoginRoute;
     SignupRoute: typeof SignupRoute;
     BBoardIdRouteRoute: typeof BBoardIdRouteRouteWithChildren;
+    BoardsIndexRoute: typeof BoardsIndexRoute;
     ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
 }
 
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
             path: '/b/$boardId';
             fullPath: '/b/$boardId';
             preLoaderRoute: typeof BBoardIdRouteRouteImport;
+            parentRoute: typeof rootRouteImport;
+        };
+        '/boards/': {
+            id: '/boards/';
+            path: '/boards';
+            fullPath: '/boards/';
+            preLoaderRoute: typeof BoardsIndexRouteImport;
             parentRoute: typeof rootRouteImport;
         };
         '/api/auth/$': {
@@ -171,8 +191,19 @@ const rootRouteChildren: RootRouteChildren = {
     LoginRoute: LoginRoute,
     SignupRoute: SignupRoute,
     BBoardIdRouteRoute: BBoardIdRouteRouteWithChildren,
+    BoardsIndexRoute: BoardsIndexRoute,
     ApiAuthSplatRoute: ApiAuthSplatRoute,
 };
 export const routeTree = rootRouteImport
     ._addFileChildren(rootRouteChildren)
     ._addFileTypes<FileRouteTypes>();
+
+import type { getRouter } from './router.tsx';
+import type { startInstance } from './start.ts';
+declare module '@tanstack/react-start' {
+    interface Register {
+        ssr: true;
+        router: Awaited<ReturnType<typeof getRouter>>;
+        config: Awaited<ReturnType<typeof startInstance.getOptions>>;
+    }
+}
