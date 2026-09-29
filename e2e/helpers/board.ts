@@ -1,4 +1,5 @@
-import type { Page } from '@playwright/test';
+import { expect  } from '@playwright/test';
+import type {Page} from '@playwright/test';
 import { gotoHydrated } from './auth';
 
 /** Goes to `/`, follows the redirect to the user's default board. */
@@ -24,6 +25,12 @@ export async function addCard(page: Page, listTitle: string, title: string) {
     await list.getByRole('button', { name: 'Add card' }).click();
     await list.getByLabel('New card title').fill(title);
     await list.getByLabel('New card title').press('Enter');
+    // Wait until the server replaces the optimistic temp id: card actions and
+    // the card link are disabled/broken while the id is temporary.
+    await expect(cardRow(page, title).getByRole('link')).not.toHaveAttribute(
+        'id',
+        /^card-temp-/,
+    );
 }
 
 export async function addList(page: Page, title: string) {

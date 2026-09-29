@@ -43,7 +43,8 @@ test('moves a card to another list', async ({ page }) => {
     await addCard(page, 'To do', 'Ship it');
     const row = cardRow(page, 'Ship it');
     await row.getByRole('button', { name: 'Card actions' }).click();
-    await page.getByRole('menuitem', { name: 'Move to…' }).click();
+    // Radix opens a submenu on pointer hover, not reliably on click.
+    await page.getByRole('menuitem', { name: 'Move to…' }).hover();
     await page.getByRole('menuitem', { name: 'Done' }).click();
 
     await expect(listColumn(page, 'Done').getByText('Ship it')).toBeVisible();
