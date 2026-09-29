@@ -1,4 +1,9 @@
-import type { BoardData, Card, ListWithCards } from '#/lib/boards-query';
+import type {
+    BoardData,
+    BoardSummary,
+    Card,
+    ListWithCards,
+} from '#/lib/boards-query';
 
 // Optimistic entities live in the cache only until the server responds;
 // their ids must never reach a server function.
@@ -129,4 +134,21 @@ export function findCardInBoard(
         if (card) return { card, list };
     }
     return undefined;
+}
+
+export function renameBoardInList(
+    boards: BoardSummary[],
+    boardId: string,
+    title: string,
+): BoardSummary[] {
+    return boards.map((board) =>
+        board.id === boardId ? { ...board, title } : board,
+    );
+}
+
+export function removeBoardFromList(
+    boards: BoardSummary[],
+    boardId: string,
+): BoardSummary[] {
+    return boards.filter((board) => board.id !== boardId);
 }

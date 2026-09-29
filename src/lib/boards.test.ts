@@ -8,7 +8,9 @@ import {
     isTempId,
     moveCardInBoard,
     removeCardFromBoard,
+    removeBoardFromList,
     removeListFromBoard,
+    renameBoardInList,
     renameListInBoard,
     updateCardInBoard,
 } from '#/lib/boards';
@@ -208,5 +210,24 @@ describe('temp ids', () => {
 describe('cardLinkId', () => {
     it('builds a stable DOM id from the card id', () => {
         expect(cardLinkId('abc')).toBe('card-abc');
+    });
+});
+
+describe('boards list cache', () => {
+    const boards = [
+        { id: 'a', title: 'A', listCount: 2, cardCount: 0 },
+        { id: 'b', title: 'B', listCount: 1, cardCount: 3 },
+    ];
+
+    it('renames only the target board without mutating the input', () => {
+        const next = renameBoardInList(boards, 'b', 'Renamed');
+        expect(next.map((b) => b.title)).toEqual(['A', 'Renamed']);
+        expect(boards[1].title).toBe('B');
+    });
+
+    it('removes only the target board, keeping the original snapshot for rollback', () => {
+        const next = removeBoardFromList(boards, 'a');
+        expect(next.map((b) => b.id)).toEqual(['b']);
+        expect(boards).toHaveLength(2);
     });
 });
