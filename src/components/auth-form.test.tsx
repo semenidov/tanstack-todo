@@ -72,4 +72,63 @@ describe('AuthForm', () => {
         ).toBeInTheDocument();
         expect(onSubmit).not.toHaveBeenCalled();
     });
+
+    it('clears only the focused field error, leaving the other field error intact', async () => {
+        const user = userEvent.setup();
+        renderForm();
+
+        // Blur both fields with invalid values so each has its own field-level error.
+        await user.type(screen.getByLabelText('Email'), 'not-an-email');
+        await user.type(screen.getByLabelText('Password'), 'short');
+        await user.tab();
+        expect(
+            await screen.findByText('Password must be at least 8 characters'),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Enter a valid email')).toBeInTheDocument();
+
+        await user.click(screen.getByLabelText('Email'));
+
+        expect(
+            screen.queryByText('Enter a valid email'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Password must be at least 8 characters'),
+        ).toBeInTheDocument();
+    });
+
+    it('clears the field error when typing a character into it', async () => {
+        const user = userEvent.setup();
+        renderForm();
+        await user.type(screen.getByLabelText('Password'), 'short');
+        await user.tab();
+        expect(
+            await screen.findByText('Password must be at least 8 characters'),
+        ).toBeInTheDocument();
+
+        await user.type(screen.getByLabelText('Password'), 'a');
+
+        expect(
+            screen.queryByText('Password must be at least 8 characters'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('shows the error again after resubmitting with an invalid value', async () => {
+        const user = userEvent.setup();
+        const { onSubmit } = renderForm();
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        expect(
+            await screen.findByText('Enter a valid email'),
+        ).toBeInTheDocument();
+
+        await user.type(screen.getByLabelText('Email'), 'still-not-an-email');
+        expect(
+            screen.queryByText('Enter a valid email'),
+        ).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        expect(
+            await screen.findByText('Enter a valid email'),
+        ).toBeInTheDocument();
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
 });
