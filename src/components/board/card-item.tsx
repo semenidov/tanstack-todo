@@ -44,7 +44,7 @@ export function CardItem({ boardId, card, otherLists }: CardItemProps) {
                         size="icon-sm"
                         aria-label="Card actions"
                         disabled={isSaving}
-                        className="absolute right-1 top-1 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
                     >
                         <EllipsisIcon />
                     </Button>
