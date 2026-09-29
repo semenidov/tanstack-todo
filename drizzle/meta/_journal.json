@@ -43,6 +43,13 @@
             "when": 1790609302205,
             "tag": "0005_shocking_deathbird",
             "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1790690315102,
+            "tag": "0006_good_colossus",
+            "breakpoints": true
         }
     ]
 }

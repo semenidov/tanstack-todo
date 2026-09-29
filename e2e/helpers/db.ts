@@ -11,7 +11,7 @@ const db = drizzle(neon(url));
 
 export async function resetDb() {
     await db.execute(
-        sql`truncate table "todos", "boards", "user" restart identity cascade`,
+        sql`truncate table "boards", "user" restart identity cascade`,
     );
 }
 

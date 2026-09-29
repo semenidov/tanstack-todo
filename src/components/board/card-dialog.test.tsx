@@ -63,7 +63,6 @@ const card: Card = {
     listId: 'list-1',
     title: 'Buy milk',
     description: null,
-    legacyTodoId: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
 };
