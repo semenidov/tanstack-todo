@@ -1,8 +1,17 @@
+import { BoardsSkeleton } from '#/components/boards/boards-skeleton';
+import { BoardsView } from '#/components/boards/boards-view';
+import { RouteError } from '#/components/route-error';
 import { boardsListQueryOptions } from '#/lib/boards-query';
+import { pageMeta } from '#/lib/seo';
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute, Link, redirect } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/boards/')({
+    component: BoardsPage,
+    errorComponent: RouteError,
+    pendingComponent: BoardsSkeleton,
+    pendingMs: 200,
+    pendingMinMs: 300,
     beforeLoad: ({ context }) => {
         if (!context.session) throw redirect({ to: '/login' });
     },
@@ -11,25 +20,11 @@ export const Route = createFileRoute('/boards/')({
             ...boardsListQueryOptions,
             staleTime: 'static',
         }),
-    component: BoardsPage,
+    head: () => ({ meta: pageMeta('Boards') }),
 });
 
-// Placeholder: replaced by the boards page task.
 function BoardsPage() {
     const { data } = useSuspenseQuery(boardsListQueryOptions);
 
-    return (
-        <main className="mx-auto max-w-3xl p-4">
-            <h1 className="text-2xl font-semibold">Boards</h1>
-            <ul className="mt-4 flex flex-col gap-2">
-                {data.map((board) => (
-                    <li key={board.id}>
-                        <Link to="/b/$boardId" params={{ boardId: board.id }}>
-                            {board.title}
-                        </Link>
-                    </li>
-                ))}
-            </ul>
-        </main>
-    );
+    return <BoardsView boards={data} />;
 }

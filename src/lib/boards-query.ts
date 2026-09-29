@@ -15,3 +15,4 @@ export const boardsListQueryOptions = queryOptions({
 export type BoardData = NonNullable<Awaited<ReturnType<typeof getBoardServer>>>;
 export type ListWithCards = BoardData['lists'][number];
 export type Card = ListWithCards['cards'][number];
+export type BoardSummary = Awaited<ReturnType<typeof listBoardsServer>>[number];
