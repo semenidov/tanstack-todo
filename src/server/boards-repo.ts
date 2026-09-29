@@ -1,8 +1,6 @@
 import { db } from '#/db';
 import { boards, cards, lists } from '#/db/schema';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
-
-const DEFAULT_LIST_TITLES = ['To do', 'Done'];
+import { and, asc, count, countDistinct, eq, inArray } from 'drizzle-orm';
 
 function ownedBoardIds(userId: string) {
     return db
@@ -19,47 +17,30 @@ function ownedListIds(userId: string) {
         .where(eq(boards.ownerId, userId));
 }
 
-// Column references are spelled out: drizzle drops table qualifiers inside
-// `sql` in a single-table select, which makes `id` ambiguous in subqueries.
-const listCount = sql<number>`(
-    select count(*) from "lists" where "lists"."board_id" = "boards"."id"
-)`.mapWith(Number);
-
-const cardCount = sql<number>`(
-    select count(*) from "cards"
-    inner join "lists" on "cards"."list_id" = "lists"."id"
-    where "lists"."board_id" = "boards"."id"
-)`.mapWith(Number);
-
 export function listBoards(userId: string) {
+    // Left joins keep boards without lists/cards; counting non-null ids gives 0 for them.
+    // A card belongs to one list, so count(cards.id) has no duplicates; lists repeat
+    // once per card, hence countDistinct.
     return db
-        .select({ id: boards.id, title: boards.title, listCount, cardCount })
+        .select({
+            id: boards.id,
+            title: boards.title,
+            listCount: countDistinct(lists.id),
+            cardCount: count(cards.id),
+        })
         .from(boards)
+        .leftJoin(lists, eq(lists.boardId, boards.id))
+        .leftJoin(cards, eq(cards.listId, lists.id))
         .where(eq(boards.ownerId, userId))
+        .groupBy(boards.id)
         .orderBy(asc(boards.createdAt));
 }
 
 export async function createBoard(userId: string, title: string) {
-    // neon-http has no interactive transactions, but a batch runs in one
-    // transaction: the board is never left without its lists. The id is
-    // generated here because lists can't read the board insert's result.
-    // Explicit createdAt keeps list order stable (now() is equal inside a transaction).
-    const boardId = crypto.randomUUID();
-    const now = Date.now();
-    const [[board]] = await db.batch([
-        db
-            .insert(boards)
-            .values({ id: boardId, ownerId: userId, title })
-            .returning(),
-        db.insert(lists).values(
-            DEFAULT_LIST_TITLES.map((listTitle, i) => ({
-                boardId,
-                title: listTitle,
-                createdAt: new Date(now + i),
-            })),
-        ),
-    ]);
-
+    const [board] = await db
+        .insert(boards)
+        .values({ ownerId: userId, title })
+        .returning();
     return board;
 }
 
@@ -83,7 +64,7 @@ export async function getBoard(userId: string, boardId: string) {
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
         with: {
             lists: {
-                orderBy: (l, { asc }) => asc(l.createdAt),
+                orderBy: (l) => asc(l.createdAt),
                 with: {
                     cards: {
                         orderBy: (c, { desc }) => desc(c.createdAt),

@@ -36,7 +36,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/start.ts` - `createStart`: глобальные Sentry-middleware (request + function) - ловят ошибки server fns; `createCsrfMiddleware` на все server fns (отбивает cross-site вызовы).
 - `src/instrument.client.ts` / `src/instrument.server.ts` - `Sentry.init` (DSN из env, без DSN - no-op; только ошибки). `src/lib/sentry.ts` - общий строгий `dataCollection` (без тел/кук/заголовков/данных БД/переменных стека).
 - `src/routes/__root.tsx` - корневой роут: html-shell, head, `<Toaster>`, `notFoundComponent` (404 через MessageScreen), тип контекста `{ queryClient }`.
-- `src/routes/index.tsx` - `/`: лоадер получает доску по умолчанию (`defaultBoardQueryOptions`, лениво создаётся на сервере) и делает `redirect` на `/b/$boardId`; компонент не рендерится.
+- `src/routes/index.tsx` - `/`: `redirect` на `/boards`; компонент не рендерится.
 - `src/server/debug.ts` - `crashServerFn` (тестовая серверная ошибка для Sentry); на production (`VERCEL_ENV`) отвечает 404 без броска.
 - `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
@@ -81,7 +81,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 
 ## Роуты
 
-`/` редиректит на доску по умолчанию · `/b/$boardId` доска · `/b/$boardId/c/$cardId` окно карточки (дочерний роут доски) · неизвестный URL → root `notFoundComponent`.
+`/` редиректит на `/boards` · `/boards` список досок · `/b/$boardId` доска · `/b/$boardId/c/$cardId` окно карточки (дочерний роут доски) · неизвестный URL → root `notFoundComponent`.
 
 ## Сквозные паттерны
 

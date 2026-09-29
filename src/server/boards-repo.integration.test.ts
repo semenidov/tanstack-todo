@@ -20,13 +20,24 @@ import { eq } from 'drizzle-orm';
 
 const MISSING_ID = '00000000-0000-0000-0000-000000000000';
 
+/** A board with «To do» and «Done» lists; `createBoard` itself creates an empty board. */
+async function seedBoard(userId: string, title: string) {
+    const board = await createBoard(userId, title);
+    const now = Date.now();
+    await db.insert(lists).values([
+        { boardId: board.id, title: 'To do', createdAt: new Date(now) },
+        { boardId: board.id, title: 'Done', createdAt: new Date(now + 1) },
+    ]);
+    return board;
+}
+
 describe('listBoards', () => {
     it('returns own boards ascending by createdAt with list and card counts', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const first = await createBoard(a.id, 'First');
-        const second = await createBoard(a.id, 'Second');
-        await createBoard(b.id, 'Foreign');
+        const first = await seedBoard(a.id, 'First');
+        const second = await seedBoard(a.id, 'Second');
+        await seedBoard(b.id, 'Foreign');
         const [todo] = await db
             .select()
             .from(lists)
@@ -63,19 +74,16 @@ describe('listBoards', () => {
 });
 
 describe('createBoard', () => {
-    it('creates a board with the given title and two lists in order', async () => {
+    it('creates an empty board with the given title', async () => {
         const a = await seedUser();
 
         const board = await createBoard(a.id, 'Roadmap');
 
         expect(board.title).toBe('Roadmap');
         expect(board.ownerId).toBe(a.id);
-        const boardLists = await db
-            .select()
-            .from(lists)
-            .where(eq(lists.boardId, board.id))
-            .orderBy(lists.createdAt);
-        expect(boardLists.map((l) => l.title)).toEqual(['To do', 'Done']);
+        expect(
+            await db.select().from(lists).where(eq(lists.boardId, board.id)),
+        ).toEqual([]);
     });
 
     it('creates a new board on each call', async () => {
@@ -91,7 +99,7 @@ describe('createBoard', () => {
 describe('renameBoard', () => {
     it('renames the own board', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Old');
+        const board = await seedBoard(a.id, 'Old');
 
         const rows = await renameBoard(a.id, board.id, 'New');
 
@@ -106,7 +114,7 @@ describe('renameBoard', () => {
     it('does not rename another user board', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Old');
+        const board = await seedBoard(a.id, 'Old');
 
         const rows = await renameBoard(b.id, board.id, 'Hacked');
 
@@ -128,7 +136,7 @@ describe('renameBoard', () => {
 describe('deleteBoard', () => {
     it('deletes the own board with its lists and cards', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Doomed');
+        const board = await seedBoard(a.id, 'Doomed');
         const [todo] = await db
             .select()
             .from(lists)
@@ -153,7 +161,7 @@ describe('deleteBoard', () => {
     it('does not delete another user board', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Mine');
+        const board = await seedBoard(a.id, 'Mine');
 
         const rows = await deleteBoard(b.id, board.id);
 
@@ -180,7 +188,7 @@ describe('deleteBoard', () => {
 describe('getBoard', () => {
     it('returns lists ascending by createdAt and cards descending by createdAt', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const boardLists = await db
             .select()
             .from(lists)
@@ -205,7 +213,7 @@ describe('getBoard', () => {
     it('returns null for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
 
         expect(await getBoard(b.id, board.id)).toBeNull();
     });
@@ -219,7 +227,7 @@ describe('getBoard', () => {
 describe('addList', () => {
     it('adds a list for the board owner', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
 
         const row = await addList(a.id, board.id, 'In progress');
 
@@ -230,7 +238,7 @@ describe('addList', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
 
         const row = await addList(b.id, board.id, 'hacked');
         expect(row).toBeNull();
@@ -240,7 +248,7 @@ describe('addList', () => {
 describe('renameList', () => {
     it('renames a list on the owner board', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -255,7 +263,7 @@ describe('renameList', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -270,7 +278,7 @@ describe('renameList', () => {
 describe('deleteList', () => {
     it('deletes a list and its cards', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -291,7 +299,7 @@ describe('deleteList', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -306,7 +314,7 @@ describe('deleteList', () => {
 describe('addCard', () => {
     it('adds a card to a list on the owner board', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -321,7 +329,7 @@ describe('addCard', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -336,7 +344,7 @@ describe('addCard', () => {
 describe('updateCard', () => {
     it('updates title and description for the owner', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -356,7 +364,7 @@ describe('updateCard', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -372,7 +380,7 @@ describe('updateCard', () => {
 describe('moveCard', () => {
     it('moves a card to another list on the same board', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const boardLists = await db
             .select()
             .from(lists)
@@ -388,7 +396,7 @@ describe('moveCard', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const boardLists = await db
             .select()
             .from(lists)
@@ -407,7 +415,7 @@ describe('moveCard', () => {
 
     it('refuses to move a card to a list on another board of the same owner', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -436,7 +444,7 @@ describe('moveCard', () => {
 describe('deleteCard', () => {
     it('deletes a card for the owner', async () => {
         const a = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
@@ -451,7 +459,7 @@ describe('deleteCard', () => {
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
-        const board = await createBoard(a.id, 'Board');
+        const board = await seedBoard(a.id, 'Board');
         const [list] = await db
             .select()
             .from(lists)
