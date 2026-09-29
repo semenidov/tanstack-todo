@@ -20,7 +20,6 @@ export const Route = createFileRoute('/signup')({
 
 function SignupPage() {
     const router = useRouter();
-    const navigate = Route.useNavigate();
 
     async function handleSubmit(values: { email: string; password: string }) {
         const { error } = await authClient.signUp.email({
@@ -31,8 +30,10 @@ function SignupPage() {
             toast.error(error.message ?? 'Sign up failed');
             return;
         }
+        // Re-running this route's beforeLoad redirects the now signed-in user
+        // to `/` and on to their board. A separate navigate('/') raced that
+        // redirect and could leave the URL at `/`.
         await router.invalidate();
-        await navigate({ to: '/' });
     }
 
     return (

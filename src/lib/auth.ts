@@ -28,7 +28,9 @@ export const auth = betterAuth({
         cookieCache: { enabled: true, maxAge: 5 * 60 },
     },
     rateLimit: {
-        enabled: true,
+        // E2E signs up many users from one IP and trips the sign-up limit (429).
+        // Only the Playwright web server sets this flag.
+        enabled: process.env.E2E_DISABLE_RATE_LIMIT !== 'true',
         window: 60,
         max: 100,
     },

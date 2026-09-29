@@ -46,6 +46,7 @@ export default defineConfig({
         env: {
             DATABASE_URL: process.env.DATABASE_URL!,
             BETTER_AUTH_URL: baseURL,
+            E2E_DISABLE_RATE_LIMIT: 'true',
         },
     },
 });
