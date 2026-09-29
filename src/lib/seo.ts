@@ -41,6 +41,6 @@ export const siteLinks = [
     {
         rel: 'manifest',
         href: '/manifest.webmanifest',
-        crossOrigin: 'use-credentials',
+        crossOrigin: 'use-credentials' as const,
     },
 ];
