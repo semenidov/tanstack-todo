@@ -49,8 +49,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
 - `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
 - `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification`), сгенерены CLI; ре-экспортятся из `schema.ts`.
-- `src/db/schema.ts` - таблицы `todos` (UI и server functions удалены в #37, таблица остаётся до #44), `boards`, `lists`, `cards` (`cards.description` nullable) + `relations` для `boards/lists/cards` (нужны для relational `getBoard`) + `export * from './auth-schema'`.
-- `src/db/backfill-boards.integration.test.ts` - перенос todo → boards/lists/cards, идемпотентность.
+- `src/db/schema.ts` - таблицы `boards`, `lists`, `cards` (`cards.description` nullable) + `relations` для `boards/lists/cards` (нужны для relational `getBoard`) + `export * from './auth-schema'`.
 - `src/server/boards-repo.ts` - чистый data-слой досок: `getDefaultBoard/getBoard/addList/renameList/deleteList/addCard/updateCard/moveCard/deleteCard`, все с явным `userId`. Доступ проверяется самим запросом (join/`inArray`-подзапрос до `boards.owner_id = userId`), отдельной функции проверки нет; для инсертов (`addList/addCard`) - предварительный `findFirst` с проверкой владельца перед `insert`. `moveCard` требует, чтобы целевая колонка была на той же доске, что и текущая. Мутации над чужим/несуществующим id не меняют данные и возвращают `[]`/`null`.
 - `src/server/boards-repo.integration.test.ts` - ownership-скоуп для всех репо-функций досок, включая попытку `moveCard` на чужую доску того же владельца.
 - `src/server/boards.ts` - server fns над досками (`getDefaultBoardServer/getBoardServer/addListServer/renameListServer/deleteListServer/addCardServer/updateCardServer/moveCardServer/deleteCardServer`). Тонкие обёртки: `requireUserId` → вызов `boards-repo`, валидация zod (`z.uuid()`, название/описание с лимитами).
@@ -72,15 +71,11 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
 - `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (Neon-ветка `test`), `truncate` в `beforeEach`.
 - `src/test/load-test-env.ts` - `dotenv` `.env.test` (импортится первым, до `#/db`).
-- `src/test/db.ts` - сид-хелперы `seedUser`/`seedTodo` (прямой insert).
+- `src/test/db.ts` - сид-хелпер `seedUser` (прямой insert).
 
 ## Модель данных
 
-`todos`: `id` (uuid, pk, defaultRandom), `name` (text), `isComplete` (bool), `createdAt`, `updatedAt` (timestamptz). Индекс `todos_user_id_created_at_idx` на `(user_id, createdAt)` - все запросы идут по владельцу с сортировкой по дате. UI и server functions над таблицей удалены (#37); сама таблица остаётся до #44 (там же убираются `legacy_todo_id` и её данные переносятся в `boards`, если ещё нет).
-
-`todos.userId` (text, FK → `user.id`, notNull, cascade) - владелец задачи.
-
-`boards`/`lists`/`cards`: `boards` (`ownerId` → `user.id`, cascade, `title`), `lists` (`boardId` → `boards.id`, cascade, `title`), `cards` (`listId` → `lists.id`, cascade, `title`, `legacyTodoId` - nullable unique uuid без FK, временная связь для идемпотентного переноса из `todos`, удаляется вместе с `todos`). Каждая таблица - `id`/`createdAt`/`updatedAt` как у `todos`. Индексы: `boards_owner_id_idx`, `lists_board_id_created_at_idx`, `cards_list_id_created_at_idx`. Миграция `drizzle/0004_backfill_boards_from_todos.sql` идемпотентно копирует существующие todo в доску «My tasks» (колонки «To do»/«Done» по `isComplete`) для пользователей без досок.
+`boards`/`lists`/`cards`: `boards` (`ownerId` → `user.id`, cascade, `title`), `lists` (`boardId` → `boards.id`, cascade, `title`), `cards` (`listId` → `lists.id`, cascade, `title`, `description` nullable). Каждая таблица - `id` (uuid, pk, defaultRandom)/`createdAt`/`updatedAt` (timestamptz). Индексы: `boards_owner_id_idx`, `lists_board_id_created_at_idx`, `cards_list_id_created_at_idx`.
 
 Auth (Better Auth): `user` (идентичность), `account` (учётки/провайдеры, 1:N; хеш пароля в `account.password`), `session` (серверные сессии), `verification` (одноразовые токены).
 
