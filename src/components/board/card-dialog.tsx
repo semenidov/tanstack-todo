@@ -115,7 +115,7 @@ export function CardDialog({
                             <button
                                 type="button"
                                 onClick={() => setIsEditingTitle(true)}
-                                className="flex h-9 min-w-0 items-center text-left [overflow-wrap:anywhere]"
+                                className="flex min-h-9 min-w-0 items-center text-left [overflow-wrap:anywhere]"
                             >
                                 {card.title}
                             </button>
