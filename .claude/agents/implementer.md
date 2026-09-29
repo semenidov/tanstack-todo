@@ -19,7 +19,7 @@ If the issue has no plan, or the plan is ambiguous or contradicts the code, stop
 - Read only the files named in the plan and what they directly import when needed. Read targeted ranges, not whole large files. Don't explore the codebase, don't read `DOCUMENTATION.md` or `DECISIONS.md` in full (grep the relevant section).
 - Follow `CONTRIBUTING.md` (branch `type/<issue>-slug` from fresh `master`, Conventional Commits, draft PR, `Closes #N`). Read it once with a grep for the rules you need.
 - Before writing code, read `CODING.md` in full and follow it. It is short on purpose.
-- Don't run tests, typecheck, lint or the dev server (DECISIONS #33). Exception: if you write or edit e2e tests, run the affected spec files locally (`npx playwright test <file>`) and make them pass before pushing. Git hooks run on commit/push; if a hook fails, fix only what it reports.
+- Don't run tests, typecheck, lint or the dev server (DECISIONS #33). Exception: if you write or edit e2e tests, run only those spec files locally (`npx playwright test <files>`) and make them pass before pushing. Never run the full e2e suite locally - CI does that. A Neon network error (`fetch failed`, `ConnectTimeoutError`) is the environment, not your change: report it instead of retrying. Git hooks run on commit/push; if a hook fails, fix only what it reports.
 - Don't generate binary assets (images, icons) or install dependencies unless the plan says so.
 - Don't merge, don't force-push, don't touch `.env*` files, never print secrets.
 - Update `DOCUMENTATION.md` / `DECISIONS.md` only as the plan specifies, briefly.
