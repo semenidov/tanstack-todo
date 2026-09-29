@@ -18,8 +18,11 @@ interface BoardTileProps {
     onDelete: () => void;
 }
 
+// Title box is fixed at two lines and the count is pinned to the bottom, so
+// switching to the rename input doesn't move anything (CODING.md, Вёрстка).
 const TILE_CLASS =
-    'block h-24 rounded-lg border bg-card p-3 shadow-xs transition-colors';
+    'flex h-24 flex-col justify-between rounded-lg border bg-card p-3 shadow-xs transition-colors';
+const TITLE_BOX_CLASS = 'h-10 pr-7 text-sm leading-5 font-medium';
 
 export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
     const [isEditing, setIsEditing] = useState(false);
@@ -37,27 +40,29 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
         <div className="group/tile relative">
             {isEditing ? (
                 <div className={TILE_CLASS}>
-                    <Input
-                        autoFocus
-                        defaultValue={board.title}
-                        aria-label="Board title"
-                        className="h-7 px-2 text-sm font-medium"
-                        onFocus={(e) => e.currentTarget.select()}
-                        onBlur={(e) => commit(e.currentTarget.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                commit(e.currentTarget.value);
-                            }
-                            if (e.key === 'Escape') {
-                                e.preventDefault();
-                                setIsEditing(false);
-                            }
-                        }}
-                    />
-                    <p className="mt-1 px-2 text-xs text-muted-foreground">
+                    <div className={TITLE_BOX_CLASS}>
+                        <Input
+                            autoFocus
+                            defaultValue={board.title}
+                            aria-label="Board title"
+                            className="h-5 rounded-sm border-none bg-transparent p-0 text-sm leading-5 font-medium shadow-none md:text-sm dark:bg-transparent"
+                            onFocus={(e) => e.currentTarget.select()}
+                            onBlur={(e) => commit(e.currentTarget.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    commit(e.currentTarget.value);
+                                }
+                                if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    setIsEditing(false);
+                                }
+                            }}
+                        />
+                    </div>
+                    <span className="text-xs text-muted-foreground">
                         {listsLabel}
-                    </p>
+                    </span>
                 </div>
             ) : (
                 <Link
@@ -65,10 +70,13 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
                     params={{ boardId: board.id }}
                     className={`${TILE_CLASS} hover:bg-accent`}
                 >
-                    <span className="line-clamp-2 pr-7 text-sm font-medium">
+                    <span
+                        title={board.title}
+                        className={`${TITLE_BOX_CLASS} line-clamp-2 [overflow-wrap:anywhere]`}
+                    >
                         {board.title}
                     </span>
-                    <span className="mt-1 block text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                         {listsLabel}
                     </span>
                 </Link>
