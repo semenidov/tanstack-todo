@@ -52,6 +52,7 @@ export function AddCard({ boardId, listId }: AddCardProps) {
             value={value}
             placeholder="Card title"
             aria-label="New card title"
+            className="h-8"
             onChange={(e) => setValue(e.target.value)}
             onBlur={close}
             onKeyDown={(e) => {

@@ -93,6 +93,7 @@ export function CardDialog({
                                 autoFocus
                                 defaultValue={card.title}
                                 aria-label="Card title"
+                                className="h-9 border-none bg-transparent px-0 py-0 text-lg leading-none font-semibold shadow-none"
                                 onFocus={(e) => e.currentTarget.select()}
                                 onBlur={(e) =>
                                     commitTitle(e.currentTarget.value)
@@ -114,7 +115,7 @@ export function CardDialog({
                             <button
                                 type="button"
                                 onClick={() => setIsEditingTitle(true)}
-                                className="min-w-0 text-left [overflow-wrap:anywhere]"
+                                className="flex h-9 min-w-0 items-center text-left [overflow-wrap:anywhere]"
                             >
                                 {card.title}
                             </button>
@@ -123,10 +124,10 @@ export function CardDialog({
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    <div className="space-y-1.5">
+                    <div>
                         <label
                             htmlFor="card-list"
-                            className="text-sm font-medium"
+                            className="mb-2 block text-sm font-medium"
                         >
                             List
                         </label>
@@ -152,10 +153,10 @@ export function CardDialog({
                         </Select>
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div>
                         <label
                             htmlFor="card-description"
-                            className="text-sm font-medium"
+                            className="mb-2 block text-sm font-medium"
                         >
                             Description
                         </label>
@@ -168,7 +169,7 @@ export function CardDialog({
                             onChange={(e) => setDescription(e.target.value)}
                         />
                         {description.trim() !== (card.description ?? '') && (
-                            <div className="flex justify-end gap-2">
+                            <div className="mt-3 flex justify-end gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
