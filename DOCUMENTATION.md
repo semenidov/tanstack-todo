@@ -36,7 +36,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/start.ts` - `createStart`: глобальные Sentry-middleware (request + function) - ловят ошибки server fns; `createCsrfMiddleware` на все server fns (отбивает cross-site вызовы).
 - `src/instrument.client.ts` / `src/instrument.server.ts` - `Sentry.init` (DSN из env, без DSN - no-op; только ошибки). `src/lib/sentry.ts` - общий строгий `dataCollection` (без тел/кук/заголовков/данных БД/переменных стека).
 - `src/routes/__root.tsx` - корневой роут: html-shell, head, `<Toaster>`, `notFoundComponent` (404 через MessageScreen), тип контекста `{ queryClient }`.
-- `src/routes/index.tsx` - `/`: лоадер префетчит список, `useSuspenseQuery`, `TodoHeader` + `TodoList`/`Empty`, `errorComponent`.
+- `src/routes/index.tsx` - `/`: лоадер получает доску по умолчанию (`defaultBoardQueryOptions`, лениво создаётся на сервере) и делает `redirect` на `/b/$boardId`; компонент не рендерится.
 - `src/routes/new.tsx` - `/new`: `addTodoServer` + `TodoForm`, submit → invalidate + navigate + тосты.
 - `src/routes/edit.$todoId.tsx` - `/edit/$todoId`: в лоадере uuid-guard + `getTodo` (иначе `notFound`), `updateTodoServer`, `TodoForm`, `TaskNotFound` (notFoundComponent), `errorComponent`.
 - `src/components/todo-list.tsx` - `TodoList`/`TodoItem`: toggle (оптимистичная мутация) и delete (стратегия A); server fns берёт из `#/server/todos`, экспортит тип `Todo`.
@@ -65,14 +65,19 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/server/boards-repo.integration.test.ts` - ownership-скоуп для всех репо-функций досок, включая попытку `moveCard` на чужую доску того же владельца.
 - `src/server/boards.ts` - server fns над досками (`getDefaultBoardServer/getBoardServer/addListServer/renameListServer/deleteListServer/addCardServer/updateCardServer/moveCardServer/deleteCardServer`). Тонкие обёртки: `requireUserId` → вызов `boards-repo`, валидация zod (`z.uuid()`, название/описание с лимитами).
 - `src/lib/boards-query.ts` - `boardQueryOptions(boardId)`, `defaultBoardQueryOptions` (импортируют read-fns из `#/server/boards`); экспортит типы `BoardData`/`ListWithCards`/`Card`, выведенные из возврата `getBoardServer`.
-- `src/lib/boards.ts` - чистые функции над `BoardData`: `addListToBoard/renameListInBoard/removeListFromBoard` (для оптимистичных правок кэша `['boards', boardId]`).
-- `src/routes/b.$boardId.tsx` - `/b/$boardId`: доска (фаза 1a, только колонки). Лоадер - uuid-guard + `boardQueryOptions` (иначе `notFound`), `pendingComponent: BoardSkeleton`, `notFoundComponent: BoardNotFound`, `errorComponent: RouteError`. `head` берёт название доски из `loaderData`.
+- `src/lib/boards.ts` - чистые функции над `BoardData`: списки (`addListToBoard`/`renameListInBoard`/`removeListFromBoard`) и карточки (`addCardToList`/`updateCardInBoard`/`moveCardInBoard`/`removeCardFromBoard`/`findCardInBoard`) для оптимистичных правок кэша `['boards', boardId]`.
+- `src/routes/b/$boardId/route.tsx` - `/b/$boardId`: доска-layout (папочная конвенция роутера), рендерит `BoardView` + `<Outlet />` для окна карточки. Лоадер - uuid-guard + `boardQueryOptions` (иначе `notFound`), `pendingComponent: BoardSkeleton`, `notFoundComponent: BoardNotFound`, `errorComponent: RouteError`. `head` берёт название доски из `loaderData`.
+- `src/routes/b/$boardId/c/$cardId.tsx` - `/b/$boardId/c/$cardId`: дочерний роут, окно карточки. Карточка ищется в кэше `boardQueryOptions` (`findCardInBoard`, без отдельного запроса); не найдена - тост «Card not found» + `navigate` на доску. `head` берёт название карточки из лоадера (читает тот же кэш).
 - `src/components/board/board-view.tsx` - `BoardView`: шапка (название доски, `ThemeToggle`, выход - без Add/бейджа) + горизонтальный ряд `ListColumn` + `AddList`; пустая доска - `Empty` + `AddList`.
-- `src/components/board/list-column.tsx` - `ListColumn`: колонка (`w-[85vw] sm:w-72`, `snap-start`, внутренний скролл), заголовок через `ListTitle`, меню `⋯` (Rename/Delete) через shadcn `DropdownMenu`. Мутации: `useRenameList` (оптимистичная, откат+тост, invalidate), `useDeleteList` - `deleteConfirmed` (после `DeleteListDialog`, для непустых колонок) и `deleteEmptyWithUndo` (пустая колонка - как удаление todo: тост Undo 5с, `settled`-флаг).
+- `src/components/board/list-column.tsx` - `ListColumn`: колонка (`w-[85vw] sm:w-72`, `snap-start`, внутренний скролл), заголовок через `ListTitle`, меню `⋯` (Rename/Delete) через shadcn `DropdownMenu`; тело - `AddCard` (вверху) + список `CardItem`. Мутации: `useRenameList` (оптимистичная, откат+тост, invalidate), `useDeleteList` - `deleteConfirmed` (после `DeleteListDialog`, для непустых колонок) и `deleteEmptyWithUndo` (пустая колонка - как удаление todo: тост Undo 5с, `settled`-флаг).
 - `src/components/board/list-title.tsx` - `ListTitle`: заголовок с инлайн-редактированием (Enter/blur - сохранить непустое и изменённое, Esc - отмена без сохранения), контролируется родителем (`isEditing` снаружи, чтобы пункт меню Rename тоже мог войти в режим правки).
 - `src/components/board/add-list.tsx` - `AddList`: кнопка → поле; Enter сохраняет и оставляет поле открытым (рефокус), Esc/blur закрывают. Оптимистичное добавление с временным `id` (`crypto.randomUUID()`), реальный id приходит через `onSettled` → invalidate (сервер не возвращает созданную запись).
 - `src/components/board/delete-list-dialog.tsx` - `DeleteListDialog`: shadcn `AlertDialog`, текст с числом карточек (ед./мн. число), фокус на Cancel (`autoFocus`, он первый в DOM).
 - `src/components/board/board-skeleton.tsx` - `BoardSkeleton`: шапка + 3 колонки-скелетона на `ui/skeleton`.
+- `src/components/board/add-card.tsx` - `AddCard`: как `AddList`, но в начале колонки; временный `id` через `createTempId()`, Enter сохраняет и оставляет поле открытым, Esc/blur закрывают.
+- `src/components/board/card-item.tsx` - `CardItem`: `Link` на `/b/$boardId/c/$cardId`, меню `⋯` (hover на десктопе через `group-hover`, всегда видно на мобильном) - подменю «Move to…» (`DropdownMenuSub`, остальные колонки доски) и «Delete» с Undo (как у колонок). Пока `id` временный (`isTempId`) - ссылка и меню отключены.
+- `src/components/board/card-mutations.tsx` - хуки мутаций карточек: `useAddCard`, `useUpdateCard`, `useMoveCard` (оптимистично переносят карточку в начало целевой колонки), `useDeleteCard` (Undo 5с, по образцу `useDeleteList`). Общие для `add-card.tsx`, `card-item.tsx`, `card-dialog.tsx`.
+- `src/components/board/card-dialog.tsx` - `CardDialog`: shadcn `Dialog`, инлайн-название (Enter/blur - сохранить, Esc - отмена, как `ListTitle`), `Select` колонки (выбор сразу вызывает `useMoveCard`), описание - `Textarea` + Save/Cancel (кнопки появляются при расхождении с сохранённым значением), «Delete card» с Undo. Закрытие (Esc/✕/клик мимо) - через `onOpenChange` у `Dialog`, `onClose` пробрасывается роутом и делает `navigate` на `/b/$boardId`.
 - `src/db/index.ts` - drizzle-клиент на `neon-http` (HTTP-драйвер Neon, работает и локально, и на Vercel). `DATABASE_URL` - pooled-строка Neon. Транзакций не используем.
 - `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
 - `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (Neon-ветка `test`), `truncate` в `beforeEach`.
@@ -91,7 +96,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 
 ## Роуты
 
-`/` список · `/new` создать · `/edit/$todoId` редактировать · `/b/$boardId` доска (фаза 1a, `/` пока не переключена) · неизвестный URL → root `notFoundComponent`.
+`/` редиректит на доску по умолчанию · `/new` создать · `/edit/$todoId` редактировать (старый UI todo, удаляется следующей задачей) · `/b/$boardId` доска · `/b/$boardId/c/$cardId` окно карточки (дочерний роут доски) · неизвестный URL → root `notFoundComponent`.
 
 ## Сквозные паттерны
 

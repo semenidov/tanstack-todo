@@ -13,9 +13,10 @@ import { Route as IndexRouteImport } from './routes/index';
 import { Route as LoginRouteImport } from './routes/login';
 import { Route as NewRouteImport } from './routes/new';
 import { Route as SignupRouteImport } from './routes/signup';
-import { Route as BBoardIdRouteImport } from './routes/b.$boardId';
+import { Route as BBoardIdRouteRouteImport } from './routes/b/$boardId/route';
 import { Route as EditTodoIdRouteImport } from './routes/edit.$todoId';
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$';
+import { Route as BBoardIdCCardIdRouteImport } from './routes/b/$boardId/c/$cardId';
 
 const IndexRoute = IndexRouteImport.update({
     id: '/',
@@ -37,7 +38,7 @@ const SignupRoute = SignupRouteImport.update({
     path: '/signup',
     getParentRoute: () => rootRouteImport,
 } as any);
-const BBoardIdRoute = BBoardIdRouteImport.update({
+const BBoardIdRouteRoute = BBoardIdRouteRouteImport.update({
     id: '/b/$boardId',
     path: '/b/$boardId',
     getParentRoute: () => rootRouteImport,
@@ -52,24 +53,31 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
     path: '/api/auth/$',
     getParentRoute: () => rootRouteImport,
 } as any);
+const BBoardIdCCardIdRoute = BBoardIdCCardIdRouteImport.update({
+    id: '/c/$cardId',
+    path: '/c/$cardId',
+    getParentRoute: () => BBoardIdRouteRoute,
+} as any);
 
 export interface FileRoutesByFullPath {
     '/': typeof IndexRoute;
     '/login': typeof LoginRoute;
     '/new': typeof NewRoute;
     '/signup': typeof SignupRoute;
-    '/b/$boardId': typeof BBoardIdRoute;
+    '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
     '/edit/$todoId': typeof EditTodoIdRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
+    '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
 export interface FileRoutesByTo {
     '/': typeof IndexRoute;
     '/login': typeof LoginRoute;
     '/new': typeof NewRoute;
     '/signup': typeof SignupRoute;
-    '/b/$boardId': typeof BBoardIdRoute;
+    '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
     '/edit/$todoId': typeof EditTodoIdRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
+    '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
 export interface FileRoutesById {
     __root__: typeof rootRouteImport;
@@ -77,9 +85,10 @@ export interface FileRoutesById {
     '/login': typeof LoginRoute;
     '/new': typeof NewRoute;
     '/signup': typeof SignupRoute;
-    '/b/$boardId': typeof BBoardIdRoute;
+    '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
     '/edit/$todoId': typeof EditTodoIdRoute;
     '/api/auth/$': typeof ApiAuthSplatRoute;
+    '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
 }
 export interface FileRouteTypes {
     fileRoutesByFullPath: FileRoutesByFullPath;
@@ -90,7 +99,8 @@ export interface FileRouteTypes {
         | '/signup'
         | '/b/$boardId'
         | '/edit/$todoId'
-        | '/api/auth/$';
+        | '/api/auth/$'
+        | '/b/$boardId/c/$cardId';
     fileRoutesByTo: FileRoutesByTo;
     to:
         | '/'
@@ -99,7 +109,8 @@ export interface FileRouteTypes {
         | '/signup'
         | '/b/$boardId'
         | '/edit/$todoId'
-        | '/api/auth/$';
+        | '/api/auth/$'
+        | '/b/$boardId/c/$cardId';
     id:
         | '__root__'
         | '/'
@@ -108,7 +119,8 @@ export interface FileRouteTypes {
         | '/signup'
         | '/b/$boardId'
         | '/edit/$todoId'
-        | '/api/auth/$';
+        | '/api/auth/$'
+        | '/b/$boardId/c/$cardId';
     fileRoutesById: FileRoutesById;
 }
 export interface RootRouteChildren {
@@ -116,7 +128,7 @@ export interface RootRouteChildren {
     LoginRoute: typeof LoginRoute;
     NewRoute: typeof NewRoute;
     SignupRoute: typeof SignupRoute;
-    BBoardIdRoute: typeof BBoardIdRoute;
+    BBoardIdRouteRoute: typeof BBoardIdRouteRouteWithChildren;
     EditTodoIdRoute: typeof EditTodoIdRoute;
     ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
 }
@@ -155,7 +167,7 @@ declare module '@tanstack/react-router' {
             id: '/b/$boardId';
             path: '/b/$boardId';
             fullPath: '/b/$boardId';
-            preLoaderRoute: typeof BBoardIdRouteImport;
+            preLoaderRoute: typeof BBoardIdRouteRouteImport;
             parentRoute: typeof rootRouteImport;
         };
         '/edit/$todoId': {
@@ -172,15 +184,34 @@ declare module '@tanstack/react-router' {
             preLoaderRoute: typeof ApiAuthSplatRouteImport;
             parentRoute: typeof rootRouteImport;
         };
+        '/b/$boardId/c/$cardId': {
+            id: '/b/$boardId/c/$cardId';
+            path: '/c/$cardId';
+            fullPath: '/b/$boardId/c/$cardId';
+            preLoaderRoute: typeof BBoardIdCCardIdRouteImport;
+            parentRoute: typeof BBoardIdRouteRoute;
+        };
     }
 }
+
+interface BBoardIdRouteRouteChildren {
+    BBoardIdCCardIdRoute: typeof BBoardIdCCardIdRoute;
+}
+
+const BBoardIdRouteRouteChildren: BBoardIdRouteRouteChildren = {
+    BBoardIdCCardIdRoute: BBoardIdCCardIdRoute,
+};
+
+const BBoardIdRouteRouteWithChildren = BBoardIdRouteRoute._addFileChildren(
+    BBoardIdRouteRouteChildren,
+);
 
 const rootRouteChildren: RootRouteChildren = {
     IndexRoute: IndexRoute,
     LoginRoute: LoginRoute,
     NewRoute: NewRoute,
     SignupRoute: SignupRoute,
-    BBoardIdRoute: BBoardIdRoute,
+    BBoardIdRouteRoute: BBoardIdRouteRouteWithChildren,
     EditTodoIdRoute: EditTodoIdRoute,
     ApiAuthSplatRoute: ApiAuthSplatRoute,
 };

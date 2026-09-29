@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { AddCard } from '#/components/board/add-card';
+import { CardItem } from '#/components/board/card-item';
 import { DeleteListDialog } from '#/components/board/delete-list-dialog';
 import { ListTitle } from '#/components/board/list-title';
 import { Button } from '#/components/ui/button';
@@ -106,9 +108,10 @@ function useDeleteList(boardId: string) {
 interface ListColumnProps {
     boardId: string;
     list: ListWithCards;
+    allLists: Array<ListWithCards>;
 }
 
-export function ListColumn({ boardId, list }: ListColumnProps) {
+export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const renameList = useRenameList(boardId);
@@ -165,16 +168,21 @@ export function ListColumn({ boardId, list }: ListColumnProps) {
                     </DropdownMenuContent>
                 </DropdownMenu>
             </div>
-            <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-                {list.cards.map((card) => (
-                    <li
-                        key={card.id}
-                        className="truncate rounded-md border bg-background px-3 py-2 text-sm shadow-xs"
-                    >
-                        {card.title}
-                    </li>
-                ))}
-            </ul>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                <AddCard boardId={boardId} listId={list.id} />
+                <ul className="space-y-2 pt-2">
+                    {list.cards.map((card) => (
+                        <CardItem
+                            key={card.id}
+                            boardId={boardId}
+                            card={card}
+                            otherLists={allLists.filter(
+                                (l) => l.id !== list.id,
+                            )}
+                        />
+                    ))}
+                </ul>
+            </div>
             <DeleteListDialog
                 open={isDeleteDialogOpen}
                 onOpenChange={setIsDeleteDialogOpen}

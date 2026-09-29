@@ -1,45 +1,15 @@
-import { TodoHeader } from '#/components/todo-header';
-import { TodoList } from '#/components/todo-list';
-import { TodoListSkeleton } from '#/components/todo-list-skeleton';
-import { RouteError } from '#/components/route-error';
-import { countCompleted } from '#/lib/todos';
-import { todosQueryOptions } from '#/lib/todos-query';
-import { pageMeta } from '#/lib/seo';
+import { defaultBoardQueryOptions } from '#/lib/boards-query';
 import { createFileRoute, redirect } from '@tanstack/react-router';
-import { useSuspenseQuery } from '@tanstack/react-query';
 
 export const Route = createFileRoute('/')({
-    head: () => ({ meta: pageMeta('Tasks') }),
-    component: RouteComponent,
-    errorComponent: RouteError,
-    pendingComponent: TodoListSkeleton,
-    pendingMs: 200,
-    pendingMinMs: 300,
     beforeLoad: ({ context }) => {
         if (!context.session) throw redirect({ to: '/login' });
     },
-    loader: ({ context }) => {
-        return context.queryClient.query({
-            ...todosQueryOptions,
+    loader: async ({ context }) => {
+        const board = await context.queryClient.query({
+            ...defaultBoardQueryOptions,
             staleTime: 'static',
         });
+        throw redirect({ to: '/b/$boardId', params: { boardId: board.id } });
     },
 });
-
-function RouteComponent() {
-    const { data: todoList } = useSuspenseQuery(todosQueryOptions);
-    const totalCount = todoList.length;
-    const completedCount = countCompleted(todoList);
-
-    return (
-        <div className="min-h-screen bg-muted/30 p-4">
-            <div className="mx-auto max-w-md space-y-6 py-6">
-                <TodoHeader
-                    completedCount={completedCount}
-                    totalCount={totalCount}
-                />
-                <TodoList todoList={todoList} />
-            </div>
-        </div>
-    );
-}

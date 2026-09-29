@@ -70,6 +70,7 @@ export function BoardView({ board, lists }: BoardData) {
                             key={list.id}
                             boardId={board.id}
                             list={list}
+                            allLists={lists}
                         />
                     ))}
                     <AddList boardId={board.id} />
