@@ -1,4 +1,5 @@
 import {
+    createTempId,
     addCardToList,
     moveCardInBoard,
     removeCardFromBoard,
@@ -30,7 +31,7 @@ export function useAddCard(boardId: string, listId: string) {
             await queryClient.cancelQueries({ queryKey: key });
             const previous = queryClient.getQueryData(key);
             const card: Card = {
-                id: crypto.randomUUID(),
+                id: createTempId(),
                 listId,
                 title,
                 description: null,

@@ -1,5 +1,5 @@
-import { expect  } from '@playwright/test';
-import type {Page} from '@playwright/test';
+import { expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 import { gotoHydrated } from './auth';
 
 /** Goes to `/`, follows the redirect to the user's default board. */
@@ -31,6 +31,10 @@ export async function addCard(page: Page, listTitle: string, title: string) {
         'id',
         /^card-temp-/,
     );
+    // The composer stays open for the next card; close it so its blur-collapse
+    // doesn't shift the layout under the next click.
+    await list.getByLabel('New card title').press('Escape');
+    await expect(list.getByLabel('New card title')).toHaveCount(0);
 }
 
 export async function addList(page: Page, title: string) {
