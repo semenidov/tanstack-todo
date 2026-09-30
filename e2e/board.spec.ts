@@ -25,6 +25,27 @@ test('adds a card and shows it in the list', async ({ page }) => {
     await expect(cardRow(page, 'Buy milk')).toBeVisible();
 });
 
+test('a new card can be opened and has a working menu as soon as it appears', async ({
+    page,
+}) => {
+    const list = listColumn(page, 'To do');
+    await list.getByRole('button', { name: 'Add card' }).click();
+    await list.getByLabel('New card title').fill('Fresh card');
+    await list.getByLabel('New card title').press('Enter');
+
+    const row = cardRow(page, 'Fresh card');
+    await expect(row).toBeVisible();
+    await row.getByRole('button', { name: 'Card actions' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await row.getByRole('link').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(
+        page.getByRole('dialog').getByRole('button', { name: 'Fresh card' }),
+    ).toBeVisible();
+});
+
 test('renames a card through the card dialog', async ({ page }) => {
     await addCard(page, 'To do', 'Old name');
     await cardRow(page, 'Old name').getByRole('link').click();
