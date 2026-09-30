@@ -1,5 +1,4 @@
 import {
-    createTempId,
     addCardToList,
     moveCardInBoard,
     removeCardFromBoard,
@@ -26,27 +25,21 @@ export function useAddCard(boardId: string, listId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
 
+    // Not optimistic: the card enters the cache only with the id the server gave it.
     return useMutation({
-        mutationFn: (title: string) =>
-            addCardServer({ data: { listId, title } }),
-        onMutate: async (title) => {
+        mutationFn: async (title: string) => {
+            const card = await addCardServer({ data: { listId, title } });
+            // null: the list is gone or belongs to someone else.
+            if (!card) throw new Error('Card was not created');
+            return card;
+        },
+        onSuccess: async (card) => {
             await queryClient.cancelQueries({ queryKey: key });
-            const previous = queryClient.getQueryData(key);
-            const card: Card = {
-                id: createTempId(),
-                listId,
-                title,
-                description: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            };
             queryClient.setQueryData(key, (old) =>
                 old ? addCardToList(old, listId, card) : old,
             );
-            return { previous };
         },
-        onError: (_error, _title, context) => {
-            queryClient.setQueryData(key, context?.previous);
+        onError: () => {
             toast.error("Couldn't add the card. Please try again.");
         },
         onSettled: () => {

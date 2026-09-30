@@ -45,7 +45,7 @@ export const addListServer = createServerFn({ method: 'POST' })
     .validator(z.object({ boardId: z.uuid(), title: titleSchema }))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        await repo.addList(userId, data.boardId, data.title);
+        return repo.addList(userId, data.boardId, data.title);
     });
 
 export const renameListServer = createServerFn({ method: 'POST' })
@@ -73,7 +73,7 @@ export const addCardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ listId: z.uuid(), title: titleSchema }))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        await repo.addCard(userId, data.listId, data.title);
+        return repo.addCard(userId, data.listId, data.title);
     });
 
 export const updateCardServer = createServerFn({ method: 'POST' })

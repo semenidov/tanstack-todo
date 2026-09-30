@@ -5,7 +5,6 @@ interface ListTitleProps {
     title: string;
     count: number;
     isEditing: boolean;
-    disabled?: boolean;
     onStartEditing: () => void;
     onCancelEditing: () => void;
     onSave: (title: string) => void;
@@ -15,7 +14,6 @@ export function ListTitle({
     title,
     count,
     isEditing,
-    disabled = false,
     onStartEditing,
     onCancelEditing,
     onSave,
@@ -56,7 +54,6 @@ export function ListTitle({
         <button
             type="button"
             onClick={onStartEditing}
-            disabled={disabled}
             className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left text-sm font-medium"
         >
             <span className="truncate">{title}</span>

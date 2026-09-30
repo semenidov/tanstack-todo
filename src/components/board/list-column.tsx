@@ -13,7 +13,6 @@ import {
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { ListWithCards } from '#/lib/boards-query';
 import {
-    isTempId,
     removeListFromBoard,
     renameListInBoard,
     restoreListToBoard,
@@ -127,8 +126,6 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const renameList = useRenameList(boardId);
     const { deleteConfirmed, deleteEmptyWithUndo } = useDeleteList(boardId);
-    // Not saved yet: its id is temporary, so rename/delete would hit a missing list.
-    const isSaving = isTempId(list.id);
 
     function handleDeleteSelected() {
         if (list.cards.length === 0) {
@@ -145,7 +142,6 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
                     title={list.title}
                     count={list.cards.length}
                     isEditing={isEditingTitle}
-                    disabled={isSaving}
                     onStartEditing={() => setIsEditingTitle(true)}
                     onCancelEditing={() => setIsEditingTitle(false)}
                     onSave={(title) =>
@@ -158,7 +154,6 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
                             variant="ghost"
                             size="icon-sm"
                             aria-label="List actions"
-                            disabled={isSaving}
                             className="shrink-0"
                         >
                             <EllipsisIcon />
