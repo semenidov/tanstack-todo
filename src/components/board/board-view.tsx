@@ -12,11 +12,13 @@ import {
 } from '#/components/ui/empty';
 import { authClient } from '#/lib/auth-client';
 import type { BoardData } from '#/lib/boards-query';
+import { useDragScroll } from '#/lib/use-drag-scroll';
 import { useRouter } from '@tanstack/react-router';
 import { LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
 
 export function BoardView({ board, lists }: BoardData) {
     const router = useRouter();
+    const dragScrollRef = useDragScroll();
 
     async function handleSignOut() {
         await authClient.signOut();
@@ -64,7 +66,10 @@ export function BoardView({ board, lists }: BoardData) {
                     </Empty>
                 </div>
             ) : (
-                <div className="flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4">
+                <div
+                    ref={dragScrollRef}
+                    className="flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto"
+                >
                     {lists.map((list) => (
                         <ListColumn
                             key={list.id}
