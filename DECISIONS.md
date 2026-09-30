@@ -14,7 +14,7 @@ Todos - это серверные данные; Query даёт кэш, опти�
 
 `useMutation<void, Error, Vars, Ctx>` задаём явно - инференс ломается на паре onMutate+context (ошибки `TVariables`/`{}`).
 
-## 4. 2026-09-18 · Hard delete
+## 4. 2026-09-18 · Hard delete - Отменено №55 (для колонок и карточек)
 
 `db.delete` вместо soft-delete (флаг). Проще, по ТЗ. Soft дал бы историю/undo, но тянет миграцию и фильтры везде.
 
