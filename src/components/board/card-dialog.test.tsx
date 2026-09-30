@@ -6,16 +6,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CardDialog } from '#/components/board/card-dialog';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 
-const { updateCardSpy, moveCardSpy, deleteCardSpy } = vi.hoisted(() => ({
-    updateCardSpy: vi.fn(() => Promise.resolve()),
-    moveCardSpy: vi.fn(() => Promise.resolve()),
-    deleteCardSpy: vi.fn(() => Promise.resolve()),
-}));
+const { updateCardSpy, moveCardSpy, deleteCardSpy, restoreCardSpy } =
+    vi.hoisted(() => ({
+        updateCardSpy: vi.fn(() => Promise.resolve()),
+        moveCardSpy: vi.fn(() => Promise.resolve()),
+        deleteCardSpy: vi.fn(() => Promise.resolve()),
+        restoreCardSpy: vi.fn(() => Promise.resolve()),
+    }));
 
 vi.mock('#/server/boards', () => ({
     updateCardServer: updateCardSpy,
     moveCardServer: moveCardSpy,
     deleteCardServer: deleteCardSpy,
+    restoreCardServer: restoreCardSpy,
 }));
 
 vi.mock('@tanstack/react-start', () => ({
