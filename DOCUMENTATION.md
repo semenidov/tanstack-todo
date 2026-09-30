@@ -116,7 +116,7 @@ Auth (Better Auth): `user` (идентичность), `account` (учётки/�
 
 Vitest + React Testing Library + jsdom. Слои по «трофею»:
 
-- **Unit** - чистые функции над доской (`src/lib/boards.ts`): добавление/переименование/удаление списка и карточки, поиск карточки, временные id.
+- **Unit** - чистые функции над доской (`src/lib/boards.ts`): добавление/переименование/удаление списка и карточки, поиск карточки, возврат удалённого на место (restore).
 - **Component** - `add-card.test.tsx`, `card-dialog.test.tsx`, `delete-list-dialog.test.tsx`, `list-title.test.tsx`: рендер, инлайн-редактирование (Enter/blur/Esc), диалоги подтверждения, `auth-form.test.tsx` (см. ниже). Границы мокаются: `@tanstack/react-start` (`useServerFn`), `@tanstack/react-router`, `sonner`. БД не участвует.
 - **Component (формы)** - `auth-form.test.tsx`: презентационная, моков нет. Валидация не с первого символа, ошибка по `onBlur`, `onSubmit(value)` при валидных данных, пустой сабмит - ошибки у обоих полей (#57), очистка ошибки только у поля в фокусе. Ошибку ассертим по `role="alert"` / тексту (`FieldError`).
 - **Integration** - `src/server/boards-repo.integration.test.ts` (проект `integration`, node + **Neon-ветка `test`**): скоуп/IDOR на настоящем SQL для всех функций `boards-repo` (включая попытку переноса карточки на чужую доску того же владельца); `src/db/backfill-boards.integration.test.ts` - перенос todo → доски, идемпотентность. Требует `.env.test` на ветку `test` (не main - `truncate` в `beforeEach` сотрёт!) + маркер `TEST_DB=1` (предохранитель: без него сетап бросает и тесты не идут). По сети → медленнее и возможны транзиентные `ECONNRESET` → `retry: 2` + таймауты 30с.
