@@ -68,7 +68,7 @@ export function BoardView({ board, lists }: BoardData) {
             ) : (
                 <div
                     ref={dragScrollRef}
-                    className="flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto"
+                    className="flex flex-1 items-start snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto"
                 >
                     {lists.map((list) => (
                         <ListColumn
