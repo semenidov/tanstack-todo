@@ -1,7 +1,8 @@
 ---
 name: implementer
 description: Implements exactly one GitHub issue from its "Implementation plan" section and opens a draft PR. Use after the plan is written and approved; not for design decisions, debugging or ambiguous tasks.
-model: sonnet
+model: opus
+effort: medium
 tools: Read, Edit, Write, Glob, Grep, Bash, mcp__github__issue_read, mcp__github__create_pull_request, mcp__github__update_pull_request
 ---
 
