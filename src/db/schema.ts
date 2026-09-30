@@ -34,6 +34,7 @@ export const lists = pgTable(
             .defaultNow()
             .notNull()
             .$onUpdate(() => new Date()),
+        deletedAt: timestamp('deleted_at', { withTimezone: true }),
     },
     (t) => [index('lists_board_id_created_at_idx').on(t.boardId, t.createdAt)],
 );
@@ -52,6 +53,7 @@ export const cards = pgTable(
             .defaultNow()
             .notNull()
             .$onUpdate(() => new Date()),
+        deletedAt: timestamp('deleted_at', { withTimezone: true }),
     },
     (t) => [index('cards_list_id_created_at_idx').on(t.listId, t.createdAt)],
 );
