@@ -15,10 +15,39 @@ import type { BoardData } from '#/lib/boards-query';
 import { useDragScroll } from '#/lib/use-drag-scroll';
 import { useRouter } from '@tanstack/react-router';
 import { LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
 export function BoardView({ board, lists }: BoardData) {
     const router = useRouter();
     const dragScrollRef = useDragScroll();
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const prevListCountRef = useRef(lists.length);
+
+    // One ref for both: drag-pan listeners and the container handle for scrolling.
+    const setContainerRef = useCallback(
+        (el: HTMLDivElement | null) => {
+            containerRef.current = el;
+            const cleanupDragScroll = dragScrollRef(el);
+            return () => {
+                containerRef.current = null;
+                cleanupDragScroll?.();
+            };
+        },
+        [dragScrollRef],
+    );
+
+    // Scroll to a newly added list after it is rendered. Lists are ordered by createdAt,
+    // so the new one is always the last column before AddList.
+    useLayoutEffect(() => {
+        const prevCount = prevListCountRef.current;
+        prevListCountRef.current = lists.length;
+        if (lists.length <= prevCount) return;
+        containerRef.current?.children[lists.length - 1]?.scrollIntoView({
+            behavior: 'smooth',
+            inline: 'center',
+            block: 'nearest',
+        });
+    }, [lists.length]);
 
     async function handleSignOut() {
         await authClient.signOut();
@@ -67,7 +96,7 @@ export function BoardView({ board, lists }: BoardData) {
                 </div>
             ) : (
                 <div
-                    ref={dragScrollRef}
+                    ref={setContainerRef}
                     className="flex flex-1 items-start snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto"
                 >
                     {lists.map((list) => (
