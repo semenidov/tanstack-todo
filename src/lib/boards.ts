@@ -52,6 +52,20 @@ export function removeListFromBoard(
     };
 }
 
+// Undo of a list delete: back to its place, lists are ordered asc(createdAt).
+export function restoreListToBoard(
+    board: BoardData,
+    list: ListWithCards,
+): BoardData {
+    if (board.lists.some((l) => l.id === list.id)) return board;
+    const index = board.lists.findIndex(
+        (l) => l.createdAt.getTime() > list.createdAt.getTime(),
+    );
+    const lists = [...board.lists];
+    lists.splice(index === -1 ? lists.length : index, 0, list);
+    return { ...board, lists };
+}
+
 // New cards sort first (lists.cards is ordered desc(createdAt) server-side).
 export function addCardToList(
     board: BoardData,
@@ -122,6 +136,24 @@ export function removeCardFromBoard(
             ...list,
             cards: list.cards.filter((card) => card.id !== cardId),
         })),
+    };
+}
+
+// Undo of a card delete: back to its place in its list, cards are ordered
+// desc(createdAt). No-op if the list is gone from the board.
+export function restoreCardToBoard(board: BoardData, card: Card): BoardData {
+    if (findCardInBoard(board, card.id)) return board;
+    return {
+        ...board,
+        lists: board.lists.map((list) => {
+            if (list.id !== card.listId) return list;
+            const index = list.cards.findIndex(
+                (c) => c.createdAt.getTime() < card.createdAt.getTime(),
+            );
+            const cards = [...list.cards];
+            cards.splice(index === -1 ? cards.length : index, 0, card);
+            return { ...list, cards };
+        }),
     };
 }
 
