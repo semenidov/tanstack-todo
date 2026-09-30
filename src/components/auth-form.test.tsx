@@ -73,6 +73,61 @@ describe('AuthForm', () => {
         expect(onSubmit).not.toHaveBeenCalled();
     });
 
+    it('shows errors on both fields when submitted empty', async () => {
+        const user = userEvent.setup();
+        const { onSubmit } = renderForm();
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        expect(
+            await screen.findByText('Enter a valid email'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Password must be at least 8 characters'),
+        ).toBeInTheDocument();
+        expect(screen.getByLabelText('Email')).toHaveAttribute(
+            'aria-invalid',
+            'true',
+        );
+        expect(screen.getByLabelText('Password')).toHaveAttribute(
+            'aria-invalid',
+            'true',
+        );
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('clears only the password error when focusing it after an empty submit', async () => {
+        const user = userEvent.setup();
+        renderForm();
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        expect(
+            await screen.findByText('Password must be at least 8 characters'),
+        ).toBeInTheDocument();
+
+        await user.click(screen.getByLabelText('Password'));
+
+        expect(
+            screen.queryByText('Password must be at least 8 characters'),
+        ).not.toBeInTheDocument();
+        expect(screen.getByText('Enter a valid email')).toBeInTheDocument();
+    });
+
+    it('shows only the password error for a valid email and empty password', async () => {
+        const user = userEvent.setup();
+        const { onSubmit } = renderForm();
+        await user.type(screen.getByLabelText('Email'), 'user@example.com');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        expect(
+            await screen.findByText('Password must be at least 8 characters'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('Enter a valid email'),
+        ).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Email')).toHaveAttribute(
+            'aria-invalid',
+            'false',
+        );
+        expect(onSubmit).not.toHaveBeenCalled();
+    });
+
     it('clears only the focused field error, leaving the other field error intact', async () => {
         const user = userEvent.setup();
         renderForm();

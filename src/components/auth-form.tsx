@@ -41,7 +41,12 @@ export function AuthForm({
 }: AuthFormProps) {
     const form = useForm({
         defaultValues: { email: '', password: '' },
-        validators: { onSubmit: authSchema },
+        // Submit validation lives on each field, not form-level: TanStack Form
+        // aborts submit before form-level validators while any field already
+        // has an error (e.g. email's onBlur after autofocus), so the password
+        // error never appeared (#57). canSubmitWhenInvalid keeps the button
+        // enabled and lets handleSubmit re-validate every field.
+        canSubmitWhenInvalid: true,
         onSubmit: async ({ value }) => {
             await onSubmit(value);
         },
@@ -58,7 +63,10 @@ export function AuthForm({
         >
             <form.Field
                 name="email"
-                validators={{ onBlur: authSchema.shape.email }}
+                validators={{
+                    onBlur: authSchema.shape.email,
+                    onSubmit: authSchema.shape.email,
+                }}
             >
                 {(field) => (
                     <Field data-invalid={field.state.meta.errors.length > 0}>
@@ -85,7 +93,10 @@ export function AuthForm({
 
             <form.Field
                 name="password"
-                validators={{ onBlur: authSchema.shape.password }}
+                validators={{
+                    onBlur: authSchema.shape.password,
+                    onSubmit: authSchema.shape.password,
+                }}
             >
                 {(field) => (
                     <Field data-invalid={field.state.meta.errors.length > 0}>
@@ -109,16 +120,11 @@ export function AuthForm({
                 )}
             </form.Field>
 
-            <form.Subscribe
-                selector={(s) => ({
-                    canSubmit: s.canSubmit,
-                    isSubmitting: s.isSubmitting,
-                })}
-            >
-                {({ canSubmit, isSubmitting }) => (
+            <form.Subscribe selector={(s) => s.isSubmitting}>
+                {(isSubmitting) => (
                     <Button
                         type="submit"
-                        disabled={!canSubmit || isSubmitting}
+                        disabled={isSubmitting}
                         className="w-full"
                     >
                         {icon}
