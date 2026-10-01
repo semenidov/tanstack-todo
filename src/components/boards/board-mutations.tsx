@@ -1,5 +1,5 @@
 import { removeBoardFromList, renameBoardInList } from '#/lib/boards';
-import { boardsListQueryOptions } from '#/lib/boards-query';
+import { boardQueryOptions, boardsListQueryOptions } from '#/lib/boards-query';
 import { deleteBoardServer, renameBoardServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -13,19 +13,37 @@ export function useRenameBoard() {
         mutationFn: (vars: { boardId: string; title: string }) =>
             renameBoardServer({ data: vars }),
         onMutate: async (vars) => {
-            await queryClient.cancelQueries({ queryKey: key });
+            const boardKey = boardQueryOptions(vars.boardId).queryKey;
+            await Promise.all([
+                queryClient.cancelQueries({ queryKey: key }),
+                queryClient.cancelQueries({ queryKey: boardKey }),
+            ]);
             const previous = queryClient.getQueryData(key);
+            const previousBoard = queryClient.getQueryData(boardKey);
             queryClient.setQueryData(key, (old) =>
                 old ? renameBoardInList(old, vars.boardId, vars.title) : old,
             );
-            return { previous };
+            // The board page header reads the board cache (absent if it was never opened).
+            queryClient.setQueryData(boardKey, (old) =>
+                old
+                    ? { ...old, board: { ...old.board, title: vars.title } }
+                    : old,
+            );
+            return { previous, previousBoard };
         },
-        onError: (_error, _vars, context) => {
+        onError: (_error, vars, context) => {
             queryClient.setQueryData(key, context?.previous);
+            queryClient.setQueryData(
+                boardQueryOptions(vars.boardId).queryKey,
+                context?.previousBoard,
+            );
             toast.error("Couldn't rename the board. Please try again.");
         },
-        onSettled: () => {
+        onSettled: (_data, _error, vars) => {
             queryClient.invalidateQueries({ queryKey: key });
+            queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(vars.boardId).queryKey,
+            });
         },
     });
 }

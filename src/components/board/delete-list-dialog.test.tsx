@@ -15,8 +15,13 @@ describe('DeleteListDialog', () => {
         );
 
         expect(
-            screen.getByText('Delete list "In progress"?'),
+            screen.getByRole('heading', { name: 'Delete list "In progress"?' }),
         ).toBeInTheDocument();
+        // Long titles truncate in the heading; the full title stays available on hover.
+        expect(screen.getByText('In progress')).toHaveAttribute(
+            'title',
+            'In progress',
+        );
         expect(
             screen.getByText(
                 'The list and its 3 cards will be permanently deleted.',

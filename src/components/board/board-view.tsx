@@ -1,5 +1,7 @@
 import { AddList } from '#/components/board/add-list';
 import { ListColumn } from '#/components/board/list-column';
+import { EditableTitle } from '#/components/editable-title';
+import { useRenameBoard } from '#/components/boards/board-mutations';
 import { ThemeToggle } from '#/components/theme-toggle';
 import { Button } from '#/components/ui/button';
 import {
@@ -12,11 +14,44 @@ import {
 } from '#/components/ui/empty';
 import { authClient } from '#/lib/auth-client';
 import type { BoardData } from '#/lib/boards-query';
-import { useRouter } from '@tanstack/react-router';
-import { LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
+import { useDragScroll } from '#/lib/use-drag-scroll';
+import { Link, useRouter } from '@tanstack/react-router';
+import { ArrowLeftIcon, LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 export function BoardView({ board, lists }: BoardData) {
     const router = useRouter();
+    const renameBoard = useRenameBoard();
+    const [isEditing, setIsEditing] = useState(false);
+    const dragScrollRef = useDragScroll();
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const prevListCountRef = useRef(lists.length);
+
+    // One ref for both: drag-pan listeners and the container handle for scrolling.
+    const setContainerRef = useCallback(
+        (el: HTMLDivElement | null) => {
+            containerRef.current = el;
+            const cleanupDragScroll = dragScrollRef(el);
+            return () => {
+                containerRef.current = null;
+                cleanupDragScroll?.();
+            };
+        },
+        [dragScrollRef],
+    );
+
+    // Scroll to a newly added list after it is rendered. Lists are ordered by createdAt,
+    // so the new one is always the last column before AddList.
+    useLayoutEffect(() => {
+        const prevCount = prevListCountRef.current;
+        prevListCountRef.current = lists.length;
+        if (lists.length <= prevCount) return;
+        containerRef.current?.children[lists.length - 1]?.scrollIntoView({
+            behavior: 'smooth',
+            inline: 'center',
+            block: 'nearest',
+        });
+    }, [lists.length]);
 
     async function handleSignOut() {
         await authClient.signOut();
@@ -27,9 +62,37 @@ export function BoardView({ board, lists }: BoardData) {
     return (
         <div className="flex min-h-screen flex-col bg-muted/30">
             <header className="flex items-center justify-between gap-4 border-b bg-card px-4 py-3">
-                <h1 className="truncate text-xl font-semibold tracking-tight">
-                    {board.title}
-                </h1>
+                <div className="flex min-w-0 items-center gap-2">
+                    <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                    >
+                        <Link to="/boards" aria-label="Back to boards">
+                            <ArrowLeftIcon />
+                            <span className="hidden sm:inline">Boards</span>
+                        </Link>
+                    </Button>
+                    <h1 className="min-w-0">
+                        <EditableTitle
+                            title={board.title}
+                            isEditing={isEditing}
+                            aria-label="Board title"
+                            className="block h-9 max-w-full truncate rounded-sm px-2 text-xl leading-9 font-semibold tracking-tight"
+                            inputClassName="h-9 px-2 text-xl leading-9 font-semibold tracking-tight md:text-xl"
+                            onStartEditing={() => setIsEditing(true)}
+                            onCancelEditing={() => setIsEditing(false)}
+                            onSave={(title) =>
+                                renameBoard.mutate(
+                                    { boardId: board.id, title },
+                                    // The tab title comes from loader data, so re-run the loader.
+                                    { onSettled: () => router.invalidate() },
+                                )
+                            }
+                        />
+                    </h1>
+                </div>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
                     <Button
@@ -64,7 +127,10 @@ export function BoardView({ board, lists }: BoardData) {
                     </Empty>
                 </div>
             ) : (
-                <div className="flex flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4">
+                <div
+                    ref={setContainerRef}
+                    className="flex flex-1 items-start snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto"
+                >
                     {lists.map((list) => (
                         <ListColumn
                             key={list.id}
