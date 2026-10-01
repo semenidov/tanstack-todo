@@ -34,9 +34,7 @@ jobs:
             - run: npm ci
             - run: npm run test:unit
 
-    # One ephemeral Neon branch per run, shared by integration and e2e, reset to a clean schema (#75).
-    db-tests:
-        needs: [quality, unit]
+    integration:
         runs-on: ubuntu-latest
         env:
             NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -53,9 +51,10 @@ jobs:
               with:
                   username: neondb_owner
                   project_id: ${{ secrets.NEON_PROJECT_ID }}
-                  branch_name: ci-${{ github.run_id }}-${{ github.run_attempt }}
+                  branch_name: ci-${{ github.run_id }}
                   api_key: ${{ secrets.NEON_API_KEY }}
-            - name: Reset to a clean schema
+            # The branch is a copy of main (prod data): wipe it and apply all migrations from scratch (#75).
+            - name: Reset to clean schema
               env:
                   DATABASE_URL: ${{ steps.neon.outputs.db_url }}
                   ALLOW_DB_RESET: '1'
@@ -65,7 +64,41 @@ jobs:
                   DATABASE_URL: ${{ steps.neon.outputs.db_url }}
                   TEST_DB: '1'
               run: npm run test:integration
+            - name: Delete ephemeral Neon branch
+              if: always()
+              uses: neondatabase/delete-branch-action@v3
+              with:
+                  project_id: ${{ secrets.NEON_PROJECT_ID }}
+                  branch: ci-${{ github.run_id }}
+                  api_key: ${{ secrets.NEON_API_KEY }}
+
+    e2e:
+        needs: [quality, unit, integration]
+        runs-on: ubuntu-latest
+        env:
+            NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: npm
+            - run: npm ci
             - run: npx playwright install --with-deps chromium
+            - name: Create ephemeral Neon branch
+              id: neon
+              uses: neondatabase/create-branch-action@v5
+              with:
+                  project_id: ${{ secrets.NEON_PROJECT_ID }}
+                  branch_name: e2e-${{ github.run_id }}
+                  api_key: ${{ secrets.NEON_API_KEY }}
+                  username: neondb_owner
+            # The branch is a copy of main (prod data): wipe it and apply all migrations from scratch (#75).
+            - name: Reset to clean schema
+              env:
+                  DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+                  ALLOW_DB_RESET: '1'
+              run: npm run db:reset
             - name: Run E2E
               env:
                   DATABASE_URL: ${{ steps.neon.outputs.db_url }}
@@ -83,16 +116,15 @@ jobs:
               uses: neondatabase/delete-branch-action@v3
               with:
                   project_id: ${{ secrets.NEON_PROJECT_ID }}
-                  branch: ci-${{ github.run_id }}-${{ github.run_attempt }}
+                  branch: e2e-${{ github.run_id }}
                   api_key: ${{ secrets.NEON_API_KEY }}
 
     migrate:
         if: github.ref == 'refs/heads/master'
-        needs: [quality, unit, db-tests]
+        needs: [quality, unit, integration]
         runs-on: ubuntu-latest
-        concurrency:
-            group: neon-staging
-            cancel-in-progress: false
+        env:
+            DATABASE_URL: ${{ secrets.NEON_MAIN_DATABASE_URL }}
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
@@ -100,24 +132,10 @@ jobs:
                   node-version: 24
                   cache: npm
             - run: npm ci
-            - name: Ensure migration DB urls are set
-              env:
-                  MAIN_URL: ${{ secrets.NEON_MAIN_DATABASE_URL }}
-                  STAGING_URL: ${{ secrets.NEON_STAGING_DATABASE_URL }}
+            - name: Ensure migration DB url is set
               run: |
-                  if [ -z "$MAIN_URL" ]; then
+                  if [ -z "$DATABASE_URL" ]; then
                     echo "::error::NEON_MAIN_DATABASE_URL secret is missing or empty"
                     exit 1
                   fi
-                  if [ -z "$STAGING_URL" ]; then
-                    echo "::error::NEON_STAGING_DATABASE_URL secret is missing or empty"
-                    exit 1
-                  fi
-            - name: Migrate main
-              env:
-                  DATABASE_URL: ${{ secrets.NEON_MAIN_DATABASE_URL }}
-              run: npm run db:migrate
-            - name: Migrate staging
-              env:
-                  DATABASE_URL: ${{ secrets.NEON_STAGING_DATABASE_URL }}
-              run: npm run db:migrate
+            - run: npm run db:migrate
