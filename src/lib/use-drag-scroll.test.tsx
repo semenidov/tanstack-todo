@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { getDragScrollLeft, useDragScroll } from '#/lib/use-drag-scroll';
+import {
+    getDragScrollLeft,
+    getNearestSnapLeft,
+    useDragScroll,
+} from '#/lib/use-drag-scroll';
 
 describe('getDragScrollLeft', () => {
     it('scrolls opposite to the mouse movement', () => {
@@ -10,6 +14,17 @@ describe('getDragScrollLeft', () => {
 
     it('keeps the start position when the mouse has not moved', () => {
         expect(getDragScrollLeft(100, 50, 50)).toBe(100);
+    });
+});
+
+describe('getNearestSnapLeft', () => {
+    it('picks the snap point closest to the release position', () => {
+        expect(getNearestSnapLeft([0, 300, 600], 420)).toBe(300);
+        expect(getNearestSnapLeft([0, 300, 600], 480)).toBe(600);
+    });
+
+    it('returns null when there are no snap points', () => {
+        expect(getNearestSnapLeft([], 120)).toBeNull();
     });
 });
 
@@ -39,14 +54,16 @@ describe('useDragScroll', () => {
 
         fireEvent.pointerDown(board, { ...mouse, clientX: 50 });
         expect(board).toHaveClass('select-none', 'cursor-grabbing!');
-        expect(board).not.toHaveClass('snap-mandatory');
+        // Snap is off for the whole drag, so the board follows the mouse freely.
+        expect(board.style.scrollSnapType).toBe('none');
 
         fireEvent.pointerMove(board, { ...mouse, clientX: 20 });
         expect(board.scrollLeft).toBe(130);
 
         fireEvent.pointerUp(board, { ...mouse, clientX: 20 });
         expect(board).not.toHaveClass('select-none', 'cursor-grabbing!');
-        expect(board).toHaveClass('snap-mandatory');
+        // No snap-aligned children here: nothing to glide to, snap is handed back to CSS.
+        expect(board.style.scrollSnapType).toBe('');
     });
 
     it('does not start on a descendant', () => {
