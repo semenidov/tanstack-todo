@@ -7,7 +7,8 @@ on:
 
 concurrency:
     group: ci-${{ github.ref }}
-    cancel-in-progress: true
+    # Never cancel a master run: it may be in the middle of the prod `migrate`.
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     quality:
@@ -84,46 +85,6 @@ jobs:
                   project_id: ${{ secrets.NEON_PROJECT_ID }}
                   branch: ci-${{ github.run_id }}-${{ github.run_attempt }}
                   api_key: ${{ secrets.NEON_API_KEY }}
-
-    # Previews share the `staging` Neon branch: apply this PR's migrations to it (#75).
-    migrate-staging:
-        if: github.event_name == 'pull_request'
-        needs: [db-tests]
-        runs-on: ubuntu-latest
-        concurrency:
-            group: neon-staging
-            cancel-in-progress: false
-        env:
-            DATABASE_URL: ${{ secrets.NEON_STAGING_DATABASE_URL }}
-        steps:
-            - uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0
-            - name: Check for migration changes
-              id: changes
-              run: |
-                  if git diff --quiet origin/${{ github.base_ref }}...HEAD -- drizzle/; then
-                    echo "No changes in drizzle/, staging is left as is"
-                    echo "migrations=false" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "migrations=true" >> "$GITHUB_OUTPUT"
-                  fi
-            - uses: actions/setup-node@v4
-              if: steps.changes.outputs.migrations == 'true'
-              with:
-                  node-version: 24
-                  cache: npm
-            - if: steps.changes.outputs.migrations == 'true'
-              run: npm ci
-            - name: Ensure staging DB url is set
-              if: steps.changes.outputs.migrations == 'true'
-              run: |
-                  if [ -z "$DATABASE_URL" ]; then
-                    echo "::error::NEON_STAGING_DATABASE_URL secret is missing or empty"
-                    exit 1
-                  fi
-            - if: steps.changes.outputs.migrations == 'true'
-              run: npm run db:migrate
 
     migrate:
         if: github.ref == 'refs/heads/master'
