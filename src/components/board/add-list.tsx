@@ -87,40 +87,44 @@ export function AddList({ boardId, className }: AddListProps) {
     return (
         <div
             className={cn(
-                'relative w-[85vw] shrink-0 snap-center sm:w-72 sm:snap-start',
+                'w-[85vw] shrink-0 snap-center sm:w-72 sm:snap-start',
                 className,
             )}
         >
-            {/* readOnly, not disabled: the field keeps focus while the request is pending. */}
-            <Input
-                ref={inputRef}
-                value={value}
-                placeholder="List title"
-                aria-label="New list title"
-                readOnly={addList.isPending}
-                aria-busy={addList.isPending}
-                className="pr-8"
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={() => {
-                    if (!addList.isPending) close();
-                }}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSubmit();
-                    }
-                    if (e.key === 'Escape') {
-                        e.preventDefault();
-                        close();
-                    }
-                }}
-            />
-            {addList.isPending && (
-                <Loader2Icon
-                    aria-hidden="true"
-                    className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+            {/* Own wrapper: the outer one stretches to the row height, the spinner must
+                center on the field, not on the row. */}
+            <div className="relative">
+                {/* readOnly, not disabled: the field keeps focus while the request is pending. */}
+                <Input
+                    ref={inputRef}
+                    value={value}
+                    placeholder="List title"
+                    aria-label="New list title"
+                    readOnly={addList.isPending}
+                    aria-busy={addList.isPending}
+                    className="pr-8"
+                    onChange={(e) => setValue(e.target.value)}
+                    onBlur={() => {
+                        if (!addList.isPending) close();
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSubmit();
+                        }
+                        if (e.key === 'Escape') {
+                            e.preventDefault();
+                            close();
+                        }
+                    }}
                 />
-            )}
+                {addList.isPending && (
+                    <Loader2Icon
+                        aria-hidden="true"
+                        className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                    />
+                )}
+            </div>
         </div>
     );
 }
