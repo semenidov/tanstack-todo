@@ -23,6 +23,7 @@
         "check": "prettier --check .",
         "db:generate": "drizzle-kit generate",
         "db:migrate": "drizzle-kit migrate",
+        "db:reset": "tsx scripts/db-reset.ts && drizzle-kit migrate",
         "db:push": "drizzle-kit push",
         "db:push:test": "drizzle-kit push --config=drizzle.config.test.ts",
         "db:pull": "drizzle-kit pull",
