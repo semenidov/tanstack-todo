@@ -5,21 +5,9 @@ import type {
     ListWithCards,
 } from '#/lib/boards-query';
 
-// Optimistic entities live in the cache only until the server responds;
-// their ids must never reach a server function.
-const TEMP_ID_PREFIX = 'temp-';
-
-export function createTempId(): string {
-    return `${TEMP_ID_PREFIX}${crypto.randomUUID()}`;
-}
-
 // DOM id of a card link on the board, used to return focus after the card dialog closes.
 export function cardLinkId(cardId: string): string {
     return `card-${cardId}`;
-}
-
-export function isTempId(id: string): boolean {
-    return id.startsWith(TEMP_ID_PREFIX);
 }
 
 export function addListToBoard(

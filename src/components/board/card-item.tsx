@@ -9,7 +9,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu';
-import { cardLinkId, isTempId } from '#/lib/boards';
+import { cardLinkId } from '#/lib/boards';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon } from 'lucide-react';
@@ -23,8 +23,6 @@ interface CardItemProps {
 export function CardItem({ boardId, card, otherLists }: CardItemProps) {
     const moveCard = useMoveCard(boardId);
     const { deleteWithUndo } = useDeleteCard(boardId);
-    // Not saved yet: its id is temporary, so opening/moving/deleting it would hit a missing card.
-    const isSaving = isTempId(card.id);
 
     return (
         <li className="group/card relative rounded-md border bg-background shadow-xs">
@@ -32,7 +30,6 @@ export function CardItem({ boardId, card, otherLists }: CardItemProps) {
                 to="/b/$boardId/c/$cardId"
                 params={{ boardId, cardId: card.id }}
                 id={cardLinkId(card.id)}
-                disabled={isSaving}
                 className="block truncate px-3 py-2 pr-8 text-sm"
             >
                 {card.title}
@@ -43,7 +40,6 @@ export function CardItem({ boardId, card, otherLists }: CardItemProps) {
                         variant="ghost"
                         size="icon-sm"
                         aria-label="Card actions"
-                        disabled={isSaving}
                         className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
                     >
                         <EllipsisIcon />

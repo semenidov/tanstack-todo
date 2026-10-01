@@ -4,7 +4,7 @@ import { boardsListQueryOptions } from '#/lib/boards-query';
 import { createBoardServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { PlusIcon } from 'lucide-react';
+import { Loader2Icon, PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from 'cn';
 
@@ -67,26 +67,38 @@ export function CreateBoardTile({ className }: CreateBoardTileProps) {
 
     return (
         <div className={cn(TILE_CLASS, className)}>
-            <Input
-                autoFocus
-                value={value}
-                placeholder="Board title"
-                aria-label="New board title"
-                disabled={createBoard.isPending}
-                className="h-7 px-2 text-sm"
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={close}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSubmit();
-                    }
-                    if (e.key === 'Escape') {
-                        e.preventDefault();
-                        close();
-                    }
-                }}
-            />
+            <div className="relative">
+                {/* readOnly, not disabled: the field keeps focus while the request is pending. */}
+                <Input
+                    autoFocus
+                    value={value}
+                    placeholder="Board title"
+                    aria-label="New board title"
+                    readOnly={createBoard.isPending}
+                    aria-busy={createBoard.isPending}
+                    className="h-7 pl-2 pr-8 text-sm"
+                    onChange={(e) => setValue(e.target.value)}
+                    onBlur={() => {
+                        if (!createBoard.isPending) close();
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSubmit();
+                        }
+                        if (e.key === 'Escape') {
+                            e.preventDefault();
+                            close();
+                        }
+                    }}
+                />
+                {createBoard.isPending && (
+                    <Loader2Icon
+                        aria-hidden="true"
+                        className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                    />
+                )}
+            </div>
         </div>
     );
 }

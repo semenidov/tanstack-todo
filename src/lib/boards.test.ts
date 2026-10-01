@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     addCardToList,
     addListToBoard,
-    createTempId,
     findCardInBoard,
     cardLinkId,
-    isTempId,
     moveCardInBoard,
     removeCardFromBoard,
     removeBoardFromList,
@@ -192,20 +190,6 @@ describe('findCardInBoard', () => {
         const board = makeBoard([makeList('a', 'A', [])]);
 
         expect(findCardInBoard(board, 'missing')).toBeUndefined();
-    });
-});
-
-describe('temp ids', () => {
-    it('recognizes ids created by createTempId', () => {
-        expect(isTempId(createTempId())).toBe(true);
-    });
-
-    it('does not treat a regular uuid as temporary', () => {
-        expect(isTempId(crypto.randomUUID())).toBe(false);
-    });
-
-    it('creates unique ids', () => {
-        expect(createTempId()).not.toBe(createTempId());
     });
 });
 
