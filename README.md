@@ -25,8 +25,8 @@ Full-stack task board on TanStack Start - Trello-like boards, lists and cards. [
 ## Engineering highlights
 
 - CI runs against an ephemeral Neon branch per run, not a shared test DB - [decision #26](DECISIONS.md#26-2026-09-19--ci-integration---эфемерная-neon-ветка-на-прогон-уточняет-25)
-- Migrations run on ephemeral CI branches before tests, on preview via `vercel-build`, and on `master` in CI - [decision #45](DECISIONS.md#45-2026-09-28--миграции-на-эфемерных-ci-ветках-перед-тестами-30), [decision #47](DECISIONS.md#47-2026-09-25--миграции-на-preview-деплоях-через-vercel-build-уточняет-37)
-- Preview deploys get their own database via the Neon-Vercel integration (branch per git branch), cleaned up when the PR closes - [decision #37](DECISIONS.md#37-2026-09-25--бд-для-превью---интеграция-neon-managed-ветка-на-git-ветку), [`neon-preview-cleanup.yml`](.github/workflows/neon-preview-cleanup.yml)
+- Migrations run on ephemeral CI branches before tests (after a reset to a clean schema, `db:reset`), on preview via `vercel-build`, and on `master` in CI - [decision #45](DECISIONS.md#45-2026-09-28--миграции-на-эфемерных-ci-ветках-перед-тестами-30), [decision #47](DECISIONS.md#47-2026-09-25--миграции-на-preview-деплоях-через-vercel-build-уточняет-37)
+- All preview deploys share one Neon branch `staging` (no prod data, no branch per preview: Neon has a 10-branch limit), so migrations must be backward compatible - [decision #55](DECISIONS.md#55-2026-10-02--превью-на-общей-neon-ветке-staging-ci-ветки-сбрасываются-до-чистой-схемы-75-отменяет-37-43-уточняет-27-45-47)
 - Ownership is checked on every request via a join, not a separate query, with integration tests covering IDOR - [decision #10](DECISIONS.md#10-2026-09-18--скоуп-todos-по-userid-во-всех-server-fns-idor), [decision #48](DECISIONS.md#48-2026-09-28--доска-по-умолчанию---лениво-первая-по-createdat-доступ-через-join-в-каждом-запросе-34)
 - Optimistic updates with a deferred-commit delete + Undo toast, instead of instant hard delete - [decision #5](DECISIONS.md#5-2026-09-18--удаление---стратегия-a-отложенный-коммит--undo-тост)
 - Sentry wired with source maps via the Vite plugin, plus Vercel Analytics with normalized URLs - [decision #35](DECISIONS.md#35-2026-09-25--source-maps-в-sentry-через-vite-плагин-фаза-2), [decision #38](DECISIONS.md#38-2026-09-25--vercel-web-analytics--speed-insights)
@@ -42,7 +42,7 @@ flowchart LR
     Vercel --> BetterAuth[Better Auth]
     Vercel --> Sentry[Sentry]
     GHA[GitHub Actions] -->|ephemeral branch| Neon
-    VercelPreview[Vercel preview deploy] -->|preview branch| Neon
+    VercelPreview[Vercel preview deploy] -->|shared staging branch| Neon
 ```
 
 ## Getting started
@@ -53,7 +53,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Requires a `.env` with `DATABASE_URL`, `DATABASE_URL_UNPOOLED` (Neon connection strings) and `BETTER_AUTH_SECRET`.
+Requires a `.env` with `DATABASE_URL` (Neon connection string) and `BETTER_AUTH_SECRET`. `DATABASE_URL_UNPOOLED` is only used by the Vercel preview build to migrate the shared `staging` branch.
 
 Tests:
 
