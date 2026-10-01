@@ -1,11 +1,10 @@
 import { neon } from '@neondatabase/serverless';
-import { config } from 'dotenv';
 import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 
 import { dbHost, isDbResetAllowed } from '../src/lib/db-reset.ts';
 
-// Checked before reading env files or touching the database (#75).
+// Checked before touching the database (#75).
 if (!isDbResetAllowed(process.env)) {
     console.error(
         'db:reset wipes the database. Refusing to run without ALLOW_DB_RESET=1.',
@@ -13,13 +12,14 @@ if (!isDbResetAllowed(process.env)) {
     process.exit(1);
 }
 
-// Same env sources as drizzle.config.ts, so the reset and the following `drizzle-kit migrate` hit one database.
-config({ path: ['.env.local', '.env'], quiet: true });
-
+// DATABASE_URL only from the process environment, never from `.env*`: the local `.env` may point to prod.
+// The following `drizzle-kit migrate` gets the same URL: dotenv in drizzle.config.ts never overrides a set variable.
 const url = process.env.DATABASE_URL;
 const host = dbHost(url);
 if (!url || !host) {
-    console.error('db:reset: DATABASE_URL is missing or invalid.');
+    console.error(
+        'db:reset: pass DATABASE_URL explicitly in the environment (.env files are not read).',
+    );
     process.exit(1);
 }
 
