@@ -16,6 +16,7 @@
     ```
 - Производное состояние вычислять при рендере, не хранить в `useState` + `useEffect`.
 - Данные - через `loader` + TanStack Query (`queryOptions` в `src/lib/*-query.ts`), не `useEffect` + `fetch`.
+- TanStack Form: submit-валидация - на уровне полей (`validators.onSubmit` у `form.Field`) + `canSubmitWhenInvalid: true`, не form-level: при уже существующей ошибке любого поля (например, onBlur) `handleSubmit` выходит до form-level валидатора, и остальные поля остаются без ошибок (#57).
 
 ## TypeScript
 
