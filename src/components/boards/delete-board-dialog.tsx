@@ -30,8 +30,15 @@ export function DeleteBoardDialog({
         <AlertDialog open={open} onOpenChange={onOpenChange}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>
-                        Delete board &quot;{boardTitle}&quot;?
+                    {/* Flex row: a long title truncates, the quotes and "?" stay visible. */}
+                    <AlertDialogTitle className="flex w-full min-w-0 justify-center sm:justify-start">
+                        <span className="shrink-0 whitespace-pre">
+                            {'Delete board "'}
+                        </span>
+                        <span className="truncate" title={boardTitle}>
+                            {boardTitle}
+                        </span>
+                        <span className="shrink-0">&quot;?</span>
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         The board, its {listCount}{' '}

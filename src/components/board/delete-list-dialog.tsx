@@ -28,8 +28,15 @@ export function DeleteListDialog({
         <AlertDialog open={open} onOpenChange={onOpenChange}>
             <AlertDialogContent>
                 <AlertDialogHeader>
-                    <AlertDialogTitle>
-                        Delete list &quot;{listTitle}&quot;?
+                    {/* Flex row: a long title truncates, the quotes and "?" stay visible. */}
+                    <AlertDialogTitle className="flex w-full min-w-0 justify-center sm:justify-start">
+                        <span className="shrink-0 whitespace-pre">
+                            {'Delete list "'}
+                        </span>
+                        <span className="truncate" title={listTitle}>
+                            {listTitle}
+                        </span>
+                        <span className="shrink-0">&quot;?</span>
                     </AlertDialogTitle>
                     <AlertDialogDescription>
                         The list and its {cardCount}{' '}

@@ -5,6 +5,10 @@ import type { BoardData, ListWithCards } from '#/lib/boards-query';
 
 vi.mock('@tanstack/react-router', () => ({
     useRouter: () => ({ invalidate: vi.fn(), navigate: vi.fn() }),
+    Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+}));
+vi.mock('#/components/boards/board-mutations', () => ({
+    useRenameBoard: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 vi.mock('#/lib/auth-client', () => ({
     authClient: { signOut: vi.fn() },

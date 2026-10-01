@@ -20,6 +20,31 @@ test('shows a board with its lists', async ({ page }) => {
     await expect(listColumn(page, 'Done')).toBeVisible();
 });
 
+test('links back to the boards list', async ({ page }) => {
+    await page.getByRole('link', { name: 'Back to boards' }).click();
+    await page.waitForURL(/\/boards$/);
+    await expect(page.getByRole('heading', { name: 'Boards' })).toBeVisible();
+});
+
+test('renames the board in the header and the tile shows it', async ({
+    page,
+}) => {
+    await page.getByRole('heading', { name: 'My tasks' }).click();
+    const input = page.getByLabel('Board title');
+    await input.fill('Renamed board');
+    await input.press('Enter');
+    await expect(
+        page.getByRole('heading', { name: 'Renamed board' }),
+    ).toBeVisible();
+    await expect(page).toHaveTitle(/Renamed board/);
+
+    await page.getByRole('link', { name: 'Back to boards' }).click();
+    await page.waitForURL(/\/boards$/);
+    await expect(
+        page.getByRole('link', { name: /Renamed board/ }),
+    ).toBeVisible();
+});
+
 test('adds a card and shows it in the list', async ({ page }) => {
     await addCard(page, 'To do', 'Buy milk');
     await expect(cardRow(page, 'Buy milk')).toBeVisible();

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { EditableTitle } from '#/components/editable-title';
 import { DeleteBoardDialog } from '#/components/boards/delete-board-dialog';
 import { Button } from '#/components/ui/button';
 import {
@@ -7,7 +8,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu';
-import { Input } from '#/components/ui/input';
 import type { BoardSummary } from '#/lib/boards-query';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon } from 'lucide-react';
@@ -28,12 +28,6 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-    function commit(raw: string) {
-        const trimmed = raw.trim();
-        if (trimmed && trimmed !== board.title) onRename(trimmed);
-        setIsEditing(false);
-    }
-
     const listsLabel = `${board.listCount} ${board.listCount === 1 ? 'list' : 'lists'}`;
 
     return (
@@ -41,23 +35,14 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
             {isEditing ? (
                 <div className={TILE_CLASS}>
                     <div className={TITLE_BOX_CLASS}>
-                        <Input
-                            autoFocus
-                            defaultValue={board.title}
+                        <EditableTitle
+                            title={board.title}
+                            isEditing
                             aria-label="Board title"
-                            className="h-5 rounded-sm border-none bg-transparent p-0 text-sm leading-5 font-medium shadow-none md:text-sm dark:bg-transparent"
-                            onFocus={(e) => e.currentTarget.select()}
-                            onBlur={(e) => commit(e.currentTarget.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    commit(e.currentTarget.value);
-                                }
-                                if (e.key === 'Escape') {
-                                    e.preventDefault();
-                                    setIsEditing(false);
-                                }
-                            }}
+                            inputClassName="h-5 rounded-sm border-none bg-transparent p-0 text-sm leading-5 font-medium shadow-none md:text-sm dark:bg-transparent"
+                            onStartEditing={() => setIsEditing(true)}
+                            onCancelEditing={() => setIsEditing(false)}
+                            onSave={onRename}
                         />
                     </div>
                     <span className="text-xs text-muted-foreground">

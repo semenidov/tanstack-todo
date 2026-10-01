@@ -19,7 +19,11 @@ describe('DeleteBoardDialog', () => {
     it('shows the board title and list and card counts', () => {
         renderDialog(3, 12);
 
-        expect(screen.getByText('Delete board "Roadmap"?')).toBeInTheDocument();
+        expect(
+            screen.getByRole('heading', { name: 'Delete board "Roadmap"?' }),
+        ).toBeInTheDocument();
+        // Long titles truncate in the heading; the full title stays available on hover.
+        expect(screen.getByText('Roadmap')).toHaveAttribute('title', 'Roadmap');
         expect(
             screen.getByText(
                 'The board, its 3 lists and 12 cards will be permanently deleted.',
