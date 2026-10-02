@@ -41,3 +41,33 @@ export async function addList(page: Page, title: string) {
     await page.getByLabel('New list title').fill(title);
     await page.getByLabel('New list title').press('Enter');
 }
+
+/** Card titles of a list, top to bottom. */
+export function cardTitles(page: Page, listTitle: string) {
+    return listColumn(page, listTitle)
+        .getByRole('listitem')
+        .getByRole('link')
+        .allTextContents();
+}
+
+/** Moves a card through its menu → Move… window to a list and a 1-based position. */
+export async function moveCardTo(
+    page: Page,
+    title: string,
+    listTitle: string,
+    position: number,
+) {
+    await cardRow(page, title)
+        .getByRole('button', { name: 'Card actions' })
+        .click();
+    await page.getByRole('menuitem', { name: 'Move…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Move card' });
+    await dialog.getByRole('combobox', { name: 'List' }).click();
+    await page.getByRole('option', { name: listTitle, exact: true }).click();
+    await dialog.getByRole('combobox', { name: 'Position' }).click();
+    await page
+        .getByRole('option', { name: String(position), exact: true })
+        .click();
+    await dialog.getByRole('button', { name: 'Move' }).click();
+    await expect(dialog).toHaveCount(0);
+}

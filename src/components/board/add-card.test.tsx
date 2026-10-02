@@ -30,6 +30,7 @@ const savedCard: Card = {
     listId: 'list-1',
     title: 'Buy milk',
     description: null,
+    position: 'a0',
     createdAt: new Date(0),
     updatedAt: new Date(0),
 };

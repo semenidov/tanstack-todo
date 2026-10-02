@@ -5,8 +5,10 @@ import {
     addCard,
     addList,
     cardRow,
+    cardTitles,
     gotoBoard,
     listColumn,
+    moveCardTo,
 } from './helpers/board';
 
 test.beforeEach(async ({ page }) => {
@@ -86,16 +88,68 @@ test('renames a card through the card dialog', async ({ page }) => {
     await expect(cardRow(page, 'Old name')).toHaveCount(0);
 });
 
-test('moves a card to another list', async ({ page }) => {
-    await addCard(page, 'To do', 'Ship it');
-    const row = cardRow(page, 'Ship it');
-    await row.getByRole('button', { name: 'Card actions' }).click();
-    // Radix opens a submenu on pointer hover, not reliably on click.
-    await page.getByRole('menuitem', { name: 'Move to…' }).hover();
-    await page.getByRole('menuitem', { name: 'Done' }).click();
+test('adds new cards on top and keeps the order after reload', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'First');
+    await addCard(page, 'To do', 'Second');
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Second', 'First']);
 
-    await expect(listColumn(page, 'Done').getByText('Ship it')).toBeVisible();
-    await expect(listColumn(page, 'To do').getByText('Ship it')).toHaveCount(0);
+    await page.reload();
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Second', 'First']);
+});
+
+test('moves a card to a position in another list through the Move window', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Ship it');
+    await addCard(page, 'Done', 'Done 2');
+    await addCard(page, 'Done', 'Done 1');
+
+    await moveCardTo(page, 'Ship it', 'Done', 2);
+
+    const expected = ['Done 1', 'Ship it', 'Done 2'];
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual([]);
+    // The spinner is gone once the server confirmed the move.
+    await expect(cardRow(page, 'Ship it')).not.toHaveAttribute('aria-busy');
+    await page.reload();
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);
+});
+
+test('moves a card down inside its list to exactly the chosen position', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Card 3');
+    await addCard(page, 'To do', 'Card 2');
+    await addCard(page, 'To do', 'Card 1');
+
+    await moveCardTo(page, 'Card 1', 'To do', 3);
+
+    const expected = ['Card 2', 'Card 3', 'Card 1'];
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
+    await page.reload();
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
+});
+
+test('the Move button is disabled for the current position', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Only');
+    await cardRow(page, 'Only')
+        .getByRole('button', { name: 'Card actions' })
+        .click();
+    await page.getByRole('menuitem', { name: 'Move…' }).click();
+
+    await expect(
+        page
+            .getByRole('dialog', { name: 'Move card' })
+            .getByRole('button', { name: 'Move' }),
+    ).toBeDisabled();
 });
 
 test('deletes a card on the server right away', async ({ page }) => {
