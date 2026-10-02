@@ -182,9 +182,7 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
                             key={card.id}
                             boardId={boardId}
                             card={card}
-                            otherLists={allLists.filter(
-                                (l) => l.id !== list.id,
-                            )}
+                            lists={allLists}
                         />
                     ))}
                 </ul>

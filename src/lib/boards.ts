@@ -54,7 +54,7 @@ export function restoreListToBoard(
     return { ...board, lists };
 }
 
-// New cards sort first (lists.cards is ordered desc(createdAt) server-side).
+// New cards sort first: the server gives them a key before the first card.
 export function addCardToList(
     board: BoardData,
     listId: string,
@@ -90,28 +90,61 @@ export function moveCardInBoard(
     board: BoardData,
     cardId: string,
     toListId: string,
+    index: number,
 ): BoardData {
     const card = findCardInBoard(board, cardId)?.card;
-    if (!card) return board;
+    if (!card || !board.lists.some((l) => l.id === toListId)) return board;
 
     return {
         ...board,
         lists: board.lists.map((list) => {
+            const cards = list.cards.filter((c) => c.id !== cardId);
             if (list.id === toListId) {
-                return {
-                    ...list,
-                    cards: [
-                        { ...card, listId: toListId },
-                        ...list.cards.filter((c) => c.id !== cardId),
-                    ],
-                };
+                cards.splice(index, 0, { ...card, listId: toListId });
             }
-            return {
-                ...list,
-                cards: list.cards.filter((c) => c.id !== cardId),
-            };
+            return { ...list, cards };
         }),
     };
+}
+
+export interface CardMoveNeighbors {
+    prevCardId: string | null;
+    nextCardId: string | null;
+}
+
+// The target index counts in the list without the moved card, so the same index
+// works for moves down and up inside one list and for moves to another list.
+// Move dialog position N is index N - 1; a drop at index i has the card there.
+export function cardMoveNeighbors(
+    board: BoardData,
+    cardId: string,
+    toListId: string,
+    index: number,
+): CardMoveNeighbors | undefined {
+    const list = board.lists.find((l) => l.id === toListId);
+    if (!list) return undefined;
+    const cards = list.cards.filter((c) => c.id !== cardId);
+    const at = Math.max(0, Math.min(index, cards.length));
+    return {
+        // .at(-1) would wrap to the last card, so index 0 has no prev explicitly.
+        prevCardId: at === 0 ? null : (cards.at(at - 1)?.id ?? null),
+        nextCardId: cards.at(at)?.id ?? null,
+    };
+}
+
+// True when the move would leave the card where it is (no request needed).
+export function isSameCardSpot(
+    board: BoardData,
+    cardId: string,
+    toListId: string,
+    index: number,
+): boolean {
+    const found = findCardInBoard(board, cardId);
+    if (!found) return true;
+    return (
+        found.list.id === toListId &&
+        found.list.cards.findIndex((c) => c.id === cardId) === index
+    );
 }
 
 export function removeCardFromBoard(
@@ -127,8 +160,19 @@ export function removeCardFromBoard(
     };
 }
 
-// Undo of a card delete: back to its place in its list, cards are ordered
-// desc(createdAt). No-op if the list is gone from the board.
+// Card order inside a list, same as the server: position byte-wise (keys are
+// ASCII, so JS string comparison matches COLLATE "C"), then id.
+export function compareCardOrder(
+    a: Pick<Card, 'id' | 'position'>,
+    b: Pick<Card, 'id' | 'position'>,
+): number {
+    if (a.position !== b.position) return a.position < b.position ? -1 : 1;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? -1 : 1;
+}
+
+// Undo of a card delete: back to its place in its list by position.
+// No-op if the list is gone from the board.
 export function restoreCardToBoard(board: BoardData, card: Card): BoardData {
     if (findCardInBoard(board, card.id)) return board;
     return {
@@ -136,7 +180,7 @@ export function restoreCardToBoard(board: BoardData, card: Card): BoardData {
         lists: board.lists.map((list) => {
             if (list.id !== card.listId) return list;
             const index = list.cards.findIndex(
-                (c) => c.createdAt.getTime() < card.createdAt.getTime(),
+                (c) => compareCardOrder(c, card) > 0,
             );
             const cards = [...list.cards];
             cards.splice(index === -1 ? cards.length : index, 0, card);

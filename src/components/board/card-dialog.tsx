@@ -41,7 +41,7 @@ export function CardDialog({
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [description, setDescription] = useState(card.description ?? '');
     const updateCard = useUpdateCard(boardId);
-    const moveCard = useMoveCard(boardId);
+    const { moveCard } = useMoveCard(boardId);
     const { deleteWithUndo } = useDeleteCard(boardId);
 
     function commitTitle(raw: string) {
@@ -133,11 +133,9 @@ export function CardDialog({
                         </label>
                         <Select
                             value={list.id}
+                            // To the top of the chosen list; exact position - Move… on the card.
                             onValueChange={(toListId) =>
-                                moveCard.mutate({
-                                    cardId: card.id,
-                                    toListId,
-                                })
+                                moveCard(card.id, toListId, 0)
                             }
                         >
                             <SelectTrigger id="card-list" className="w-full">

@@ -1,0 +1,90 @@
+import { useId, useState } from 'react';
+import { Button } from '#/components/ui/button';
+import { Label } from '#/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '#/components/ui/select';
+import type { Card, ListWithCards } from '#/lib/boards-query';
+
+interface MoveCardFormProps {
+    card: Card;
+    lists: Array<ListWithCards>;
+    /** `index` counts in the target list without the card: position N is N - 1. */
+    onMove: (toListId: string, index: number) => void;
+}
+
+// Content of the Move… popover: a list, a 1-based position in it, and Move.
+export function MoveCardForm({ card, lists, onMove }: MoveCardFormProps) {
+    const id = useId();
+    const [listId, setListId] = useState(card.listId);
+    const [position, setPosition] = useState(1);
+
+    const target = lists.find((l) => l.id === listId);
+    const others = target?.cards.filter((c) => c.id !== card.id) ?? [];
+    // In the current list 1..N, in another one 1..N+1: both are «others + 1».
+    const positionCount = others.length + 1;
+    const currentIndex = target?.cards.findIndex((c) => c.id === card.id) ?? -1;
+    const isSameSpot = currentIndex !== -1 && currentIndex === position - 1;
+
+    return (
+        <form
+            className="grid gap-3"
+            onSubmit={(e) => {
+                e.preventDefault();
+                if (!isSameSpot) onMove(listId, position - 1);
+            }}
+        >
+            <div className="grid gap-1.5">
+                <Label htmlFor={`${id}-list`}>List</Label>
+                <Select
+                    value={listId}
+                    onValueChange={(value) => {
+                        setListId(value);
+                        setPosition(1);
+                    }}
+                >
+                    <SelectTrigger id={`${id}-list`} className="w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {lists.map((list) => (
+                            <SelectItem
+                                key={list.id}
+                                value={list.id}
+                                title={list.title}
+                                className="max-w-72"
+                            >
+                                <span className="truncate">{list.title}</span>
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="grid gap-1.5">
+                <Label htmlFor={`${id}-position`}>Position</Label>
+                <Select
+                    value={String(position)}
+                    onValueChange={(value) => setPosition(Number(value))}
+                >
+                    <SelectTrigger id={`${id}-position`} className="w-full">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Array.from({ length: positionCount }, (_, i) => (
+                            <SelectItem key={i + 1} value={String(i + 1)}>
+                                {i + 1}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <Button type="submit" disabled={isSameSpot}>
+                Move
+            </Button>
+        </form>
+    );
+}
