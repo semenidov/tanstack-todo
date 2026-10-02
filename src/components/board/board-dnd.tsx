@@ -29,7 +29,11 @@ import {
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useMoveCard } from '#/components/board/card-mutations';
-import { findCardInBoard, moveCardInBoard } from '#/lib/boards';
+import {
+    cardMoveNeighbors,
+    findCardInBoard,
+    moveCardInBoard,
+} from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { BoardData, ListWithCards } from '#/lib/boards-query';
 import type { CardDndAnnouncerState } from '#/lib/card-dnd';
@@ -98,7 +102,7 @@ interface BoardDndProps {
  */
 export function BoardDnd({ board, lists, children }: BoardDndProps) {
     const queryClient = useQueryClient();
-    const { moveCard } = useMoveCard(board.id);
+    const { moveCardNextTo } = useMoveCard(board.id);
     const reducedMotion = usePrefersReducedMotion();
     const hydrated = useHydrated();
     const [drag, setDrag] = useState<DragState | null>(null);
@@ -262,7 +266,17 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
             String(over.id),
         );
         if (!target) return;
-        if (moveCard(drag.activeId, target.listId, target.index)) {
+        // Neighbors from the lists the user saw: the cache may have changed meanwhile.
+        const neighbors = cardMoveNeighbors(
+            { board, lists: drag.lists },
+            drag.activeId,
+            target.listId,
+            target.index,
+        );
+        if (
+            neighbors &&
+            moveCardNextTo(drag.activeId, target.listId, neighbors)
+        ) {
             setDropped({
                 base: lists,
                 lists: moveInLists(

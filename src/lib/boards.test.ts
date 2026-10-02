@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     addCardToList,
     addListToBoard,
+    cardIndexAfterNeighbors,
     cardMoveNeighbors,
     findCardInBoard,
     isSameCardSpot,
@@ -266,6 +267,60 @@ describe('cardMoveNeighbors', () => {
     it('returns undefined when the target list is missing', () => {
         expect(
             cardMoveNeighbors(orderBoard(), 'c1', 'missing', 0),
+        ).toBeUndefined();
+    });
+});
+
+describe('cardIndexAfterNeighbors', () => {
+    it('puts the card right after its prev neighbor, wherever it is now', () => {
+        // A new card n0 came on top after the neighbors were taken.
+        const board = makeBoard([
+            makeList('a', 'A', [
+                makeCard('n0'),
+                makeCard('c1'),
+                makeCard('c2'),
+                makeCard('c3'),
+            ]),
+        ]);
+
+        expect(
+            cardIndexAfterNeighbors(board, 'c3', 'a', {
+                prevCardId: 'c1',
+                nextCardId: 'c2',
+            }),
+        ).toBe(2);
+    });
+
+    it('puts the card first without a prev neighbor', () => {
+        expect(
+            cardIndexAfterNeighbors(orderBoard(), 'c3', 'a', {
+                prevCardId: null,
+                nextCardId: 'c1',
+            }),
+        ).toBe(0);
+    });
+
+    it('falls back to the next neighbor when the prev one is gone', () => {
+        expect(
+            cardIndexAfterNeighbors(orderBoard(), 'c1', 'b', {
+                prevCardId: 'gone',
+                nextCardId: 'd2',
+            }),
+        ).toBe(1);
+    });
+
+    it('returns undefined when no neighbor is found or the list is missing', () => {
+        expect(
+            cardIndexAfterNeighbors(orderBoard(), 'c1', 'b', {
+                prevCardId: 'gone',
+                nextCardId: null,
+            }),
+        ).toBeUndefined();
+        expect(
+            cardIndexAfterNeighbors(orderBoard(), 'c1', 'x', {
+                prevCardId: null,
+                nextCardId: null,
+            }),
         ).toBeUndefined();
     });
 });

@@ -132,6 +132,25 @@ export function cardMoveNeighbors(
     };
 }
 
+// Index (in the list without the card) that puts the card between neighbors taken
+// earlier, e.g. from the lists a drag showed: cards added since then don't shift it.
+// Undefined when the list or both neighbors are gone.
+export function cardIndexAfterNeighbors(
+    board: BoardData,
+    cardId: string,
+    toListId: string,
+    { prevCardId, nextCardId }: CardMoveNeighbors,
+): number | undefined {
+    const list = board.lists.find((l) => l.id === toListId);
+    if (!list) return undefined;
+    if (prevCardId === null) return 0;
+    const cards = list.cards.filter((c) => c.id !== cardId);
+    const prev = cards.findIndex((c) => c.id === prevCardId);
+    if (prev !== -1) return prev + 1;
+    const next = cards.findIndex((c) => c.id === nextCardId);
+    return next === -1 ? undefined : next;
+}
+
 // True when the move would leave the card where it is (no request needed).
 export function isSameCardSpot(
     board: BoardData,

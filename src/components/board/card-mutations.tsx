@@ -1,5 +1,6 @@
 import {
     addCardToList,
+    cardIndexAfterNeighbors,
     cardMoveNeighbors,
     isSameCardSpot,
     moveCardInBoard,
@@ -9,6 +10,7 @@ import {
 } from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { Card } from '#/lib/boards-query';
+import type { CardMoveNeighbors } from '#/lib/boards';
 import {
     addCardServer,
     deleteCardServer,
@@ -170,7 +172,28 @@ export function useMoveCard(boardId: string) {
         return true;
     };
 
-    return { moveCard };
+    /**
+     * Same as `moveCard`, but the spot is given by neighbors taken earlier (a drag
+     * shows a snapshot of the lists): cards added to the cache since then don't
+     * shift the card off the spot the user saw.
+     */
+    const moveCardNextTo = (
+        cardId: string,
+        toListId: string,
+        neighbors: CardMoveNeighbors,
+    ): boolean => {
+        const board = queryClient.getQueryData(key);
+        if (!board) return false;
+        const index = cardIndexAfterNeighbors(
+            board,
+            cardId,
+            toListId,
+            neighbors,
+        );
+        return index !== undefined && moveCard(cardId, toListId, index);
+    };
+
+    return { moveCard, moveCardNextTo };
 }
 
 /** True while the card has a move in the queue that the server has not confirmed. */

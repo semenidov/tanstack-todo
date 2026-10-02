@@ -130,6 +130,39 @@ describe('useMoveCard', () => {
         );
     });
 
+    it('places a dropped card by the neighbors the drag showed, even if the cache changed', async () => {
+        moveCardSpy.mockResolvedValue();
+        const { queryClient, result, ids } = setup();
+        // The drag showed [c1, c2, c3]; meanwhile a new card came on top.
+        const changed: BoardData = {
+            ...board,
+            lists: [
+                makeList('a', ['n0', 'c1', 'c2', 'c3']),
+                makeList('b', ['d1']),
+            ],
+        };
+        queryClient.setQueryData(key, changed);
+
+        act(() => {
+            result.current.moveCardNextTo('c3', 'a', {
+                prevCardId: 'c1',
+                nextCardId: 'c2',
+            });
+        });
+
+        expect(ids()).toEqual([['n0', 'c1', 'c3', 'c2'], ['d1']]);
+        await waitFor(() =>
+            expect(moveCardSpy).toHaveBeenCalledWith({
+                data: {
+                    cardId: 'c3',
+                    toListId: 'a',
+                    prevCardId: 'c1',
+                    nextCardId: 'c2',
+                },
+            }),
+        );
+    });
+
     it('queues quick moves and refetches the board only after the last one', async () => {
         const first = deferred();
         const second = deferred();
