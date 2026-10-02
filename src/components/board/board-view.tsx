@@ -1,4 +1,5 @@
 import { AddList } from '#/components/board/add-list';
+import { BoardDnd } from '#/components/board/board-dnd';
 import { ListColumn } from '#/components/board/list-column';
 import { EditableTitle } from '#/components/editable-title';
 import { useRenameBoard } from '#/components/boards/board-mutations';
@@ -16,6 +17,7 @@ import { authClient } from '#/lib/auth-client';
 import type { BoardData } from '#/lib/boards-query';
 import { useDragScroll } from '#/lib/use-drag-scroll';
 import { Link, useRouter } from '@tanstack/react-router';
+import { cn } from 'cn';
 import { ArrowLeftIcon, LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
@@ -127,20 +129,30 @@ export function BoardView({ board, lists }: BoardData) {
                     </Empty>
                 </div>
             ) : (
-                <div
-                    ref={setContainerRef}
-                    className="flex flex-1 items-start snap-x snap-mandatory gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto"
-                >
-                    {lists.map((list) => (
-                        <ListColumn
-                            key={list.id}
-                            boardId={board.id}
-                            list={list}
-                            allLists={lists}
-                        />
-                    ))}
-                    <AddList boardId={board.id} />
-                </div>
+                <BoardDnd board={board} lists={lists}>
+                    {({ lists: shownLists, isDragging }) => (
+                        <div
+                            ref={setContainerRef}
+                            className={cn(
+                                'flex flex-1 items-start gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto',
+                                // No snapping while a card is dragged: it would fight auto-scroll.
+                                isDragging
+                                    ? 'snap-none'
+                                    : 'snap-x snap-mandatory',
+                            )}
+                        >
+                            {shownLists.map((list) => (
+                                <ListColumn
+                                    key={list.id}
+                                    boardId={board.id}
+                                    list={list}
+                                    allLists={shownLists}
+                                />
+                            ))}
+                            <AddList boardId={board.id} />
+                        </div>
+                    )}
+                </BoardDnd>
             )}
         </div>
     );

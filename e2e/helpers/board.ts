@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import type { Page } from '@playwright/test';
+import type { Page, Response } from '@playwright/test';
 import { gotoHydrated } from './auth';
 import { seedBoard } from './db';
 
@@ -76,4 +76,61 @@ export async function moveCardTo(
     await dialog.getByRole('button', { name: 'Move' }).click();
     await expect(dialog).toHaveCount(0);
     expect((await saved).ok()).toBe(true);
+}
+
+/** The drag-and-drop screen reader live region (latest announcement). */
+export function dndAnnouncement(page: Page) {
+    return page.locator('[id^="DndLiveRegion"]');
+}
+
+/** Resolves once `count` card moves (POST server fn calls) have been answered. */
+export function waitForSavedMoves(page: Page, count: number) {
+    let answered = 0;
+    return new Promise<void>((resolve, reject) => {
+        const onResponse = (r: Response) => {
+            if (
+                r.request().method() !== 'POST' ||
+                !r.url().includes('_serverFn')
+            )
+                return;
+            if (!r.ok()) reject(new Error(`Move failed: ${r.status()}`));
+            answered += 1;
+            if (answered === count) {
+                page.off('response', onResponse);
+                resolve();
+            }
+        };
+        page.on('response', onResponse);
+    });
+}
+
+/**
+ * Drags a card with the keyboard: Space picks it up, `keys` move it (each waits
+ * for its announcement), Space drops it.
+ */
+export async function dragCardWithKeys(
+    page: Page,
+    title: string,
+    keys: Array<{ key: string; announcement: string }>,
+) {
+    await cardRow(page, title).getByRole('link').focus();
+    await page.keyboard.press('Space');
+    await expect(dndAnnouncement(page)).toHaveText(`Picked up card ${title}`);
+    for (const { key, announcement } of keys) {
+        await page.keyboard.press(key);
+        await expect(dndAnnouncement(page)).toHaveText(announcement);
+    }
+    await page.keyboard.press('Space');
+}
+
+/** Presses the mouse on a card and moves it past the 5 px drag threshold. */
+export async function pickUpWithMouse(page: Page, title: string) {
+    const box = await cardRow(page, title).boundingBox();
+    if (!box) throw new Error(`No card ${title}`);
+    await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2 + 10, {
+        steps: 5,
+    });
+    await expect(dndAnnouncement(page)).toHaveText(`Picked up card ${title}`);
 }

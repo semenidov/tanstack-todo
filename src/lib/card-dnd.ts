@@ -1,9 +1,9 @@
 import type {
     Announcements,
     ClientRect,
-    Coordinates,
     UniqueIdentifier,
 } from '@dnd-kit/core';
+import type { Coordinates } from '@dnd-kit/utilities';
 import type { ListWithCards } from '#/lib/boards-query';
 
 // Drag-and-drop of cards. The drop targets ("over") are cards and whole list
@@ -142,19 +142,28 @@ export function cardKeyboardPoint(
             return listRect && center(listRect);
         }
         const x = rect.left + rect.width / 2;
+        // The point stays put after the card moves in, so it must then fall inside
+        // the card's new slot, or the card would be bounced to another position.
         // Upper part of the card at the same index: the card goes before it.
-        // Just below the last card: the card goes to the end.
+        // Half a card below the last card: the card goes to the end.
         return current.index < cards.length
             ? { x, y: rect.top + rect.height / 4 }
-            : { x, y: rect.bottom + 1 };
+            : { x, y: rect.bottom + rect.height / 2 };
     }
 
     return undefined;
 }
 
+/** Kept across the announcement sets of one drag (they are rebuilt with the lists). */
+export interface CardDndAnnouncerState {
+    /** Right after the pick-up the card is over itself: don't talk over "Picked up". */
+    quietOverId: UniqueIdentifier | null;
+}
+
 /** Screen reader texts for dragging a card with the keyboard or a pointer. */
 export function cardDndAnnouncements(
     lists: Array<ListWithCards>,
+    state: CardDndAnnouncerState,
 ): Announcements {
     const title = (id: UniqueIdentifier) =>
         findCardSpot(lists, String(id))?.list.cards.find((c) => c.id === id)
@@ -172,8 +181,14 @@ export function cardDndAnnouncements(
         `Moving card ${title(id)} was cancelled`;
 
     return {
-        onDragStart: ({ active }) => `Picked up card ${title(active.id)}`,
+        onDragStart: ({ active }) => {
+            state.quietOverId = active.id;
+            return `Picked up card ${title(active.id)}`;
+        },
         onDragOver: ({ active, over }) => {
+            const quiet = state.quietOverId;
+            state.quietOverId = null;
+            if (over && over.id === quiet) return undefined;
             const where = over && position(active.id, over.id);
             return where
                 ? `Card ${title(active.id)} is in ${where}`

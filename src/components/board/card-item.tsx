@@ -1,3 +1,6 @@
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { cn } from 'cn';
 import { useRef, useState } from 'react';
 import {
     useDeleteCard,
@@ -20,6 +23,7 @@ import {
 import { cardLinkId } from '#/lib/boards';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 import { useDelayedFlag } from '#/lib/use-delayed-flag';
+import { usePrefersReducedMotion } from '#/lib/use-prefers-reduced-motion';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon, LoaderCircleIcon } from 'lucide-react';
 
@@ -41,19 +45,49 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
     // The popover opens once the menu has closed: opening it from onSelect would
     // let the menu's focus return to its trigger and dismiss the popover at once.
     const openMoveOnMenuCloseRef = useRef(false);
+    const reducedMotion = usePrefersReducedMotion();
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
+        id: card.id,
+        // Neighbors jump instead of sliding apart.
+        transition: reducedMotion ? null : undefined,
+    });
 
     return (
         <Popover open={isMoveOpen} onOpenChange={setIsMoveOpen}>
             <PopoverAnchor asChild>
                 <li
+                    ref={setNodeRef}
+                    style={{
+                        transform: CSS.Translate.toString(transform),
+                        transition,
+                    }}
                     aria-busy={showSpinner || undefined}
-                    className="group/card relative rounded-md border bg-background shadow-xs"
+                    className={cn(
+                        'group/card relative rounded-md border bg-background shadow-xs',
+                        // The placeholder where the dragged card will land.
+                        isDragging &&
+                            'border-dashed bg-muted shadow-none *:invisible',
+                    )}
                 >
+                    {/* The link is the drag handle: Space picks the card up, Enter opens it.
+                        No native link drag, no iOS link preview or text selection on long press. */}
                     <Link
                         to="/b/$boardId/c/$cardId"
                         params={{ boardId, cardId: card.id }}
                         id={cardLinkId(card.id)}
-                        className="block truncate px-3 py-2 pr-8 text-sm"
+                        ref={setActivatorNodeRef}
+                        {...listeners}
+                        aria-describedby={attributes['aria-describedby']}
+                        draggable={false}
+                        className="block truncate px-3 py-2 pr-8 text-sm select-none [-webkit-touch-callout:none]"
                     >
                         {card.title}
                     </Link>

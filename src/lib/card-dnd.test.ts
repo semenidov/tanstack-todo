@@ -201,7 +201,7 @@ describe('cardKeyboardPoint', () => {
     it('moves to the end of the next list when it has fewer cards', () => {
         expect(
             cardKeyboardPoint(lists, rects, 'a3', null, 'ArrowRight'),
-        ).toEqual({ x: 170, y: 81 });
+        ).toEqual({ x: 170, y: 95 });
     });
 
     it('moves into an empty list', () => {
@@ -227,13 +227,26 @@ describe('cardKeyboardPoint', () => {
 });
 
 describe('cardDndAnnouncements', () => {
-    const announcements = cardDndAnnouncements(lists);
+    const announcements = cardDndAnnouncements(lists, { quietOverId: null });
     // The announcement functions read only the ids.
     const active = { id: 'a1' } as Active;
     const over = (id: string) => ({ id }) as Over;
 
     it('announces the pick-up', () => {
         expect(announcements.onDragStart({ active })).toBe('Picked up card A1');
+    });
+
+    it('keeps the pick-up: the card over itself right after it is not announced', () => {
+        const fresh = cardDndAnnouncements(lists, { quietOverId: null });
+        fresh.onDragStart({ active });
+
+        expect(fresh.onDragOver({ active, over: over('a1') })).toBeUndefined();
+        expect(fresh.onDragOver({ active, over: over('a2') })).toBe(
+            'Card A1 is in position 2 of 3 in list List A',
+        );
+        expect(fresh.onDragOver({ active, over: over('a1') })).toBe(
+            'Card A1 is in position 1 of 3 in list List A',
+        );
     });
 
     it('announces the position in the same list and in another list', () => {

@@ -146,20 +146,28 @@ export function useMoveCard(boardId: string) {
     /**
      * Puts the card at `index` of `toListId` (counted without the card) in the cache
      * right away and queues the request with the neighbors from the cache.
+     * Returns false when there is nothing to move.
      */
-    const moveCard = (cardId: string, toListId: string, index: number) => {
+    const moveCard = (
+        cardId: string,
+        toListId: string,
+        index: number,
+    ): boolean => {
         // Synchronous cancel: a refetch in flight must not overwrite the move.
         void queryClient.cancelQueries({ queryKey: key });
         const board = queryClient.getQueryData(key);
-        if (!board || isSameCardSpot(board, cardId, toListId, index)) return;
+        if (!board || isSameCardSpot(board, cardId, toListId, index)) {
+            return false;
+        }
         const neighbors = cardMoveNeighbors(board, cardId, toListId, index);
-        if (!neighbors) return;
+        if (!neighbors) return false;
 
         queryClient.setQueryData(
             key,
             moveCardInBoard(board, cardId, toListId, index),
         );
         mutate({ cardId, toListId, ...neighbors });
+        return true;
     };
 
     return { moveCard };
