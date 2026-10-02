@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
-import { addListToBoard, createTempId } from '#/lib/boards';
+import { addListToBoard } from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
 import { addListServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon } from 'lucide-react';
+import { Loader2Icon, PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from 'cn';
 
@@ -13,28 +13,21 @@ function useAddList(boardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
 
+    // Not optimistic: the list enters the cache only with the id the server gave it.
     return useMutation({
-        mutationFn: (title: string) =>
-            addListServer({ data: { boardId, title } }),
-        onMutate: async (title) => {
-            await queryClient.cancelQueries({ queryKey: key });
-            const previous = queryClient.getQueryData(key);
-            queryClient.setQueryData(key, (old) =>
-                old
-                    ? addListToBoard(old, {
-                          id: createTempId(),
-                          boardId,
-                          title,
-                          createdAt: new Date(),
-                          updatedAt: new Date(),
-                          cards: [],
-                      })
-                    : old,
-            );
-            return { previous };
+        mutationFn: async (title: string) => {
+            const list = await addListServer({ data: { boardId, title } });
+            // null: the board is gone or belongs to someone else.
+            if (!list) throw new Error('List was not created');
+            return list;
         },
-        onError: (_error, _title, context) => {
-            queryClient.setQueryData(key, context?.previous);
+        onSuccess: async (list) => {
+            await queryClient.cancelQueries({ queryKey: key });
+            queryClient.setQueryData(key, (old) =>
+                old ? addListToBoard(old, { ...list, cards: [] }) : old,
+            );
+        },
+        onError: () => {
             toast.error("Couldn't add the list. Please try again.");
         },
         onSettled: () => {
@@ -65,10 +58,14 @@ export function AddList({ boardId, className }: AddListProps) {
 
     function handleSubmit() {
         const trimmed = value.trim();
-        if (!trimmed) return;
-        addList.mutate(trimmed);
-        setValue('');
-        inputRef.current?.focus();
+        if (!trimmed || addList.isPending) return;
+        // Cleared only after success, so a failed request keeps the typed text.
+        addList.mutate(trimmed, {
+            onSuccess: () => {
+                setValue('');
+                inputRef.current?.focus();
+            },
+        });
     }
 
     if (!isEditing) {
@@ -94,24 +91,40 @@ export function AddList({ boardId, className }: AddListProps) {
                 className,
             )}
         >
-            <Input
-                ref={inputRef}
-                value={value}
-                placeholder="List title"
-                aria-label="New list title"
-                onChange={(e) => setValue(e.target.value)}
-                onBlur={close}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSubmit();
-                    }
-                    if (e.key === 'Escape') {
-                        e.preventDefault();
-                        close();
-                    }
-                }}
-            />
+            {/* Own wrapper: the outer one stretches to the row height, the spinner must
+                center on the field, not on the row. */}
+            <div className="relative">
+                {/* readOnly, not disabled: the field keeps focus while the request is pending. */}
+                <Input
+                    ref={inputRef}
+                    value={value}
+                    placeholder="List title"
+                    aria-label="New list title"
+                    readOnly={addList.isPending}
+                    aria-busy={addList.isPending}
+                    className="pr-8"
+                    onChange={(e) => setValue(e.target.value)}
+                    onBlur={() => {
+                        if (!addList.isPending) close();
+                    }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSubmit();
+                        }
+                        if (e.key === 'Escape') {
+                            e.preventDefault();
+                            close();
+                        }
+                    }}
+                />
+                {addList.isPending && (
+                    <Loader2Icon
+                        aria-hidden="true"
+                        className="absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+                    />
+                )}
+            </div>
         </div>
     );
 }

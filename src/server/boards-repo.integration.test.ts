@@ -13,6 +13,8 @@ import {
     moveCard,
     renameBoard,
     renameList,
+    restoreCard,
+    restoreList,
     updateCard,
 } from '#/server/boards-repo';
 import { seedUser } from '#/test/db';
@@ -29,6 +31,20 @@ async function seedBoard(userId: string, title: string) {
         { boardId: board.id, title: 'Done', createdAt: new Date(now + 1) },
     ]);
     return board;
+}
+
+/** Lists of a board in board order, including soft-deleted ones. */
+function listsOf(boardId: string) {
+    return db
+        .select()
+        .from(lists)
+        .where(eq(lists.boardId, boardId))
+        .orderBy(lists.createdAt);
+}
+
+async function cardRow(cardId: string) {
+    const [row] = await db.select().from(cards).where(eq(cards.id, cardId));
+    return row;
 }
 
 describe('listBoards', () => {
@@ -63,6 +79,34 @@ describe('listBoards', () => {
 
         expect(await listBoards(a.id)).toEqual([
             { id: board.id, title: 'Empty', listCount: 0, cardCount: 0 },
+        ]);
+    });
+
+    it('does not count deleted lists and cards', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        await addCard(a.id, todo.id, 'kept');
+        const deleted = await addCard(a.id, todo.id, 'deleted');
+        await addCard(a.id, done.id, 'in deleted list');
+        await deleteCard(a.id, deleted!.id);
+        await deleteList(a.id, done.id);
+
+        expect(await listBoards(a.id)).toEqual([
+            { id: board.id, title: 'Board', listCount: 1, cardCount: 1 },
+        ]);
+    });
+
+    it('keeps a board whose lists are all deleted, with zero counts', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        await addCard(a.id, todo.id, 'card');
+        await deleteList(a.id, todo.id);
+        await deleteList(a.id, done.id);
+
+        expect(await listBoards(a.id)).toEqual([
+            { id: board.id, title: 'Board', listCount: 0, cardCount: 0 },
         ]);
     });
 
@@ -276,38 +320,115 @@ describe('renameList', () => {
 });
 
 describe('deleteList', () => {
-    it('deletes a list and its cards', async () => {
+    it('soft deletes a list and leaves its cards untouched', async () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
-        const [list] = await db
-            .select()
-            .from(lists)
-            .where(eq(lists.boardId, board.id))
-            .limit(1);
+        const [list] = await listsOf(board.id);
         const card = await addCard(a.id, list.id, 'card');
 
         const affected = await deleteList(a.id, list.id);
         expect(affected).toHaveLength(1);
+        expect(affected[0].deletedAt).toBeInstanceOf(Date);
 
-        const remainingCards = await db
-            .select()
-            .from(cards)
-            .where(eq(cards.id, card!.id));
-        expect(remainingCards).toHaveLength(0);
+        expect((await cardRow(card!.id)).deletedAt).toBeNull();
+    });
+
+    it('hides the list and its cards from getBoard', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        await addCard(a.id, todo.id, 'card');
+
+        await deleteList(a.id, todo.id);
+
+        const result = await getBoard(a.id, board.id);
+        expect(result?.lists.map((l) => l.id)).toEqual([done.id]);
     });
 
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
-        const [list] = await db
-            .select()
-            .from(lists)
-            .where(eq(lists.boardId, board.id))
-            .limit(1);
+        const [list] = await listsOf(board.id);
 
         const affected = await deleteList(b.id, list.id);
         expect(affected).toHaveLength(0);
+        expect((await listsOf(board.id))[0].deletedAt).toBeNull();
+    });
+});
+
+describe('restoreList', () => {
+    it('brings the list back with its cards in place', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        const card = await addCard(a.id, todo.id, 'card');
+        await deleteList(a.id, todo.id);
+
+        const affected = await restoreList(a.id, todo.id);
+        expect(affected).toHaveLength(1);
+
+        const result = await getBoard(a.id, board.id);
+        expect(result?.lists.map((l) => l.id)).toEqual([todo.id, done.id]);
+        expect(result?.lists[0].cards.map((c) => c.id)).toEqual([card!.id]);
+    });
+
+    it('is a no-op for another user', async () => {
+        const a = await seedUser();
+        const b = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        await deleteList(a.id, list.id);
+
+        const affected = await restoreList(b.id, list.id);
+        expect(affected).toHaveLength(0);
+        expect((await listsOf(board.id))[0].deletedAt).toBeInstanceOf(Date);
+    });
+});
+
+describe('mutations on a deleted list', () => {
+    it('renameList is a no-op', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        await deleteList(a.id, list.id);
+
+        expect(await renameList(a.id, list.id, 'renamed')).toHaveLength(0);
+        expect((await listsOf(board.id))[0].title).toBe('To do');
+    });
+
+    it('addCard is a no-op', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        await deleteList(a.id, list.id);
+
+        expect(await addCard(a.id, list.id, 'card')).toBeNull();
+        expect(
+            await db.select().from(cards).where(eq(cards.listId, list.id)),
+        ).toHaveLength(0);
+    });
+
+    it('moveCard into a deleted list is a no-op', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        const card = await addCard(a.id, todo.id, 'card');
+        await deleteList(a.id, done.id);
+
+        expect(await moveCard(a.id, card!.id, done.id)).toBeNull();
+        expect((await cardRow(card!.id)).listId).toBe(todo.id);
+    });
+
+    it('moveCard out of a deleted list is a no-op', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        const card = await addCard(a.id, todo.id, 'card');
+        await deleteList(a.id, todo.id);
+
+        expect(await moveCard(a.id, card!.id, done.id)).toBeNull();
+        expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 });
 
@@ -442,32 +563,85 @@ describe('moveCard', () => {
 });
 
 describe('deleteCard', () => {
-    it('deletes a card for the owner', async () => {
+    it('soft deletes a card for the owner and hides it from getBoard', async () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
-        const [list] = await db
-            .select()
-            .from(lists)
-            .where(eq(lists.boardId, board.id))
-            .limit(1);
+        const [list] = await listsOf(board.id);
+        const kept = await addCard(a.id, list.id, 'kept');
         const card = await addCard(a.id, list.id, 'card');
 
         const affected = await deleteCard(a.id, card!.id);
         expect(affected).toHaveLength(1);
+        expect(affected[0].deletedAt).toBeInstanceOf(Date);
+
+        const result = await getBoard(a.id, board.id);
+        expect(result?.lists[0].cards.map((c) => c.id)).toEqual([kept!.id]);
     });
 
     it('is a no-op for another user', async () => {
         const a = await seedUser();
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
-        const [list] = await db
-            .select()
-            .from(lists)
-            .where(eq(lists.boardId, board.id))
-            .limit(1);
+        const [list] = await listsOf(board.id);
         const card = await addCard(a.id, list.id, 'card');
 
         const affected = await deleteCard(b.id, card!.id);
         expect(affected).toHaveLength(0);
+        expect((await cardRow(card!.id)).deletedAt).toBeNull();
+    });
+});
+
+describe('restoreCard', () => {
+    it('brings the card back for the owner', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        const card = await addCard(a.id, list.id, 'card');
+        await deleteCard(a.id, card!.id);
+
+        const affected = await restoreCard(a.id, card!.id);
+        expect(affected).toHaveLength(1);
+
+        const result = await getBoard(a.id, board.id);
+        expect(result?.lists[0].cards.map((c) => c.id)).toEqual([card!.id]);
+    });
+
+    it('is a no-op for another user', async () => {
+        const a = await seedUser();
+        const b = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        const card = await addCard(a.id, list.id, 'card');
+        await deleteCard(a.id, card!.id);
+
+        const affected = await restoreCard(b.id, card!.id);
+        expect(affected).toHaveLength(0);
+        expect((await cardRow(card!.id)).deletedAt).toBeInstanceOf(Date);
+    });
+});
+
+describe('mutations on a deleted card', () => {
+    it('updateCard is a no-op', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        const card = await addCard(a.id, list.id, 'original');
+        await deleteCard(a.id, card!.id);
+
+        expect(
+            await updateCard(a.id, card!.id, { title: 'renamed' }),
+        ).toHaveLength(0);
+        expect((await cardRow(card!.id)).title).toBe('original');
+    });
+
+    it('moveCard is a no-op', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        const card = await addCard(a.id, todo.id, 'card');
+        await deleteCard(a.id, card!.id);
+
+        expect(await moveCard(a.id, card!.id, done.id)).toBeNull();
+        expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 });

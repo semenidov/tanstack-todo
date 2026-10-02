@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
     addCardToList,
     addListToBoard,
-    createTempId,
     findCardInBoard,
     cardLinkId,
-    isTempId,
     moveCardInBoard,
     removeCardFromBoard,
     removeBoardFromList,
     removeListFromBoard,
     renameBoardInList,
     renameListInBoard,
+    restoreCardToBoard,
+    restoreListToBoard,
     updateCardInBoard,
 } from '#/lib/boards';
 import type { BoardData, Card, ListWithCards } from '#/lib/boards-query';
@@ -193,20 +193,6 @@ describe('findCardInBoard', () => {
     });
 });
 
-describe('temp ids', () => {
-    it('recognizes ids created by createTempId', () => {
-        expect(isTempId(createTempId())).toBe(true);
-    });
-
-    it('does not treat a regular uuid as temporary', () => {
-        expect(isTempId(crypto.randomUUID())).toBe(false);
-    });
-
-    it('creates unique ids', () => {
-        expect(createTempId()).not.toBe(createTempId());
-    });
-});
-
 describe('cardLinkId', () => {
     it('builds a stable DOM id from the card id', () => {
         expect(cardLinkId('abc')).toBe('card-abc');
@@ -229,5 +215,70 @@ describe('boards list cache', () => {
         const next = removeBoardFromList(boards, 'a');
         expect(next.map((b) => b.id)).toEqual(['b']);
         expect(boards).toHaveLength(2);
+    });
+});
+
+function at<T extends { createdAt: Date }>(item: T, ms: number): T {
+    return { ...item, createdAt: new Date(ms) };
+}
+
+describe('restoreListToBoard', () => {
+    it('puts the list back between older and newer lists', () => {
+        const board = makeBoard([at(makeList('a'), 1), at(makeList('c'), 3)]);
+        const next = restoreListToBoard(board, at(makeList('b'), 2));
+        expect(next.lists.map((l) => l.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('puts the newest list at the end and the oldest at the start', () => {
+        const board = makeBoard([at(makeList('b'), 2)]);
+        const withNewest = restoreListToBoard(board, at(makeList('c'), 3));
+        const withOldest = restoreListToBoard(board, at(makeList('a'), 1));
+        expect(withNewest.lists.map((l) => l.id)).toEqual(['b', 'c']);
+        expect(withOldest.lists.map((l) => l.id)).toEqual(['a', 'b']);
+    });
+
+    it('keeps the cards of the restored list', () => {
+        const list = makeList('a', 'a', [makeCard('x')]);
+        const next = restoreListToBoard(makeBoard([]), list);
+        expect(next.lists[0].cards.map((c) => c.id)).toEqual(['x']);
+    });
+
+    it('does nothing if the list is already on the board', () => {
+        const board = makeBoard([makeList('a')]);
+        expect(restoreListToBoard(board, makeList('a'))).toBe(board);
+    });
+});
+
+describe('restoreCardToBoard', () => {
+    it('puts the card back between newer and older cards', () => {
+        const board = makeBoard([
+            makeList('list-1', 'List', [
+                at(makeCard('c'), 3),
+                at(makeCard('a'), 1),
+            ]),
+        ]);
+        const next = restoreCardToBoard(board, at(makeCard('b'), 2));
+        expect(next.lists[0].cards.map((c) => c.id)).toEqual(['c', 'b', 'a']);
+    });
+
+    it('puts the newest card first and the oldest last', () => {
+        const board = makeBoard([
+            makeList('list-1', 'List', [at(makeCard('b'), 2)]),
+        ]);
+        const withNewest = restoreCardToBoard(board, at(makeCard('c'), 3));
+        const withOldest = restoreCardToBoard(board, at(makeCard('a'), 1));
+        expect(withNewest.lists[0].cards.map((c) => c.id)).toEqual(['c', 'b']);
+        expect(withOldest.lists[0].cards.map((c) => c.id)).toEqual(['b', 'a']);
+    });
+
+    it('does nothing if the list is gone', () => {
+        const board = makeBoard([makeList('list-2')]);
+        const next = restoreCardToBoard(board, makeCard('a'));
+        expect(next.lists[0].cards).toEqual([]);
+    });
+
+    it('does nothing if the card is already on the board', () => {
+        const board = makeBoard([makeList('list-1', 'List', [makeCard('a')])]);
+        expect(restoreCardToBoard(board, makeCard('a'))).toBe(board);
     });
 });

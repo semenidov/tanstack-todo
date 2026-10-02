@@ -50,6 +50,27 @@ test('adds a card and shows it in the list', async ({ page }) => {
     await expect(cardRow(page, 'Buy milk')).toBeVisible();
 });
 
+test('a new card can be opened and has a working menu as soon as it appears', async ({
+    page,
+}) => {
+    const list = listColumn(page, 'To do');
+    await list.getByRole('button', { name: 'Add card' }).click();
+    await list.getByLabel('New card title').fill('Fresh card');
+    await list.getByLabel('New card title').press('Enter');
+
+    const row = cardRow(page, 'Fresh card');
+    await expect(row).toBeVisible();
+    await row.getByRole('button', { name: 'Card actions' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
+    await page.keyboard.press('Escape');
+
+    await row.getByRole('link').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(
+        page.getByRole('dialog').getByRole('button', { name: 'Fresh card' }),
+    ).toBeVisible();
+});
+
 test('renames a card through the card dialog', async ({ page }) => {
     await addCard(page, 'To do', 'Old name');
     await cardRow(page, 'Old name').getByRole('link').click();
@@ -77,9 +98,7 @@ test('moves a card to another list', async ({ page }) => {
     await expect(listColumn(page, 'To do').getByText('Ship it')).toHaveCount(0);
 });
 
-test('deletes a card and it stays gone after the undo window', async ({
-    page,
-}) => {
+test('deletes a card on the server right away', async ({ page }) => {
     await addCard(page, 'To do', 'Temp card');
     const row = cardRow(page, 'Temp card');
     await expect(row).toBeVisible();
@@ -87,11 +106,29 @@ test('deletes a card and it stays gone after the undo window', async ({
     await row.getByRole('button', { name: 'Card actions' }).click();
     await page.getByRole('menuitem', { name: 'Delete' }).click();
     await expect(row).toHaveCount(0);
+    // The Undo toast appears once the server has saved the delete.
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
 
-    await page.waitForTimeout(5500);
     await page.reload();
     await page.waitForLoadState('networkidle');
     await expect(cardRow(page, 'Temp card')).toHaveCount(0);
+});
+
+test('a deleted card does not come back when the board refetches', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Deleted card');
+    const row = cardRow(page, 'Deleted card');
+
+    await row.getByRole('button', { name: 'Card actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await expect(row).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
+
+    // Adding a card refetches the board while the Undo toast is still open.
+    await addCard(page, 'To do', 'Another card');
+    await expect(cardRow(page, 'Another card')).toBeVisible();
+    await expect(cardRow(page, 'Deleted card')).toHaveCount(0);
 });
 
 test('undo keeps a deleted card', async ({ page }) => {

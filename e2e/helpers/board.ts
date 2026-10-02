@@ -27,12 +27,9 @@ export async function addCard(page: Page, listTitle: string, title: string) {
     await list.getByRole('button', { name: 'Add card' }).click();
     await list.getByLabel('New card title').fill(title);
     await list.getByLabel('New card title').press('Enter');
-    // Wait until the server replaces the optimistic temp id: card actions and
-    // the card link are disabled/broken while the id is temporary.
-    await expect(cardRow(page, title).getByRole('link')).not.toHaveAttribute(
-        'id',
-        /^card-temp-/,
-    );
+    // Creation is not optimistic: the field is cleared once the server saved the card.
+    await expect(list.getByLabel('New card title')).toHaveValue('');
+    await expect(cardRow(page, title)).toBeVisible();
     // The composer stays open for the next card; close it so its blur-collapse
     // doesn't shift the layout under the next click.
     await list.getByLabel('New card title').press('Escape');

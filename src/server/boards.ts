@@ -45,7 +45,7 @@ export const addListServer = createServerFn({ method: 'POST' })
     .validator(z.object({ boardId: z.uuid(), title: titleSchema }))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        await repo.addList(userId, data.boardId, data.title);
+        return repo.addList(userId, data.boardId, data.title);
     });
 
 export const renameListServer = createServerFn({ method: 'POST' })
@@ -62,11 +62,18 @@ export const deleteListServer = createServerFn({ method: 'POST' })
         await repo.deleteList(userId, data.listId);
     });
 
+export const restoreListServer = createServerFn({ method: 'POST' })
+    .validator(z.object({ listId: z.uuid() }))
+    .handler(async ({ data }) => {
+        const userId = await requireUserId();
+        await repo.restoreList(userId, data.listId);
+    });
+
 export const addCardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ listId: z.uuid(), title: titleSchema }))
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        await repo.addCard(userId, data.listId, data.title);
+        return repo.addCard(userId, data.listId, data.title);
     });
 
 export const updateCardServer = createServerFn({ method: 'POST' })
@@ -97,4 +104,11 @@ export const deleteCardServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const userId = await requireUserId();
         await repo.deleteCard(userId, data.cardId);
+    });
+
+export const restoreCardServer = createServerFn({ method: 'POST' })
+    .validator(z.object({ cardId: z.uuid() }))
+    .handler(async ({ data }) => {
+        const userId = await requireUserId();
+        await repo.restoreCard(userId, data.cardId);
     });

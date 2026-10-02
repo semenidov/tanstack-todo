@@ -12,8 +12,16 @@ import {
 } from '#/components/ui/dropdown-menu';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { ListWithCards } from '#/lib/boards-query';
-import { isTempId, removeListFromBoard, renameListInBoard } from '#/lib/boards';
-import { deleteListServer, renameListServer } from '#/server/boards';
+import {
+    removeListFromBoard,
+    renameListInBoard,
+    restoreListToBoard,
+} from '#/lib/boards';
+import {
+    deleteListServer,
+    renameListServer,
+    restoreListServer,
+} from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { EllipsisIcon, Trash2Icon } from 'lucide-react';
@@ -49,56 +57,58 @@ function useRenameList(boardId: string) {
 function useDeleteList(boardId: string) {
     const queryClient = useQueryClient();
     const deleteList = useServerFn(deleteListServer);
+    const restoreList = useServerFn(restoreListServer);
     const key = boardQueryOptions(boardId).queryKey;
 
-    const commitDelete = (listId: string) => deleteList({ data: { listId } });
-
-    const deleteConfirmed = (listId: string) => {
-        const previous = queryClient.getQueryData(key);
+    const removeFromCache = (listId: string) =>
         queryClient.setQueryData(key, (old) =>
             old ? removeListFromBoard(old, listId) : old,
         );
-        commitDelete(listId)
-            .then(() => queryClient.invalidateQueries({ queryKey: key }))
-            .catch(() => {
-                queryClient.setQueryData(key, previous);
-                toast.error("Couldn't delete the list. Please try again.");
-            });
+    const returnToCache = (list: ListWithCards) =>
+        queryClient.setQueryData(key, (old) =>
+            old ? restoreListToBoard(old, list) : old,
+        );
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
+
+    // Soft delete on the server right away, so a refetch at any moment matches the cache.
+    const remove = async (list: ListWithCards) => {
+        await queryClient.cancelQueries({ queryKey: key });
+        removeFromCache(list.id);
+        try {
+            await deleteList({ data: { listId: list.id } });
+            return true;
+        } catch {
+            returnToCache(list);
+            toast.error("Couldn't delete the list. Please try again.");
+            return false;
+        } finally {
+            invalidate();
+        }
     };
 
-    const deleteEmptyWithUndo = (list: ListWithCards) => {
-        const previous = queryClient.getQueryData(key);
-        queryClient.setQueryData(key, (old) =>
-            old ? removeListFromBoard(old, list.id) : old,
-        );
+    const undo = async (list: ListWithCards) => {
+        await queryClient.cancelQueries({ queryKey: key });
+        returnToCache(list);
+        try {
+            await restoreList({ data: { listId: list.id } });
+        } catch {
+            removeFromCache(list.id);
+            toast.error("Couldn't restore the list. Please try again.");
+        } finally {
+            invalidate();
+        }
+    };
 
-        let settled = false;
-        const restore = () => queryClient.setQueryData(key, previous);
+    const deleteConfirmed = (list: ListWithCards) => {
+        void remove(list);
+    };
 
-        const commit = async () => {
-            if (settled) return;
-            settled = true;
-            try {
-                await commitDelete(list.id);
-                queryClient.invalidateQueries({ queryKey: key });
-            } catch {
-                restore();
-                toast.error("Couldn't delete the list. Please try again.");
-            }
-        };
-
-        const undo = () => {
-            if (settled) return;
-            settled = true;
-            restore();
-        };
-
+    const deleteEmptyWithUndo = async (list: ListWithCards) => {
+        if (!(await remove(list))) return;
         toast.warning(`Deleted "${list.title}"`, {
             icon: <Trash2Icon className="size-4" />,
-            action: { label: 'Undo', onClick: undo },
+            action: { label: 'Undo', onClick: () => void undo(list) },
             duration: UNDO_WINDOW_MS,
-            onAutoClose: commit,
-            onDismiss: commit,
         });
     };
 
@@ -116,12 +126,10 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const renameList = useRenameList(boardId);
     const { deleteConfirmed, deleteEmptyWithUndo } = useDeleteList(boardId);
-    // Not saved yet: its id is temporary, so rename/delete would hit a missing list.
-    const isSaving = isTempId(list.id);
 
     function handleDeleteSelected() {
         if (list.cards.length === 0) {
-            deleteEmptyWithUndo(list);
+            void deleteEmptyWithUndo(list);
         } else {
             setIsDeleteDialogOpen(true);
         }
@@ -134,7 +142,6 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
                     title={list.title}
                     count={list.cards.length}
                     isEditing={isEditingTitle}
-                    disabled={isSaving}
                     onStartEditing={() => setIsEditingTitle(true)}
                     onCancelEditing={() => setIsEditingTitle(false)}
                     onSave={(title) =>
@@ -147,7 +154,6 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
                             variant="ghost"
                             size="icon-sm"
                             aria-label="List actions"
-                            disabled={isSaving}
                             className="shrink-0"
                         >
                             <EllipsisIcon />
@@ -188,7 +194,7 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
                 onOpenChange={setIsDeleteDialogOpen}
                 listTitle={list.title}
                 cardCount={list.cards.length}
-                onConfirm={() => deleteConfirmed(list.id)}
+                onConfirm={() => deleteConfirmed(list)}
             />
         </div>
     );

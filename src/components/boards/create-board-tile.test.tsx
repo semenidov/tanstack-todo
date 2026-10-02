@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { CreateBoardTile } from '#/components/boards/create-board-tile';
 
 const { createBoardSpy, navigateSpy } = vi.hoisted(() => ({
@@ -56,6 +57,21 @@ describe('CreateBoardTile', () => {
                 params: { boardId: 'new-id' },
             }),
         );
+    });
+
+    it('keeps the typed title and shows a toast when the server fails', async () => {
+        createBoardSpy.mockRejectedValueOnce(new Error('network'));
+        const user = userEvent.setup();
+        renderTile();
+
+        await user.click(screen.getByRole('button', { name: /create board/i }));
+        const input = screen.getByLabelText('New board title');
+        await user.type(input, 'Plans{Enter}');
+
+        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+        expect(input).toHaveValue('Plans');
+        expect(input).not.toHaveAttribute('readonly');
+        expect(navigateSpy).not.toHaveBeenCalled();
     });
 
     it('closes on Escape without creating', async () => {

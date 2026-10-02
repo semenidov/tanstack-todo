@@ -50,6 +50,13 @@
             "when": 1790690315102,
             "tag": "0006_good_colossus",
             "breakpoints": true
+        },
+        {
+            "idx": 7,
+            "version": "7",
+            "when": 1790800469117,
+            "tag": "0007_wandering_lizard",
+            "breakpoints": true
         }
     ]
 }

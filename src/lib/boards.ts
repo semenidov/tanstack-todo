@@ -5,21 +5,9 @@ import type {
     ListWithCards,
 } from '#/lib/boards-query';
 
-// Optimistic entities live in the cache only until the server responds;
-// their ids must never reach a server function.
-const TEMP_ID_PREFIX = 'temp-';
-
-export function createTempId(): string {
-    return `${TEMP_ID_PREFIX}${crypto.randomUUID()}`;
-}
-
 // DOM id of a card link on the board, used to return focus after the card dialog closes.
 export function cardLinkId(cardId: string): string {
     return `card-${cardId}`;
-}
-
-export function isTempId(id: string): boolean {
-    return id.startsWith(TEMP_ID_PREFIX);
 }
 
 export function addListToBoard(
@@ -50,6 +38,20 @@ export function removeListFromBoard(
         ...board,
         lists: board.lists.filter((list) => list.id !== listId),
     };
+}
+
+// Undo of a list delete: back to its place, lists are ordered asc(createdAt).
+export function restoreListToBoard(
+    board: BoardData,
+    list: ListWithCards,
+): BoardData {
+    if (board.lists.some((l) => l.id === list.id)) return board;
+    const index = board.lists.findIndex(
+        (l) => l.createdAt.getTime() > list.createdAt.getTime(),
+    );
+    const lists = [...board.lists];
+    lists.splice(index === -1 ? lists.length : index, 0, list);
+    return { ...board, lists };
 }
 
 // New cards sort first (lists.cards is ordered desc(createdAt) server-side).
@@ -122,6 +124,24 @@ export function removeCardFromBoard(
             ...list,
             cards: list.cards.filter((card) => card.id !== cardId),
         })),
+    };
+}
+
+// Undo of a card delete: back to its place in its list, cards are ordered
+// desc(createdAt). No-op if the list is gone from the board.
+export function restoreCardToBoard(board: BoardData, card: Card): BoardData {
+    if (findCardInBoard(board, card.id)) return board;
+    return {
+        ...board,
+        lists: board.lists.map((list) => {
+            if (list.id !== card.listId) return list;
+            const index = list.cards.findIndex(
+                (c) => c.createdAt.getTime() < card.createdAt.getTime(),
+            );
+            const cards = [...list.cards];
+            cards.splice(index === -1 ? cards.length : index, 0, card);
+            return { ...list, cards };
+        }),
     };
 }
 

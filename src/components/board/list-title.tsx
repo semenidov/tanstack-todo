@@ -5,7 +5,6 @@ interface ListTitleProps {
     title: string;
     count: number;
     isEditing: boolean;
-    disabled?: boolean;
     onStartEditing: () => void;
     onCancelEditing: () => void;
     onSave: (title: string) => void;
