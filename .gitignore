@@ -17,3 +17,4 @@ e2e/.auth
 .vinxi
 __unconfig*
 todos.json
+e2e/_verify
