@@ -18,14 +18,7 @@ import type {
 } from '@dnd-kit/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
-import {
-    useEffect,
-    useLayoutEffect,
-    useMemo,
-    useRef,
-    useState,
-    useSyncExternalStore,
-} from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useMoveCard } from '#/components/board/card-mutations';
@@ -43,6 +36,7 @@ import {
     cardKeyboardPoint,
     pickCardDropId,
 } from '#/lib/card-dnd';
+import { useHydrated } from '#/lib/use-hydrated';
 import { usePrefersReducedMotion } from '#/lib/use-prefers-reduced-motion';
 
 // Space picks a card up: Enter stays with the card link and opens the card.
@@ -61,15 +55,6 @@ const ARROW_CODES: Array<string> = [
 
 // Lists change height while a card moves between them: measure them all the time.
 const MEASURING = { droppable: { strategy: MeasuringStrategy.Always } };
-
-const subscribeNoop = () => () => {};
-function useHydrated() {
-    return useSyncExternalStore(
-        subscribeNoop,
-        () => true,
-        () => false,
-    );
-}
 
 interface DragState {
     activeId: string;

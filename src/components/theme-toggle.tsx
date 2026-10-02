@@ -1,7 +1,7 @@
-import { useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { MonitorIcon, MoonIcon, SunIcon } from 'lucide-react';
 import { Button } from '#/components/ui/button';
+import { useHydrated } from '#/lib/use-hydrated';
 
 export enum Theme {
     Light = 'light',
@@ -20,16 +20,6 @@ const THEME_LABEL: Record<Theme, string> = {
     [Theme.Dark]: 'Dark',
     [Theme.System]: 'System',
 };
-
-const subscribe = () => () => {};
-
-function useHydrated() {
-    return useSyncExternalStore(
-        subscribe,
-        () => true,
-        () => false,
-    );
-}
 
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme();

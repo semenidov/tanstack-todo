@@ -1,5 +1,6 @@
 import { requireUserId } from '#/lib/auth-server';
 import * as repo from '#/server/boards-repo';
+import { moveCardOrThrow } from '#/server/move-card';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 
@@ -101,19 +102,7 @@ export const moveCardServer = createServerFn({ method: 'POST' })
             nextCardId: z.uuid().nullable(),
         }),
     )
-    .handler(async ({ data }) => {
-        const userId = await requireUserId();
-        const row = await repo.moveCard(
-            userId,
-            data.cardId,
-            data.toListId,
-            data.prevCardId,
-            data.nextCardId,
-        );
-        // A refusal (foreign or stale neighbors, deleted list) must reach the client
-        // as an error: it shows a toast and refetches the board.
-        if (!row) throw new Error('Card was not moved');
-    });
+    .handler(async ({ data }) => moveCardOrThrow(await requireUserId(), data));
 
 export const deleteCardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ cardId: z.uuid() }))

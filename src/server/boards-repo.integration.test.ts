@@ -230,7 +230,7 @@ describe('deleteBoard', () => {
 });
 
 describe('getBoard', () => {
-    it('returns lists ascending by createdAt and cards descending by createdAt', async () => {
+    it('returns lists ascending by createdAt and cards in their position order', async () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const boardLists = await db
@@ -868,6 +868,21 @@ describe('card order', () => {
             await expectRefused(todoIds[0], () =>
                 moveCard(a.id, todoIds[0], todo.id, null, todoIds[0]),
             );
+        });
+
+        it('neighbors in reversed order (a stale client order)', async () => {
+            const a = await seedUser();
+            const { board, done, todoIds, doneIds } = await seedOrder(
+                a.id,
+                ['a0'],
+                ['a0', 'a1', 'a2'],
+            );
+
+            // Renumbering keeps the order, so the keys stay reversed: refused.
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], done.id, doneIds[2], doneIds[0]),
+            );
+            expect(await order(a.id, board.id)).toEqual([todoIds, doneIds]);
         });
 
         it('a deleted target list', async () => {
