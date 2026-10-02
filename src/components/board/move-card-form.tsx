@@ -32,13 +32,13 @@ export function MoveCardForm({ card, lists, onMove }: MoveCardFormProps) {
 
     return (
         <form
-            className="grid gap-3"
+            className="grid min-w-0 grid-cols-1 gap-3"
             onSubmit={(e) => {
                 e.preventDefault();
                 if (!isSameSpot) onMove(listId, position - 1);
             }}
         >
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
                 <Label htmlFor={`${id}-list`}>List</Label>
                 <Select
                     value={listId}
@@ -47,8 +47,19 @@ export function MoveCardForm({ card, lists, onMove }: MoveCardFormProps) {
                         setPosition(1);
                     }}
                 >
-                    <SelectTrigger id={`${id}-list`} className="w-full">
-                        <SelectValue />
+                    {/* Long names (up to 200 chars, maybe one word) are cut with an
+                        ellipsis; the full name is in the title. */}
+                    <SelectTrigger
+                        id={`${id}-list`}
+                        title={target?.title}
+                        // Radix SelectValue drops className: style it from the trigger.
+                        className="w-full min-w-0 *:data-[slot=select-value]:min-w-0"
+                    >
+                        <SelectValue>
+                            <span className="min-w-0 truncate">
+                                {target?.title}
+                            </span>
+                        </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                         {lists.map((list) => (
@@ -56,15 +67,18 @@ export function MoveCardForm({ card, lists, onMove }: MoveCardFormProps) {
                                 key={list.id}
                                 value={list.id}
                                 title={list.title}
-                                className="max-w-72"
+                                // The item text wrapper must shrink too, or the option overflows.
+                                className="max-w-72 *:[span]:last:min-w-0"
                             >
-                                <span className="truncate">{list.title}</span>
+                                <span className="min-w-0 truncate">
+                                    {list.title}
+                                </span>
                             </SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
             </div>
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
                 <Label htmlFor={`${id}-position`}>Position</Label>
                 <Select
                     value={String(position)}
