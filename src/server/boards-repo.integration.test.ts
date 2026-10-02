@@ -416,7 +416,7 @@ describe('mutations on a deleted list', () => {
         const card = await addCard(a.id, todo.id, 'card');
         await deleteList(a.id, done.id);
 
-        expect(await moveCard(a.id, card!.id, done.id)).toBeNull();
+        expect(await moveCard(a.id, card!.id, done.id, null, null)).toBeNull();
         expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 
@@ -427,7 +427,7 @@ describe('mutations on a deleted list', () => {
         const card = await addCard(a.id, todo.id, 'card');
         await deleteList(a.id, todo.id);
 
-        expect(await moveCard(a.id, card!.id, done.id)).toBeNull();
+        expect(await moveCard(a.id, card!.id, done.id, null, null)).toBeNull();
         expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 });
@@ -510,7 +510,7 @@ describe('moveCard', () => {
         const [fromList, toList] = boardLists;
         const card = await addCard(a.id, fromList.id, 'card');
 
-        const row = await moveCard(a.id, card!.id, toList.id);
+        const row = await moveCard(a.id, card!.id, toList.id, null, null);
         expect(row?.listId).toBe(toList.id);
     });
 
@@ -526,7 +526,7 @@ describe('moveCard', () => {
         const [fromList, toList] = boardLists;
         const card = await addCard(a.id, fromList.id, 'card');
 
-        const row = await moveCard(b.id, card!.id, toList.id);
+        const row = await moveCard(b.id, card!.id, toList.id, null, null);
         expect(row).toBeNull();
         expect(
             (await db.select().from(cards).where(eq(cards.id, card!.id)))[0]
@@ -553,7 +553,7 @@ describe('moveCard', () => {
             .values({ boardId: otherBoard.id, title: 'Other list' })
             .returning();
 
-        const row = await moveCard(a.id, card!.id, otherList.id);
+        const row = await moveCard(a.id, card!.id, otherList.id, null, null);
         expect(row).toBeNull();
         expect(
             (await db.select().from(cards).where(eq(cards.id, card!.id)))[0]
@@ -641,7 +641,323 @@ describe('mutations on a deleted card', () => {
         const card = await addCard(a.id, todo.id, 'card');
         await deleteCard(a.id, card!.id);
 
-        expect(await moveCard(a.id, card!.id, done.id)).toBeNull();
+        expect(await moveCard(a.id, card!.id, done.id, null, null)).toBeNull();
         expect((await cardRow(card!.id)).listId).toBe(todo.id);
+    });
+});
+
+describe('card order', () => {
+    /** A board with «To do» and «Done»; cards inserted with the given keys. */
+    async function seedOrder(
+        userId: string,
+        todoKeys: Array<string>,
+        doneKeys: Array<string> = [],
+    ) {
+        const board = await seedBoard(userId, 'Board');
+        const [todo, done] = await listsOf(board.id);
+        const insert = async (listId: string, keys: Array<string>) => {
+            const ids: Array<string> = [];
+            for (const [i, position] of keys.entries()) {
+                const [row] = await db
+                    .insert(cards)
+                    .values({ listId, title: `card ${i}`, position })
+                    .returning();
+                ids.push(row.id);
+            }
+            return ids;
+        };
+        return {
+            board,
+            todo,
+            done,
+            todoIds: await insert(todo.id, todoKeys),
+            doneIds: await insert(done.id, doneKeys),
+        };
+    }
+
+    /** Card ids per list in getBoard order: [todo, done]. */
+    async function order(userId: string, boardId: string) {
+        const result = await getBoard(userId, boardId);
+        return result?.lists.map((l) => l.cards.map((c) => c.id)) ?? [];
+    }
+
+    it('getBoard orders cards by position byte-wise: Zz before a0', async () => {
+        const a = await seedUser();
+        const { board, todoIds } = await seedOrder(a.id, ['a0', 'b0', 'Zz']);
+
+        expect((await order(a.id, board.id))[0]).toEqual([
+            todoIds[2],
+            todoIds[0],
+            todoIds[1],
+        ]);
+    });
+
+    it('addCard puts the new card before the first live card', async () => {
+        const a = await seedUser();
+        const { board, todo, todoIds } = await seedOrder(a.id, ['a0', 'a1']);
+        await deleteCard(a.id, todoIds[0]);
+
+        const card = await addCard(a.id, todo.id, 'new');
+
+        expect(card?.position).toBe('a0');
+        expect((await order(a.id, board.id))[0]).toEqual([
+            card!.id,
+            todoIds[1],
+        ]);
+    });
+
+    it('addCard gives the first card of an empty list the key a0', async () => {
+        const a = await seedUser();
+        const { todo } = await seedOrder(a.id, []);
+
+        expect((await addCard(a.id, todo.id, 'first'))?.position).toBe('a0');
+    });
+
+    it('moveCard puts a card between two neighbors in another list', async () => {
+        const a = await seedUser();
+        const { board, done, todoIds, doneIds } = await seedOrder(
+            a.id,
+            ['a0'],
+            ['a0', 'a1'],
+        );
+
+        const row = await moveCard(
+            a.id,
+            todoIds[0],
+            done.id,
+            doneIds[0],
+            doneIds[1],
+        );
+
+        expect(row?.listId).toBe(done.id);
+        expect(await order(a.id, board.id)).toEqual([
+            [],
+            [doneIds[0], todoIds[0], doneIds[1]],
+        ]);
+    });
+
+    it('moveCard puts a card at the start and at the end of a list', async () => {
+        const a = await seedUser();
+        const { board, todo, todoIds } = await seedOrder(a.id, [
+            'a0',
+            'a1',
+            'a2',
+        ]);
+
+        await moveCard(a.id, todoIds[2], todo.id, null, todoIds[0]);
+        expect((await order(a.id, board.id))[0]).toEqual([
+            todoIds[2],
+            todoIds[0],
+            todoIds[1],
+        ]);
+
+        await moveCard(a.id, todoIds[2], todo.id, todoIds[1], null);
+        expect((await order(a.id, board.id))[0]).toEqual(todoIds);
+    });
+
+    it('moveCard moves a card down and up inside its list', async () => {
+        const a = await seedUser();
+        const { board, todo, todoIds } = await seedOrder(a.id, [
+            'a0',
+            'a1',
+            'a2',
+        ]);
+
+        await moveCard(a.id, todoIds[0], todo.id, todoIds[1], todoIds[2]);
+        expect((await order(a.id, board.id))[0]).toEqual([
+            todoIds[1],
+            todoIds[0],
+            todoIds[2],
+        ]);
+
+        await moveCard(a.id, todoIds[2], todo.id, null, todoIds[1]);
+        expect((await order(a.id, board.id))[0]).toEqual([
+            todoIds[2],
+            todoIds[1],
+            todoIds[0],
+        ]);
+    });
+
+    it('moveCard puts a card into an empty list', async () => {
+        const a = await seedUser();
+        const { board, done, todoIds } = await seedOrder(a.id, ['a0']);
+
+        const row = await moveCard(a.id, todoIds[0], done.id, null, null);
+
+        expect(row?.position).toBe('a0');
+        expect(await order(a.id, board.id)).toEqual([[], [todoIds[0]]]);
+    });
+
+    describe('refuses bad neighbors and leaves the data as is', () => {
+        async function expectRefused(
+            cardId: string,
+            move: () => Promise<unknown>,
+        ) {
+            const before = await cardRow(cardId);
+            expect(await move()).toBeNull();
+            const after = await cardRow(cardId);
+            expect([after.listId, after.position]).toEqual([
+                before.listId,
+                before.position,
+            ]);
+        }
+
+        it('a neighbor from another list', async () => {
+            const a = await seedUser();
+            const { done, todoIds } = await seedOrder(
+                a.id,
+                ['a0', 'a1'],
+                ['a0'],
+            );
+
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], done.id, todoIds[1], null),
+            );
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], done.id, null, todoIds[1]),
+            );
+        });
+
+        it('a neighbor from another user board', async () => {
+            const a = await seedUser();
+            const b = await seedUser();
+            const mine = await seedOrder(a.id, ['a0']);
+            const foreign = await seedOrder(b.id, ['a0']);
+
+            await expectRefused(mine.todoIds[0], () =>
+                moveCard(
+                    a.id,
+                    mine.todoIds[0],
+                    mine.done.id,
+                    foreign.todoIds[0],
+                    null,
+                ),
+            );
+            await expectRefused(mine.todoIds[0], () =>
+                moveCard(
+                    a.id,
+                    mine.todoIds[0],
+                    foreign.todo.id,
+                    foreign.todoIds[0],
+                    null,
+                ),
+            );
+        });
+
+        it('a deleted neighbor', async () => {
+            const a = await seedUser();
+            const { done, todoIds, doneIds } = await seedOrder(
+                a.id,
+                ['a0'],
+                ['a0'],
+            );
+            await deleteCard(a.id, doneIds[0]);
+
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], done.id, doneIds[0], null),
+            );
+        });
+
+        it('the card itself as a neighbor', async () => {
+            const a = await seedUser();
+            const { todo, todoIds } = await seedOrder(a.id, ['a0', 'a1']);
+
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], todo.id, todoIds[0], todoIds[1]),
+            );
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], todo.id, null, todoIds[0]),
+            );
+        });
+
+        it('a deleted target list', async () => {
+            const a = await seedUser();
+            const { done, todoIds } = await seedOrder(a.id, ['a0']);
+            await deleteList(a.id, done.id);
+
+            await expectRefused(todoIds[0], () =>
+                moveCard(a.id, todoIds[0], done.id, null, null),
+            );
+        });
+    });
+
+    it('renumbers the list when the neighbors have equal keys and moves the card', async () => {
+        const a = await seedUser();
+        const { board, done, todoIds, doneIds } = await seedOrder(
+            a.id,
+            ['a0'],
+            ['a0', 'a1', 'a1', 'a2'],
+        );
+        const [, first, second] = (await order(a.id, board.id))[1];
+
+        const row = await moveCard(a.id, todoIds[0], done.id, first, second);
+
+        expect(row).not.toBeNull();
+        const doneOrder = (await order(a.id, board.id))[1];
+        expect(doneOrder).toEqual([
+            doneIds[0],
+            first,
+            todoIds[0],
+            second,
+            doneIds[3],
+        ]);
+        const positions = await Promise.all(
+            doneOrder.map(async (id) => (await cardRow(id)).position),
+        );
+        expect(new Set(positions).size).toBe(positions.length);
+    });
+
+    it('renumbering keeps deleted cards in their place', async () => {
+        const a = await seedUser();
+        const { board, done, todoIds, doneIds } = await seedOrder(
+            a.id,
+            ['a0'],
+            ['a0', 'a1', 'a1'],
+        );
+        await deleteCard(a.id, doneIds[0]);
+        const [first, second] = (await order(a.id, board.id))[1];
+
+        await moveCard(a.id, todoIds[0], done.id, first, second);
+        await restoreCard(a.id, doneIds[0]);
+
+        expect((await order(a.id, board.id))[1]).toEqual([
+            doneIds[0],
+            first,
+            todoIds[0],
+            second,
+        ]);
+    });
+
+    it('Undo of a delete returns the card to its place after the neighbors moved', async () => {
+        const a = await seedUser();
+        const { board, todo, todoIds, doneIds } = await seedOrder(
+            a.id,
+            ['a0', 'a1', 'a2'],
+            ['a0'],
+        );
+        const [first, middle, last] = todoIds;
+        await deleteCard(a.id, middle);
+        // Without the deleted card, first and last are neighbors: the key lands
+        // between them, so the deleted card may share it.
+        const moved = await moveCard(a.id, doneIds[0], todo.id, first, last);
+        await restoreCard(a.id, middle);
+
+        expect(moved).not.toBeNull();
+        const todoOrder = (await order(a.id, board.id))[0];
+        expect(todoOrder[0]).toBe(first);
+        expect(todoOrder.slice(1, 3).sort()).toEqual(
+            [middle, doneIds[0]].sort(),
+        );
+        expect(todoOrder[3]).toBe(last);
+
+        // A move between cards that may share a key still lands exactly there.
+        const [, upper, lower] = todoOrder;
+        await moveCard(a.id, last, todo.id, upper, lower);
+        expect((await order(a.id, board.id))[0]).toEqual([
+            first,
+            upper,
+            last,
+            lower,
+        ]);
     });
 });

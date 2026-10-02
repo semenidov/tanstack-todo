@@ -8,7 +8,9 @@ import {
     eq,
     inArray,
     isNull,
+    min,
 } from 'drizzle-orm';
+import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 
 function ownedBoardIds(userId: string) {
     return db
@@ -87,7 +89,7 @@ export async function getBoard(userId: string, boardId: string) {
                     cards: {
                         columns: { deletedAt: false },
                         where: (c) => isNull(c.deletedAt),
-                        orderBy: (c, { desc }) => desc(c.createdAt),
+                        orderBy: (c) => [asc(c.position), asc(c.id)],
                     },
                 },
             },
@@ -152,6 +154,20 @@ export function restoreList(userId: string, listId: string) {
         .returning();
 }
 
+// Card order: `position` is a fractional-indexing key compared byte-wise (the column
+// is COLLATE "C"), ties broken by id. Keys are made only here; the client sends the
+// neighbors the card should land between.
+
+/** Key before the first live card of the list: new cards go on top. */
+async function firstPositionKey(listId: string) {
+    // An aggregate always returns one row; min is null for an empty list.
+    const [first] = await db
+        .select({ position: min(cards.position) })
+        .from(cards)
+        .where(and(eq(cards.listId, listId), isNull(cards.deletedAt)));
+    return generateKeyBetween(null, first.position);
+}
+
 export async function addCard(userId: string, listId: string, title: string) {
     const list = await db.query.lists.findFirst({
         where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
@@ -159,7 +175,11 @@ export async function addCard(userId: string, listId: string, title: string) {
     });
     if (!list || list.board.ownerId !== userId) return null;
 
-    const [row] = await db.insert(cards).values({ listId, title }).returning();
+    const position = await firstPositionKey(listId);
+    const [row] = await db
+        .insert(cards)
+        .values({ listId, title, position })
+        .returning();
     return row;
 }
 
@@ -181,11 +201,68 @@ export function updateCard(
         .returning();
 }
 
+/**
+ * Live neighbor cards in the target list, by id. Undefined if any given id is not
+ * a live card of that list (another list or board, deleted, missing).
+ */
+async function readNeighbors(
+    listId: string,
+    neighborIds: Array<string>,
+): Promise<Map<string, string> | undefined> {
+    if (neighborIds.length === 0) return new Map();
+    const rows = await db
+        .select({ id: cards.id, position: cards.position })
+        .from(cards)
+        .where(
+            and(
+                inArray(cards.id, neighborIds),
+                eq(cards.listId, listId),
+                isNull(cards.deletedAt),
+            ),
+        );
+    if (rows.length !== new Set(neighborIds).size) return undefined;
+    return new Map(rows.map((r) => [r.id, r.position]));
+}
+
+/**
+ * Gives every card of the list (deleted included, so Undo restores to the same
+ * place) a fresh key in the current order. Sequential updates without a
+ * transaction: a rare path, and the next renumbering fixes a partial failure.
+ */
+async function renumberList(listId: string) {
+    const rows = await db
+        .select({ id: cards.id })
+        .from(cards)
+        .where(eq(cards.listId, listId))
+        .orderBy(asc(cards.position), asc(cards.id));
+    const keys = generateNKeysBetween(null, null, rows.length);
+    for (const [i, row] of rows.entries()) {
+        await db
+            .update(cards)
+            .set({ position: keys[i] })
+            .where(eq(cards.id, row.id));
+    }
+}
+
+/** Key strictly between the neighbors, or undefined if their keys are not ordered. */
+function keyBetween(
+    prev: string | null,
+    next: string | null,
+): string | undefined {
+    if (prev !== null && next !== null && prev >= next) return undefined;
+    return generateKeyBetween(prev, next);
+}
+
 export async function moveCard(
     userId: string,
     cardId: string,
     toListId: string,
+    prevCardId: string | null,
+    nextCardId: string | null,
 ) {
+    if (prevCardId === cardId || nextCardId === cardId) return null;
+    if (prevCardId !== null && prevCardId === nextCardId) return null;
+
     const card = await db.query.cards.findFirst({
         where: (c) => and(eq(c.id, cardId), isNull(c.deletedAt)),
         with: { list: { with: { board: true } } },
@@ -200,12 +277,36 @@ export async function moveCard(
     if (!targetList || targetList.board.ownerId !== userId) return null;
     if (targetList.boardId !== card.list.boardId) return null;
 
-    const [row] = await db
+    const neighborIds = [prevCardId, nextCardId].filter((id) => id !== null);
+    const positionOf = (map: Map<string, string>, id: string | null) =>
+        id === null ? null : (map.get(id) ?? null);
+
+    let neighbors = await readNeighbors(toListId, neighborIds);
+    if (!neighbors) return null;
+    let position = keyBetween(
+        positionOf(neighbors, prevCardId),
+        positionOf(neighbors, nextCardId),
+    );
+    if (position === undefined) {
+        // Equal keys (two tabs inserted at one place, Undo restored a card onto a
+        // reused key): renumber and try once more.
+        await renumberList(toListId);
+        neighbors = await readNeighbors(toListId, neighborIds);
+        if (!neighbors) return null;
+        position = keyBetween(
+            positionOf(neighbors, prevCardId),
+            positionOf(neighbors, nextCardId),
+        );
+        // Still out of order: the client sent neighbors in a stale order.
+        if (position === undefined) return null;
+    }
+
+    const rows = await db
         .update(cards)
-        .set({ listId: toListId })
-        .where(eq(cards.id, cardId))
+        .set({ listId: toListId, position })
+        .where(and(eq(cards.id, cardId), isNull(cards.deletedAt)))
         .returning();
-    return row;
+    return rows.at(0) ?? null;
 }
 
 export function deleteCard(userId: string, cardId: string) {

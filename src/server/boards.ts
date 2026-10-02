@@ -93,10 +93,26 @@ export const updateCardServer = createServerFn({ method: 'POST' })
     });
 
 export const moveCardServer = createServerFn({ method: 'POST' })
-    .validator(z.object({ cardId: z.uuid(), toListId: z.uuid() }))
+    .validator(
+        z.object({
+            cardId: z.uuid(),
+            toListId: z.uuid(),
+            prevCardId: z.uuid().nullable(),
+            nextCardId: z.uuid().nullable(),
+        }),
+    )
     .handler(async ({ data }) => {
         const userId = await requireUserId();
-        await repo.moveCard(userId, data.cardId, data.toListId);
+        const row = await repo.moveCard(
+            userId,
+            data.cardId,
+            data.toListId,
+            data.prevCardId,
+            data.nextCardId,
+        );
+        // A refusal (foreign or stale neighbors, deleted list) must reach the client
+        // as an error: it shows a toast and refetches the board.
+        if (!row) throw new Error('Card was not moved');
     });
 
 export const deleteCardServer = createServerFn({ method: 'POST' })
