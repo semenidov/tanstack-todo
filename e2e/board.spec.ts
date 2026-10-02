@@ -115,7 +115,6 @@ test('moves a card to a position in another list through the Move window', async
     const expected = ['Done 1', 'Ship it', 'Done 2'];
     await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);
     await expect.poll(() => cardTitles(page, 'To do')).toEqual([]);
-    // The spinner is gone once the server confirmed the move.
     await expect(cardRow(page, 'Ship it')).not.toHaveAttribute('aria-busy');
     await page.reload();
     await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);

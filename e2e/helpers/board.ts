@@ -68,6 +68,12 @@ export async function moveCardTo(
     await page
         .getByRole('option', { name: String(position), exact: true })
         .click();
+    // The board shows the move at once; wait for the server to save it, so a
+    // reload right after sees the new order.
+    const saved = page.waitForResponse(
+        (r) => r.request().method() === 'POST' && r.url().includes('_serverFn'),
+    );
     await dialog.getByRole('button', { name: 'Move' }).click();
     await expect(dialog).toHaveCount(0);
+    expect((await saved).ok()).toBe(true);
 }
