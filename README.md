@@ -31,7 +31,7 @@ Full-stack task board on TanStack Start - Trello-like boards, lists and cards. [
 - Optimistic updates with a deferred-commit delete + Undo toast, instead of instant hard delete - [decision #5](DECISIONS.md#5-2026-09-18--удаление---стратегия-a-отложенный-коммит--undo-тост)
 - Sentry wired with source maps via the Vite plugin, plus Vercel Analytics with normalized URLs - [decision #35](DECISIONS.md#35-2026-09-25--source-maps-в-sentry-через-vite-плагин-фаза-2), [decision #38](DECISIONS.md#38-2026-09-25--vercel-web-analytics--speed-insights)
 - E2E coverage on Playwright for auth, route guards and data isolation, run as its own CI job - [decision #28](DECISIONS.md#28-2026-09-23--e2e-на-playwright-p0-authгварды изоляция), [decision #31](DECISIONS.md#31-2026-09-23--e2e-джоба-в-ci-эфемерная-ветка--браузер)
-- Agent-assisted workflow: issue with a plan written by a stronger model, executed by an implementer subagent, then reviewed - [decision #42](DECISIONS.md#42-2026-09-25--план-на-сильной-модели-исполнение---субагент-на-sonnet), [`CODING.md`](CODING.md)
+- Agent-assisted workflow: the owner approves a spec and accepts the PR on preview; an implementer subagent builds the feature to green CI, a verifier subagent reviews it and walks the scenarios - [`CONTRIBUTING.md`](CONTRIBUTING.md#процесс-фичи), [decision #56](DECISIONS.md), [`CODING.md`](CODING.md)
 
 ## Architecture
 

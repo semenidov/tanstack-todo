@@ -27,10 +27,18 @@ Closes #
 
 <!-- Concrete steps on the preview deployment. -->
 
+## Acceptance criteria → tests
+
+<!-- One row per acceptance criterion / edge case from the spec. "red-green" = the test failed before the change. -->
+
+| #   | Criterion | Test | red-green |
+| --- | --------- | ---- | --------- |
+
 ## Testing
 
-- Tests added/updated:
-- Not verified locally (CI runs the checks):
+- Run locally (own tests only):
+- No test needed (why):
+- Not verified:
 
 ## Checklist
 
