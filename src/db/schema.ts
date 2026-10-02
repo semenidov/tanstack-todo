@@ -48,6 +48,9 @@ export const cards = pgTable(
             .references(() => lists.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
         description: text('description'),
+        // Fractional-indexing key, compared byte-wise: the column is COLLATE "C"
+        // (set in the migration, drizzle has no column collation).
+        position: text('position').notNull(),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
         updatedAt: timestamp({ withTimezone: true })
             .defaultNow()
@@ -55,7 +58,7 @@ export const cards = pgTable(
             .$onUpdate(() => new Date()),
         deletedAt: timestamp('deleted_at', { withTimezone: true }),
     },
-    (t) => [index('cards_list_id_created_at_idx').on(t.listId, t.createdAt)],
+    (t) => [index('cards_list_id_position_idx').on(t.listId, t.position)],
 );
 
 export const boardsRelations = relations(boards, ({ many }) => ({
