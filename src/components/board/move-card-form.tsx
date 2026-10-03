@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { Button } from '#/components/ui/button';
+import { ListSelect } from '#/components/board/list-select';
 import { Label } from '#/components/ui/label';
 import {
     Select,
@@ -40,43 +41,15 @@ export function MoveCardForm({ card, lists, onMove }: MoveCardFormProps) {
         >
             <div className="grid min-w-0 gap-1.5">
                 <Label htmlFor={`${id}-list`}>List</Label>
-                <Select
+                <ListSelect
+                    id={`${id}-list`}
+                    lists={lists}
                     value={listId}
                     onValueChange={(value) => {
                         setListId(value);
                         setPosition(1);
                     }}
-                >
-                    {/* Long names (up to 200 chars, maybe one word) are cut with an
-                        ellipsis; the full name is in the title. */}
-                    <SelectTrigger
-                        id={`${id}-list`}
-                        title={target?.title}
-                        // Radix SelectValue drops className: style it from the trigger.
-                        className="w-full min-w-0 *:data-[slot=select-value]:min-w-0"
-                    >
-                        <SelectValue>
-                            <span className="min-w-0 truncate">
-                                {target?.title}
-                            </span>
-                        </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                        {lists.map((list) => (
-                            <SelectItem
-                                key={list.id}
-                                value={list.id}
-                                title={list.title}
-                                // The item text wrapper must shrink too, or the option overflows.
-                                className="max-w-72 *:[span]:last:min-w-0"
-                            >
-                                <span className="min-w-0 truncate">
-                                    {list.title}
-                                </span>
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                />
             </div>
             <div className="grid min-w-0 gap-1.5">
                 <Label htmlFor={`${id}-position`}>Position</Label>

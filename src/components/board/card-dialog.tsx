@@ -12,13 +12,7 @@ import {
 } from '#/components/ui/dialog';
 import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '#/components/ui/select';
+import { ListSelect } from '#/components/board/list-select';
 import { Textarea } from '#/components/ui/textarea';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 import { Trash2Icon } from 'lucide-react';
@@ -123,7 +117,9 @@ export function CardDialog({
                     )}
                 </DialogHeader>
 
-                <div className="space-y-4">
+                {/* min-w-0: a grid item of DialogContent, otherwise a long list
+                    name in the select widens the dialog. */}
+                <div className="min-w-0 space-y-4">
                     <div>
                         <label
                             htmlFor="card-list"
@@ -131,24 +127,15 @@ export function CardDialog({
                         >
                             List
                         </label>
-                        <Select
+                        <ListSelect
+                            id="card-list"
+                            lists={lists}
                             value={list.id}
                             // To the top of the chosen list; exact position - Move… on the card.
                             onValueChange={(toListId) =>
                                 moveCard(card.id, toListId, 0)
                             }
-                        >
-                            <SelectTrigger id="card-list" className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {lists.map((l) => (
-                                    <SelectItem key={l.id} value={l.id}>
-                                        {l.title}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        />
                     </div>
 
                     <div>
