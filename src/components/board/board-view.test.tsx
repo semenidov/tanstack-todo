@@ -21,6 +21,18 @@ vi.mock('#/components/board/list-column', () => ({
         <div data-testid={`list-${list.id}`}>{list.title}</div>
     ),
 }));
+vi.mock('#/components/board/board-dnd', () => ({
+    BoardDnd: ({
+        lists,
+        children,
+    }: {
+        lists: Array<ListWithCards>;
+        children: (props: {
+            lists: Array<ListWithCards>;
+            isDragging: boolean;
+        }) => React.ReactNode;
+    }) => children({ lists, isDragging: false }),
+}));
 vi.mock('#/components/board/add-list', () => ({
     AddList: () => <div data-testid="add-list" />,
 }));

@@ -5,8 +5,14 @@ import {
     addCard,
     addList,
     cardRow,
+    cardTitles,
+    dndAnnouncement,
+    dragCardWithKeys,
     gotoBoard,
     listColumn,
+    moveCardTo,
+    pickUpWithMouse,
+    waitForSavedMoves,
 } from './helpers/board';
 
 test.beforeEach(async ({ page }) => {
@@ -86,16 +92,67 @@ test('renames a card through the card dialog', async ({ page }) => {
     await expect(cardRow(page, 'Old name')).toHaveCount(0);
 });
 
-test('moves a card to another list', async ({ page }) => {
-    await addCard(page, 'To do', 'Ship it');
-    const row = cardRow(page, 'Ship it');
-    await row.getByRole('button', { name: 'Card actions' }).click();
-    // Radix opens a submenu on pointer hover, not reliably on click.
-    await page.getByRole('menuitem', { name: 'Move to…' }).hover();
-    await page.getByRole('menuitem', { name: 'Done' }).click();
+test('adds new cards on top and keeps the order after reload', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'First');
+    await addCard(page, 'To do', 'Second');
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Second', 'First']);
 
-    await expect(listColumn(page, 'Done').getByText('Ship it')).toBeVisible();
-    await expect(listColumn(page, 'To do').getByText('Ship it')).toHaveCount(0);
+    await page.reload();
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Second', 'First']);
+});
+
+test('moves a card to a position in another list through the Move window', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Ship it');
+    await addCard(page, 'Done', 'Done 2');
+    await addCard(page, 'Done', 'Done 1');
+
+    await moveCardTo(page, 'Ship it', 'Done', 2);
+
+    const expected = ['Done 1', 'Ship it', 'Done 2'];
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual([]);
+    await expect(cardRow(page, 'Ship it')).not.toHaveAttribute('aria-busy');
+    await page.reload();
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);
+});
+
+test('moves a card down inside its list to exactly the chosen position', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Card 3');
+    await addCard(page, 'To do', 'Card 2');
+    await addCard(page, 'To do', 'Card 1');
+
+    await moveCardTo(page, 'Card 1', 'To do', 3);
+
+    const expected = ['Card 2', 'Card 3', 'Card 1'];
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
+    await page.reload();
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
+});
+
+test('the Move button is disabled for the current position', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Only');
+    await cardRow(page, 'Only')
+        .getByRole('button', { name: 'Card actions' })
+        .click();
+    await page.getByRole('menuitem', { name: 'Move…' }).click();
+
+    await expect(
+        page
+            .getByRole('dialog', { name: 'Move card' })
+            .getByRole('button', { name: 'Move' }),
+    ).toBeDisabled();
 });
 
 test('deletes a card on the server right away', async ({ page }) => {
@@ -186,4 +243,149 @@ test('opens a card window from a direct link', async ({ page }) => {
     await expect(
         page.getByRole('dialog').getByText('Direct link card'),
     ).toBeVisible();
+});
+
+test('drags a card down its list with the keyboard', async ({ page }) => {
+    await addCard(page, 'To do', 'Card 3');
+    await addCard(page, 'To do', 'Card 2');
+    await addCard(page, 'To do', 'Card 1');
+
+    const saved = waitForSavedMoves(page, 1);
+    await dragCardWithKeys(page, 'Card 1', [
+        {
+            key: 'ArrowDown',
+            announcement: 'Card Card 1 is in position 2 of 3 in list To do',
+        },
+        {
+            key: 'ArrowDown',
+            announcement: 'Card Card 1 is in position 3 of 3 in list To do',
+        },
+    ]);
+    await expect(dndAnnouncement(page)).toHaveText(
+        'Card Card 1 dropped in position 3 of 3 in list To do',
+    );
+
+    const expected = ['Card 2', 'Card 3', 'Card 1'];
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
+    await saved;
+    await page.reload();
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
+});
+
+test('drags cards between lists with the keyboard, two moves in a row', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'A2');
+    await addCard(page, 'To do', 'A1');
+    await addCard(page, 'Done', 'B1');
+
+    const saved = waitForSavedMoves(page, 2);
+    // Position 2 into a list of 1 card: its end.
+    await dragCardWithKeys(page, 'A2', [
+        {
+            key: 'ArrowRight',
+            announcement: 'Card A2 is in position 2 of 2 in list Done',
+        },
+    ]);
+    // Right away, while the first move may still be saving: the same position.
+    await dragCardWithKeys(page, 'B1', [
+        {
+            key: 'ArrowLeft',
+            announcement: 'Card B1 is in position 1 of 2 in list To do',
+        },
+    ]);
+
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(['B1', 'A1']);
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual(['A2']);
+    await saved;
+    await page.reload();
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(['B1', 'A1']);
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual(['A2']);
+});
+
+test('drags a card to another list with the mouse', async ({ page }) => {
+    await addCard(page, 'To do', 'Mouse card');
+    await addCard(page, 'Done', 'Done card');
+    const boardUrl = page.url();
+
+    const saved = waitForSavedMoves(page, 1);
+    await pickUpWithMouse(page, 'Mouse card');
+    const target = await cardRow(page, 'Done card').boundingBox();
+    if (!target) throw new Error('No target card');
+    // Upper part of the target card: the dragged card goes before it.
+    await page.mouse.move(target.x + target.width / 2, target.y + 5, {
+        steps: 15,
+    });
+    await expect(dndAnnouncement(page)).toHaveText(
+        'Card Mouse card is in position 1 of 2 in list Done',
+    );
+    await page.mouse.up();
+
+    await expect
+        .poll(() => cardTitles(page, 'Done'))
+        .toEqual(['Mouse card', 'Done card']);
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual([]);
+    // The drag ended on the card link, but the card window did not open.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    expect(page.url()).toBe(boardUrl);
+    await saved;
+    await page.reload();
+    await expect
+        .poll(() => cardTitles(page, 'Done'))
+        .toEqual(['Mouse card', 'Done card']);
+});
+
+test('a card dropped outside the lists or cancelled with Esc stays in place', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Card 2');
+    await addCard(page, 'To do', 'Card 1');
+    let requests = 0;
+    page.on('request', (r) => {
+        if (r.method() === 'POST' && r.url().includes('_serverFn')) {
+            requests += 1;
+        }
+    });
+
+    // Mouse: into Done, then out of all lists (below the columns), drop there.
+    await pickUpWithMouse(page, 'Card 1');
+    const done = await listColumn(page, 'Done').boundingBox();
+    if (!done) throw new Error('No Done list');
+    await page.mouse.move(done.x + done.width / 2, done.y + done.height / 2, {
+        steps: 10,
+    });
+    await expect(dndAnnouncement(page)).toContainText('in list Done');
+    await page.mouse.move(done.x + done.width / 2, done.y + done.height + 150, {
+        steps: 10,
+    });
+    await expect(dndAnnouncement(page)).toHaveText(
+        'Card Card 1 is not over a list',
+    );
+    await page.mouse.up();
+    await expect(dndAnnouncement(page)).toHaveText(
+        'Moving card Card 1 was cancelled',
+    );
+
+    // Keyboard: move down, then Esc.
+    await cardRow(page, 'Card 1').getByRole('link').focus();
+    await page.keyboard.press('Space');
+    await expect(dndAnnouncement(page)).toHaveText('Picked up card Card 1');
+    await page.keyboard.press('ArrowDown');
+    await expect(dndAnnouncement(page)).toHaveText(
+        'Card Card 1 is in position 2 of 2 in list To do',
+    );
+    await page.keyboard.press('Escape');
+    await expect(dndAnnouncement(page)).toHaveText(
+        'Moving card Card 1 was cancelled',
+    );
+
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Card 1', 'Card 2']);
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual([]);
+    expect(requests).toBe(0);
+    await page.reload();
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Card 1', 'Card 2']);
 });

@@ -1,3 +1,8 @@
+import { useDroppable } from '@dnd-kit/core';
+import {
+    SortableContext,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { useState } from 'react';
 import { AddCard } from '#/components/board/add-card';
 import { CardItem } from '#/components/board/card-item';
@@ -126,6 +131,8 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const renameList = useRenameList(boardId);
     const { deleteConfirmed, deleteEmptyWithUndo } = useDeleteList(boardId);
+    // The whole column takes a dragged card: the title and AddCard put it first.
+    const { setNodeRef } = useDroppable({ id: list.id });
 
     function handleDeleteSelected() {
         if (list.cards.length === 0) {
@@ -136,7 +143,10 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
     }
 
     return (
-        <div className="flex max-h-full w-[85vw] shrink-0 snap-center flex-col rounded-lg border bg-card sm:w-72 sm:snap-start">
+        <div
+            ref={setNodeRef}
+            className="flex max-h-full w-[85vw] shrink-0 snap-center flex-col rounded-lg border bg-card sm:w-72 sm:snap-start"
+        >
             <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
                 <ListTitle
                     title={list.title}
@@ -176,18 +186,22 @@ export function ListColumn({ boardId, list, allLists }: ListColumnProps) {
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3">
                 <AddCard boardId={boardId} listId={list.id} />
-                <ul className="space-y-2 pt-2">
-                    {list.cards.map((card) => (
-                        <CardItem
-                            key={card.id}
-                            boardId={boardId}
-                            card={card}
-                            otherLists={allLists.filter(
-                                (l) => l.id !== list.id,
-                            )}
-                        />
-                    ))}
-                </ul>
+                <SortableContext
+                    id={list.id}
+                    items={list.cards.map((card) => card.id)}
+                    strategy={verticalListSortingStrategy}
+                >
+                    <ul className="space-y-2 pt-2">
+                        {list.cards.map((card) => (
+                            <CardItem
+                                key={card.id}
+                                boardId={boardId}
+                                card={card}
+                                lists={allLists}
+                            />
+                        ))}
+                    </ul>
+                </SortableContext>
             </div>
             <DeleteListDialog
                 open={isDeleteDialogOpen}

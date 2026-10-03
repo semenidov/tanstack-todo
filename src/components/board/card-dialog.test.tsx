@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CardDialog } from '#/components/board/card-dialog';
-import type { Card, ListWithCards } from '#/lib/boards-query';
+import { boardQueryOptions } from '#/lib/boards-query';
+import type { BoardData, Card, ListWithCards } from '#/lib/boards-query';
 
 const { updateCardSpy, moveCardSpy, deleteCardSpy, restoreCardSpy } =
     vi.hoisted(() => ({
@@ -66,6 +67,7 @@ const card: Card = {
     listId: 'list-1',
     title: 'Buy milk',
     description: null,
+    position: 'a0',
     createdAt: new Date(0),
     updatedAt: new Date(0),
 };
@@ -92,6 +94,17 @@ function renderDialog() {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } },
     });
+    const boardData: BoardData = {
+        board: {
+            id: 'board-1',
+            ownerId: 'user-1',
+            title: 'Board',
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+        },
+        lists: [list, doneList],
+    };
+    queryClient.setQueryData(boardQueryOptions('board-1').queryKey, boardData);
     return render(
         <QueryClientProvider client={queryClient}>
             <CardDialog
@@ -142,7 +155,12 @@ describe('CardDialog', () => {
         await user.selectOptions(screen.getByLabelText('List'), 'list-2');
 
         expect(moveCardSpy).toHaveBeenCalledWith({
-            data: { cardId: 'card-1', toListId: 'list-2' },
+            data: {
+                cardId: 'card-1',
+                toListId: 'list-2',
+                prevCardId: null,
+                nextCardId: null,
+            },
         });
     });
 });

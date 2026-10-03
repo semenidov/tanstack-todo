@@ -1,5 +1,6 @@
 import { requireUserId } from '#/lib/auth-server';
 import * as repo from '#/server/boards-repo';
+import { moveCardOrThrow } from '#/server/move-card';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 
@@ -93,11 +94,15 @@ export const updateCardServer = createServerFn({ method: 'POST' })
     });
 
 export const moveCardServer = createServerFn({ method: 'POST' })
-    .validator(z.object({ cardId: z.uuid(), toListId: z.uuid() }))
-    .handler(async ({ data }) => {
-        const userId = await requireUserId();
-        await repo.moveCard(userId, data.cardId, data.toListId);
-    });
+    .validator(
+        z.object({
+            cardId: z.uuid(),
+            toListId: z.uuid(),
+            prevCardId: z.uuid().nullable(),
+            nextCardId: z.uuid().nullable(),
+        }),
+    )
+    .handler(async ({ data }) => moveCardOrThrow(await requireUserId(), data));
 
 export const deleteCardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ cardId: z.uuid() }))
