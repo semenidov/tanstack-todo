@@ -31,7 +31,20 @@ export const auth = betterAuth({
         // E2E signs up many users from one IP and trips the sign-up limit (429).
         // Only the Playwright web server sets this flag.
         enabled: process.env.E2E_DISABLE_RATE_LIMIT !== 'true',
+        // Counters in Postgres: in-memory ones live per serverless instance and
+        // barely limit anything on Vercel.
+        storage: 'database',
         window: 60,
         max: 100,
+        customRules: {
+            '/sign-in/email': { window: 60, max: 5 },
+            '/sign-up/email': { window: 600, max: 3 },
+        },
+    },
+    advanced: {
+        // Vercel sets x-forwarded-for to the single client IP. A request without a
+        // usable IP is not let through: Better Auth counts it in one shared
+        // per-path bucket.
+        ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
     },
 });
