@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { QuotaExceededError, QuotaKind } from '#/lib/quotas';
 import { CreateBoardTile } from '#/components/boards/create-board-tile';
 
 const { createBoardSpy, navigateSpy } = vi.hoisted(() => ({
@@ -68,9 +69,33 @@ describe('CreateBoardTile', () => {
         const input = screen.getByLabelText('New board title');
         await user.type(input, 'Plans{Enter}');
 
-        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "Couldn't create the board. Please try again.",
+            ),
+        );
         expect(input).toHaveValue('Plans');
         expect(input).not.toHaveAttribute('readonly');
+        expect(navigateSpy).not.toHaveBeenCalled();
+    });
+
+    it('names the board quota and keeps the typed title when the limit is reached', async () => {
+        createBoardSpy.mockRejectedValueOnce(
+            new Error(new QuotaExceededError(QuotaKind.Boards, 20).message),
+        );
+        const user = userEvent.setup();
+        renderTile();
+
+        await user.click(screen.getByRole('button', { name: /create board/i }));
+        const input = screen.getByLabelText('New board title');
+        await user.type(input, 'Plans{Enter}');
+
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "You've reached the limit of 20 boards.",
+            ),
+        );
+        expect(input).toHaveValue('Plans');
         expect(navigateSpy).not.toHaveBeenCalled();
     });
 

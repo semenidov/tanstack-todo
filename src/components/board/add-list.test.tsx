@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { QuotaExceededError, QuotaKind } from '#/lib/quotas';
 import { AddList } from '#/components/board/add-list';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { BoardData, ListWithCards } from '#/lib/boards-query';
@@ -119,9 +120,32 @@ describe('AddList', () => {
         const input = screen.getByLabelText('New list title');
         await user.type(input, 'Done{Enter}');
 
-        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "Couldn't add the list. Please try again.",
+            ),
+        );
         expect(input).toHaveValue('Done');
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([]);
+    });
+
+    it('names the list quota and keeps the typed text when the limit is reached', async () => {
+        addListSpy.mockRejectedValueOnce(
+            new Error(new QuotaExceededError(QuotaKind.Lists, 30).message),
+        );
+        const user = userEvent.setup();
+        renderAddList();
+
+        await user.click(screen.getByText('Add list'));
+        const input = screen.getByLabelText('New list title');
+        await user.type(input, 'Done{Enter}');
+
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "You've reached the limit of 30 lists on this board.",
+            ),
+        );
+        expect(input).toHaveValue('Done');
     });
 
     it('treats a null response (board gone) as an error', async () => {

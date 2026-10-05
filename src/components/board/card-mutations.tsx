@@ -11,6 +11,7 @@ import {
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { Card } from '#/lib/boards-query';
 import type { CardMoveNeighbors } from '#/lib/boards';
+import { createErrorMessage } from '#/lib/quotas';
 import {
     addCardServer,
     deleteCardServer,
@@ -76,8 +77,13 @@ export function useAddCard(boardId: string, listId: string) {
                 old ? addCardToList(old, listId, card) : old,
             );
         },
-        onError: () => {
-            toast.error("Couldn't add the card. Please try again.");
+        onError: (error) => {
+            toast.error(
+                createErrorMessage(
+                    error,
+                    "Couldn't add the card. Please try again.",
+                ),
+            );
         },
         onSettled: () => invalidateAfterLastCardOrder(queryClient, boardId),
     });
