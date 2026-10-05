@@ -1,5 +1,6 @@
 import { AuthForm } from '#/components/auth-form';
 import { authClient } from '#/lib/auth-client';
+import { SIGN_IN_LIMIT, authErrorMessage } from '#/lib/auth-rate-limit';
 import { pageMeta } from '#/lib/seo';
 import {
     createFileRoute,
@@ -24,7 +25,9 @@ function LoginPage() {
     async function handleSubmit(values: { email: string; password: string }) {
         const { error } = await authClient.signIn.email(values);
         if (error) {
-            toast.error(error.message ?? 'Sign in failed');
+            toast.error(
+                authErrorMessage(error, SIGN_IN_LIMIT, 'Sign in failed'),
+            );
             return;
         }
         // Re-running this route's beforeLoad redirects the now signed-in user

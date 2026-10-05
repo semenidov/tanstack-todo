@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { db } from '#/db';
+import { SIGN_IN_LIMIT, SIGN_UP_LIMIT } from '#/lib/auth-rate-limit';
 
 const PROD_HOST = 'todo-semenidov.vercel.app';
 const PREVIEW_HOSTS = ['tanstack-todo-*-ssemenidov.vercel.app'];
@@ -37,8 +38,8 @@ export const auth = betterAuth({
         window: 60,
         max: 100,
         customRules: {
-            '/sign-in/email': { window: 60, max: 5 },
-            '/sign-up/email': { window: 600, max: 3 },
+            '/sign-in/email': SIGN_IN_LIMIT,
+            '/sign-up/email': SIGN_UP_LIMIT,
         },
     },
     advanced: {
