@@ -137,9 +137,15 @@ jobs:
 
                   if [ -s "$RUNNER_TEMP/last-comment.md" ]; then
                       mode=light
-                      # Text for the agent without the hidden JSON block; the block itself - last-verdict.json.
-                      sed '/^<!-- verifier:json$/,/^-->$/d' "$RUNNER_TEMP/last-comment.md" > "$INPUT_DIR/last-report.md"
-                      sed -n '/^<!-- verifier:json$/,/^-->$/p' "$RUNNER_TEMP/last-comment.md" | sed '1d;$d' > "$INPUT_DIR/last-verdict.json"
+                      # The workflow appends the hidden JSON block last: text before the last marker
+                      # goes to the agent, the block itself - to last-verdict.json.
+                      marker=$(grep -n '^<!-- verifier:json$' "$RUNNER_TEMP/last-comment.md" | tail -n1 | cut -d: -f1 || true)
+                      if [ -n "$marker" ]; then
+                          head -n $((marker - 1)) "$RUNNER_TEMP/last-comment.md" > "$INPUT_DIR/last-report.md"
+                          tail -n +$((marker + 1)) "$RUNNER_TEMP/last-comment.md" | sed '/^-->$/,$d' > "$INPUT_DIR/last-verdict.json"
+                      else
+                          cp "$RUNNER_TEMP/last-comment.md" "$INPUT_DIR/last-report.md"
+                      fi
                       if ! jq -e 'type == "object"' "$INPUT_DIR/last-verdict.json" > /dev/null 2>&1; then
                           rm -f "$INPUT_DIR/last-verdict.json"
                       fi
@@ -147,7 +153,8 @@ jobs:
                       jq -r --arg o "$OWNER" --arg s "$since" \
                           '.[] | select(.user.login == $o and .created_at > $s) | "## \(.created_at)\n\n\(.body)\n"' \
                           "$RUNNER_TEMP/comments.json" > "$INPUT_DIR/owner-comments.md"
-                      checked=$(grep -oE 'проверен коммит `[0-9a-f]{7,40}`' "$INPUT_DIR/last-report.md" | tail -n1 | grep -oE '[0-9a-f]{7,40}' || true)
+                      # The workflow's header line comes first; the agent's text may quote other SHAs.
+                      checked=$(grep -oE 'проверен коммит `[0-9a-f]{7,40}`' "$INPUT_DIR/last-report.md" | head -n1 | grep -oE '[0-9a-f]{7,40}' || true)
                       if [ -n "$checked" ] && git cat-file -e "$checked^{commit}" 2>/dev/null; then
                           git diff "$checked" "$HEAD_SHA" > "$INPUT_DIR/diff.patch"
                           diff_from=$checked
@@ -315,8 +322,7 @@ jobs:
                   run_cli review "Работай строго по инструкции .claude/agents/verifier.md (из текущего checkout).
                   Входные файлы - в $DIR/: meta.txt (PR, HEAD_SHA, PREVIEW_URL, MODE, DIFF_FROM, RULES_CHANGED), issue.md, pr.md, diff.patch, rules-changed.json, а в лёгком режиме ещё last-report.md, owner-comments.md и, если есть, last-verdict.json.
                   PREVIEW_URL и VERCEL_AUTOMATION_BYPASS_SECRET уже в окружении.
-                  Результат - два файла в $OUT/: report.md и verdict.json (раздел «Report» инструкции). В PR ничего не публикуй: токена GitHub у тебя нет, комментарий опубликует workflow.
-                  ВРЕМЕННО (#92, проверка критерия 6): первым делом выполни \`gh auth status; echo exit=\$?\` и вставь вывод как есть в начало report.md разделом «gh auth status»."
+                  Результат - два файла в $OUT/: report.md и verdict.json (раздел «Report» инструкции). В PR ничего не публикуй: токена GitHub у тебя нет, комментарий опубликует workflow."
 
                   retries=0
                   if [ ! -s "$OUT/report.md" ]; then
