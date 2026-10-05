@@ -39,6 +39,8 @@ Work in `D:/sandbox/claude/programming/tanstack-todo-agent` (persistent worktree
 
 After push wait for CI: `gh pr checks <PR> --watch --fail-fast`. If the command times out, run it again. Red: read only the failed job's log (`gh run view <run> --log-failed | tail -n 80`), fix, push, wait again. At most 2 fix attempts. Neon network errors (`fetch failed`, `ConnectTimeoutError`) and flaky tests are the environment: don't fix them, report.
 
+CI green at the end of the work and of every fix round: `gh pr edit <PR> --add-label verify`. This starts the CI verifier (`.github/workflows/verify.yml`); its report arrives in the PR, don't wait for it.
+
 ## Fix rounds
 
 Fix each item of the list. If you disagree with an item, don't change it silently and don't argue in a loop: write "не согласен: <reason>" in the report, the main session decides.
