@@ -34,7 +34,6 @@ jobs:
             PR: ${{ github.event.pull_request.number }}
             HEAD_SHA: ${{ github.event.pull_request.head.sha }}
             OWNER: ${{ github.repository_owner }}
-            INPUT_DIR: ${{ runner.temp }}/verify
         steps:
             - name: Remove the verify label
               run: gh api -X DELETE "repos/$GH_REPO/issues/$PR/labels/verify" --silent || true
@@ -98,6 +97,7 @@ jobs:
             - name: Collect verifier input
               id: input
               run: |
+                  INPUT_DIR="$RUNNER_TEMP/verify"
                   mkdir -p "$INPUT_DIR"
                   gh pr view "$PR" --json title,body --jq '"# \(.title)\n\n\(.body)"' > "$INPUT_DIR/pr.md"
                   issue=$(grep -oiE '(closes|fixes|resolves) #[0-9]+' "$INPUT_DIR/pr.md" | head -n1 | grep -oE '[0-9]+' || true)
