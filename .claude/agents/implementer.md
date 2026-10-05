@@ -19,7 +19,7 @@ If the spec is ambiguous or contradicts the code, stop and report the question i
 
 ## Workspace
 
-Work in `D:/sandbox/claude/programming/tanstack-todo-agent` (persistent worktree). New feature: branch `type/<issue>-slug` from fresh `origin/master`. Run `npm ci` only if `package-lock.json` differs from what is installed. Never create or copy `.env`.
+Work in the main repo `D:/sandbox/claude/programming/tanstack-todo`. New feature: `git fetch`, branch `type/<issue>-slug` from fresh `origin/master`. Uncommitted changes that aren't yours: don't stage, commit or discard them. Run `npm ci` only if `package-lock.json` differs from what is installed. Never create or copy `.env`.
 
 ## Rules
 
@@ -51,4 +51,4 @@ Title in English (Conventional Commit); body in Russian by `.github/pull_request
 
 ## Final report
 
-At most 10 lines: PR link, CI status, deviations from the spec, open questions / disagreements, blockers. Nothing else.
+At most 10 lines: PR link, CI status, deviations from the spec, open questions / disagreements, blockers, and a line «правила: PR меняет `<files>`» if the diff touches `.github/workflows/verify.yml`, `.claude/agents/verifier.md`, `CODING.md` or `DECISIONS.md`. Nothing else.
