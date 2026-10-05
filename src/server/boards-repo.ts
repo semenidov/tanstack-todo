@@ -1,4 +1,6 @@
 import { db } from '#/db';
+import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
+import type { Quotas } from '#/lib/quotas';
 import { boards, cards, lists } from '#/db/schema';
 import {
     and,
@@ -53,7 +55,30 @@ export function listBoards(userId: string) {
         .orderBy(asc(boards.createdAt));
 }
 
-export async function createBoard(userId: string, title: string) {
+// Quotas: count the live rows, then insert. Without a transaction (neon-http) two
+// parallel creates at the boundary can overshoot by one - acceptable.
+
+async function assertBelowQuota(
+    kind: QuotaKind,
+    quotas: Quotas,
+    countLive: () => Promise<Array<{ n: number }>>,
+) {
+    const [{ n }] = await countLive();
+    if (n >= quotas[kind]) throw new QuotaExceededError(kind, quotas[kind]);
+}
+
+export async function createBoard(
+    userId: string,
+    title: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    // Boards are deleted for real, so every row counts.
+    await assertBelowQuota(QuotaKind.Boards, quotas, () =>
+        db
+            .select({ n: count() })
+            .from(boards)
+            .where(eq(boards.ownerId, userId)),
+    );
     const [board] = await db
         .insert(boards)
         .values({ ownerId: userId, title })
@@ -101,11 +126,22 @@ export async function getBoard(userId: string, boardId: string) {
     return { board: boardFields, lists: boardLists };
 }
 
-export async function addList(userId: string, boardId: string, title: string) {
+export async function addList(
+    userId: string,
+    boardId: string,
+    title: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
     const board = await db.query.boards.findFirst({
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
     });
     if (!board) return null;
+    await assertBelowQuota(QuotaKind.Lists, quotas, () =>
+        db
+            .select({ n: count() })
+            .from(lists)
+            .where(and(eq(lists.boardId, boardId), isNull(lists.deletedAt))),
+    );
 
     const [row] = await db.insert(lists).values({ boardId, title }).returning();
     return row;
@@ -168,12 +204,23 @@ async function firstPositionKey(listId: string) {
     return generateKeyBetween(null, first.position);
 }
 
-export async function addCard(userId: string, listId: string, title: string) {
+export async function addCard(
+    userId: string,
+    listId: string,
+    title: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
     const list = await db.query.lists.findFirst({
         where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
         with: { board: true },
     });
     if (!list || list.board.ownerId !== userId) return null;
+    await assertBelowQuota(QuotaKind.Cards, quotas, () =>
+        db
+            .select({ n: count() })
+            .from(cards)
+            .where(and(eq(cards.listId, listId), isNull(cards.deletedAt))),
+    );
 
     const position = await firstPositionKey(listId);
     const [row] = await db
