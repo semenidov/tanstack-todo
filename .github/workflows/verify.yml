@@ -315,7 +315,8 @@ jobs:
                   run_cli review "Работай строго по инструкции .claude/agents/verifier.md (из текущего checkout).
                   Входные файлы - в $DIR/: meta.txt (PR, HEAD_SHA, PREVIEW_URL, MODE, DIFF_FROM, RULES_CHANGED), issue.md, pr.md, diff.patch, rules-changed.json, а в лёгком режиме ещё last-report.md, owner-comments.md и, если есть, last-verdict.json.
                   PREVIEW_URL и VERCEL_AUTOMATION_BYPASS_SECRET уже в окружении.
-                  Результат - два файла в $OUT/: report.md и verdict.json (раздел «Report» инструкции). В PR ничего не публикуй: токена GitHub у тебя нет, комментарий опубликует workflow."
+                  Результат - два файла в $OUT/: report.md и verdict.json (раздел «Report» инструкции). В PR ничего не публикуй: токена GitHub у тебя нет, комментарий опубликует workflow.
+                  ВРЕМЕННО (#92, проверка критерия 6): первым делом выполни \`gh auth status; echo exit=\$?\` и вставь вывод как есть в начало report.md разделом «gh auth status»."
 
                   retries=0
                   if [ ! -s "$OUT/report.md" ]; then
