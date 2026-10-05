@@ -1,0 +1,177 @@
+name: Verify
+
+# CI verifier: code review + manual QA of a PR on its Vercel preview.
+# Started by the `verify` label (the implementer sets it after green CI).
+# Process: CONTRIBUTING.md «Процесс фичи», decision №61.
+
+on:
+    pull_request:
+        types: [labeled]
+
+permissions:
+    contents: read
+    pull-requests: write
+    issues: write
+    deployments: read
+    checks: read
+    statuses: read
+
+jobs:
+    verify:
+        # Only the `verify` label and only PRs from this repo (no forks).
+        if: >-
+            github.event.label.name == 'verify' &&
+            github.event.pull_request.head.repo.full_name == github.repository
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+        # Job-level: other labels skip the job and don't touch the queue.
+        concurrency:
+            group: verify-${{ github.event.pull_request.number }}
+            cancel-in-progress: false
+        env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            GH_REPO: ${{ github.repository }}
+            PR: ${{ github.event.pull_request.number }}
+            HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+            OWNER: ${{ github.repository_owner }}
+        steps:
+            - name: Remove the verify label
+              run: gh api -X DELETE "repos/$GH_REPO/issues/$PR/labels/verify" --silent || true
+
+            - name: Record start time
+              id: start
+              run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+            - name: Require green CI on the head commit
+              run: |
+                  runs=$(gh api --paginate "repos/$GH_REPO/commits/$HEAD_SHA/check-runs?per_page=100" \
+                      --jq '.check_runs[] | select(.app.slug == "github-actions" and .name != "verify") | "\(.name) \(.status) \(.conclusion)"')
+                  echo "$runs"
+                  ok=true
+                  for job in quality unit integration e2e; do
+                      if ! grep -qE "^$job completed (success|skipped|neutral)$" <<<"$runs"; then ok=false; fi
+                  done
+                  if grep -vqE " completed (success|skipped|neutral)$" <<<"$runs"; then ok=false; fi
+                  if [ "$ok" != true ]; then
+                      gh pr comment "$PR" --body "[verifier] CI не зелёный, проверка не запускалась (коммит \`$HEAD_SHA\`)."
+                      exit 1
+                  fi
+
+            - name: Wait for the Vercel preview of the head commit
+              id: preview
+              run: |
+                  deadline=$(( $(date +%s) + 600 ))
+                  state=none
+                  while [ "$(date +%s)" -lt "$deadline" ]; do
+                      id=$(gh api "repos/$GH_REPO/deployments?sha=$HEAD_SHA&environment=Preview&per_page=1" --jq '.[0].id // empty')
+                      if [ -n "$id" ]; then
+                          status=$(gh api "repos/$GH_REPO/deployments/$id/statuses?per_page=1" --jq '.[0] // empty | "\(.state) \(.environment_url)"')
+                          state=${status%% *}
+                          url=${status#* }
+                          if [ "$state" = success ] && [ -n "$url" ]; then
+                              echo "url=$url" >> "$GITHUB_OUTPUT"
+                              echo "Preview: $url"
+                              exit 0
+                          fi
+                          if [ "$state" = failure ] || [ "$state" = error ]; then break; fi
+                      fi
+                      sleep 20
+                  done
+                  gh pr comment "$PR" --body "[verifier] Превью не готово (состояние: $state), проверка не запускалась (коммит \`$HEAD_SHA\`)."
+                  exit 1
+
+            - uses: actions/checkout@v4
+              with:
+                  ref: ${{ github.event.pull_request.head.sha }}
+                  fetch-depth: 0
+                  persist-credentials: false
+
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: npm
+            - run: npm ci
+            - run: npx playwright install --with-deps chromium
+
+            # Trusted input only: the agent doesn't read PR comments itself.
+            - name: Collect verifier input
+              id: input
+              run: |
+                  INPUT_DIR="$RUNNER_TEMP/verify"
+                  mkdir -p "$INPUT_DIR"
+                  gh pr view "$PR" --json title,body --jq '"# \(.title)\n\n\(.body)"' > "$INPUT_DIR/pr.md"
+                  issue=$(grep -oiE '(closes|fixes|resolves) #[0-9]+' "$INPUT_DIR/pr.md" | head -n1 | grep -oE '[0-9]+' || true)
+                  if [ -n "$issue" ]; then
+                      gh issue view "$issue" --json number,title,body --jq '"# #\(.number) \(.title)\n\n\(.body)"' > "$INPUT_DIR/issue.md"
+                  else
+                      echo "В описании PR нет «Closes #N» - спеки нет." > "$INPUT_DIR/issue.md"
+                  fi
+
+                  gh api --paginate "repos/$GH_REPO/issues/$PR/comments?per_page=100" --jq '.[]' \
+                      | jq -s '.' > "$RUNNER_TEMP/comments.json"
+                  jq -r '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("[verifier]")) and (.body | test("проверен коммит")))] | last // empty | .body' \
+                      "$RUNNER_TEMP/comments.json" > "$INPUT_DIR/last-report.md"
+
+                  if [ -s "$INPUT_DIR/last-report.md" ]; then
+                      mode=light
+                      since=$(jq -r '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("[verifier]")) and (.body | test("проверен коммит")))] | last | .created_at' "$RUNNER_TEMP/comments.json")
+                      jq -r --arg o "$OWNER" --arg s "$since" \
+                          '.[] | select(.user.login == $o and .created_at > $s) | "## \(.created_at)\n\n\(.body)\n"' \
+                          "$RUNNER_TEMP/comments.json" > "$INPUT_DIR/owner-comments.md"
+                      checked=$(grep -oE 'проверен коммит `[0-9a-f]{7,40}`' "$INPUT_DIR/last-report.md" | tail -n1 | grep -oE '[0-9a-f]{7,40}' || true)
+                      if [ -n "$checked" ] && git cat-file -e "$checked^{commit}" 2>/dev/null; then
+                          git diff "$checked" "$HEAD_SHA" > "$INPUT_DIR/diff.patch"
+                          diff_from=$checked
+                      else
+                          gh pr diff "$PR" > "$INPUT_DIR/diff.patch"
+                          diff_from="base (проверенный коммит не найден)"
+                      fi
+                  else
+                      mode=full
+                      rm -f "$INPUT_DIR/last-report.md"
+                      gh pr diff "$PR" > "$INPUT_DIR/diff.patch"
+                      diff_from=base
+                  fi
+
+                  # .claude/ is restored from the base branch by the action, so
+                  # the instructions are staged here from the PR checkout.
+                  cp .claude/agents/verifier.md "$INPUT_DIR/verifier.md"
+
+                  {
+                      echo "PR: $PR"
+                      echo "HEAD_SHA: $HEAD_SHA"
+                      echo "PREVIEW_URL: ${{ steps.preview.outputs.url }}"
+                      echo "MODE: $mode"
+                      echo "DIFF_FROM: $diff_from"
+                  } > "$INPUT_DIR/meta.txt"
+                  cat "$INPUT_DIR/meta.txt"
+                  ls -la "$INPUT_DIR"
+
+            - name: Run verifier
+              uses: anthropics/claude-code-action@v1
+              env:
+                  PREVIEW_URL: ${{ steps.preview.outputs.url }}
+                  VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+              with:
+                  claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+                  github_token: ${{ secrets.GITHUB_TOKEN }}
+                  display_report: 'false'
+                  show_full_output: 'false'
+                  claude_args: >-
+                      --model opus
+                      --allowedTools Read,Write,Glob,Grep,Bash
+                  prompt: |
+                      Работай строго по инструкции ${{ runner.temp }}/verify/verifier.md.
+                      Входные файлы - в ${{ runner.temp }}/verify/: meta.txt (PR, HEAD_SHA, PREVIEW_URL, MODE, DIFF_FROM), issue.md, pr.md, diff.patch, а в лёгком режиме ещё last-report.md и owner-comments.md.
+                      PREVIEW_URL и VERCEL_AUTOMATION_BYPASS_SECRET уже в окружении.
+                      Отчёт - один комментарий в PR через `gh pr comment`.
+
+            - name: Require a new verifier report
+              run: |
+                  found=$(gh api --paginate "repos/$GH_REPO/issues/$PR/comments?per_page=100" \
+                      --jq ".[] | select(.user.login == \"github-actions[bot]\" and .created_at >= \"${{ steps.start.outputs.at }}\" and (.body | startswith(\"[verifier]\")) and (.body | contains(\"проверен коммит \`$HEAD_SHA\`\"))) | .html_url")
+                  if [ -z "$found" ]; then
+                      echo "::error::No new [verifier] report with «проверен коммит \`$HEAD_SHA\`» in the PR"
+                      exit 1
+                  fi
+                  echo "Report: $found"
