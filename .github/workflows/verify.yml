@@ -2,7 +2,11 @@ name: Verify
 
 # CI verifier: code review + manual QA of a PR on its Vercel preview.
 # Started by the `verify` label (the implementer sets it after green CI).
-# Process: CONTRIBUTING.md «Процесс фичи», decision №61.
+# Process: CONTRIBUTING.md «Процесс фичи», decisions №61, №62.
+#
+# The agent (Claude Code CLI) gets no GitHub token: it writes report.md and
+# verdict.json to $RUNNER_TEMP/verify/out, the workflow validates them and
+# publishes the comment. GH_TOKEN is set only on the steps that call GitHub.
 
 on:
     pull_request:
@@ -29,20 +33,26 @@ jobs:
             group: verify-${{ github.event.pull_request.number }}
             cancel-in-progress: false
         env:
-            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             GH_REPO: ${{ github.repository }}
             PR: ${{ github.event.pull_request.number }}
             HEAD_SHA: ${{ github.event.pull_request.head.sha }}
             OWNER: ${{ github.repository_owner }}
+            RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         steps:
             - name: Remove the verify label
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: gh api -X DELETE "repos/$GH_REPO/issues/$PR/labels/verify" --silent || true
 
             - name: Record start time
               id: start
-              run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+              run: |
+                  echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+                  echo "epoch=$(date +%s)" >> "$GITHUB_OUTPUT"
 
             - name: Require green CI on the head commit
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   runs=$(gh api --paginate "repos/$GH_REPO/commits/$HEAD_SHA/check-runs?per_page=100" \
                       --jq '.check_runs[] | select(.app.slug == "github-actions" and .name != "verify") | "\(.name) \(.status) \(.conclusion)"')
@@ -59,6 +69,8 @@ jobs:
 
             - name: Wait for the Vercel preview of the head commit
               id: preview
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   deadline=$(( $(date +%s) + 600 ))
                   state=none
@@ -80,6 +92,7 @@ jobs:
                   gh pr comment "$PR" --body "[verifier] Превью не готово (состояние: $state), проверка не запускалась (коммит \`$HEAD_SHA\`)."
                   exit 1
 
+            # No token in .git/config: the agent works in this checkout.
             - uses: actions/checkout@v4
               with:
                   ref: ${{ github.event.pull_request.head.sha }}
@@ -92,13 +105,17 @@ jobs:
                   cache: npm
             - run: npm ci
             - run: npx playwright install --with-deps chromium
+            - name: Install Claude Code CLI
+              run: npm i -g @anthropic-ai/claude-code@2.1.289
 
             # Trusted input only: the agent doesn't read PR comments itself.
             - name: Collect verifier input
               id: input
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   INPUT_DIR="$RUNNER_TEMP/verify"
-                  mkdir -p "$INPUT_DIR"
+                  mkdir -p "$INPUT_DIR/out"
                   gh pr view "$PR" --json title,body --jq '"# \(.title)\n\n\(.body)"' > "$INPUT_DIR/pr.md"
                   issue=$(grep -oiE '(closes|fixes|resolves) #[0-9]+' "$INPUT_DIR/pr.md" | head -n1 | grep -oE '[0-9]+' || true)
                   if [ -n "$issue" ]; then
@@ -107,18 +124,37 @@ jobs:
                       echo "В описании PR нет «Closes #N» - спеки нет." > "$INPUT_DIR/issue.md"
                   fi
 
+                  # Rule sources changed by the whole PR (criterion: highlight rule changes).
+                  gh pr diff "$PR" --name-only \
+                      | grep -xE '\.github/workflows/verify\.yml|\.claude/agents/verifier\.md|CODING\.md|DECISIONS\.md' \
+                      | jq -R . | jq -sc . > "$INPUT_DIR/rules-changed.json" || true
+                  [ -s "$INPUT_DIR/rules-changed.json" ] || echo '[]' > "$INPUT_DIR/rules-changed.json"
+
                   gh api --paginate "repos/$GH_REPO/issues/$PR/comments?per_page=100" --jq '.[]' \
                       | jq -s '.' > "$RUNNER_TEMP/comments.json"
-                  jq -r '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("[verifier]")) and (.body | test("проверен коммит")))] | last // empty | .body' \
-                      "$RUNNER_TEMP/comments.json" > "$INPUT_DIR/last-report.md"
+                  report_filter='[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("[verifier]")) and (.body | test("проверен коммит")))] | last'
+                  jq -r "$report_filter // empty | .body" "$RUNNER_TEMP/comments.json" > "$RUNNER_TEMP/last-comment.md"
 
-                  if [ -s "$INPUT_DIR/last-report.md" ]; then
+                  if [ -s "$RUNNER_TEMP/last-comment.md" ]; then
                       mode=light
-                      since=$(jq -r '[.[] | select(.user.login == "github-actions[bot]" and (.body | startswith("[verifier]")) and (.body | test("проверен коммит")))] | last | .created_at' "$RUNNER_TEMP/comments.json")
+                      # The workflow appends the hidden JSON block last: text before the last marker
+                      # goes to the agent, the block itself - to last-verdict.json.
+                      marker=$(grep -n '^<!-- verifier:json$' "$RUNNER_TEMP/last-comment.md" | tail -n1 | cut -d: -f1 || true)
+                      if [ -n "$marker" ]; then
+                          head -n $((marker - 1)) "$RUNNER_TEMP/last-comment.md" > "$INPUT_DIR/last-report.md"
+                          tail -n +$((marker + 1)) "$RUNNER_TEMP/last-comment.md" | sed '/^-->$/,$d' > "$INPUT_DIR/last-verdict.json"
+                      else
+                          cp "$RUNNER_TEMP/last-comment.md" "$INPUT_DIR/last-report.md"
+                      fi
+                      if ! jq -e 'type == "object"' "$INPUT_DIR/last-verdict.json" > /dev/null 2>&1; then
+                          rm -f "$INPUT_DIR/last-verdict.json"
+                      fi
+                      since=$(jq -r "$report_filter | .created_at" "$RUNNER_TEMP/comments.json")
                       jq -r --arg o "$OWNER" --arg s "$since" \
                           '.[] | select(.user.login == $o and .created_at > $s) | "## \(.created_at)\n\n\(.body)\n"' \
                           "$RUNNER_TEMP/comments.json" > "$INPUT_DIR/owner-comments.md"
-                      checked=$(grep -oE 'проверен коммит `[0-9a-f]{7,40}`' "$INPUT_DIR/last-report.md" | tail -n1 | grep -oE '[0-9a-f]{7,40}' || true)
+                      # The workflow's header line comes first; the agent's text may quote other SHAs.
+                      checked=$(grep -oE 'проверен коммит `[0-9a-f]{7,40}`' "$INPUT_DIR/last-report.md" | head -n1 | grep -oE '[0-9a-f]{7,40}' || true)
                       if [ -n "$checked" ] && git cat-file -e "$checked^{commit}" 2>/dev/null; then
                           git diff "$checked" "$HEAD_SHA" > "$INPUT_DIR/diff.patch"
                           diff_from=$checked
@@ -128,14 +164,9 @@ jobs:
                       fi
                   else
                       mode=full
-                      rm -f "$INPUT_DIR/last-report.md"
                       gh pr diff "$PR" > "$INPUT_DIR/diff.patch"
                       diff_from=base
                   fi
-
-                  # .claude/ is restored from the base branch by the action, so
-                  # the instructions are staged here from the PR checkout.
-                  cp .claude/agents/verifier.md "$INPUT_DIR/verifier.md"
 
                   {
                       echo "PR: $PR"
@@ -143,35 +174,296 @@ jobs:
                       echo "PREVIEW_URL: ${{ steps.preview.outputs.url }}"
                       echo "MODE: $mode"
                       echo "DIFF_FROM: $diff_from"
+                      echo "RULES_CHANGED: $(jq -r 'join(", ")' "$INPUT_DIR/rules-changed.json")"
                   } > "$INPUT_DIR/meta.txt"
+                  echo "mode=$mode" >> "$GITHUB_OUTPUT"
+                  echo "diff_from=$diff_from" >> "$GITHUB_OUTPUT"
                   cat "$INPUT_DIR/meta.txt"
                   ls -la "$INPUT_DIR"
 
+            # No GH_TOKEN here. The repo is public, so the CLI output goes to
+            # files in $RUNNER_TEMP; the log gets only exit codes and a status.
+            # Never fails: the outcome is in outputs, the next step publishes it.
             - name: Run verifier
-              uses: anthropics/claude-code-action@v1
+              id: agent
+              timeout-minutes: 20
               env:
+                  CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+                  DISABLE_AUTOUPDATER: '1'
                   PREVIEW_URL: ${{ steps.preview.outputs.url }}
                   VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-              with:
-                  claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-                  github_token: ${{ secrets.GITHUB_TOKEN }}
-                  display_report: 'false'
-                  show_full_output: 'false'
-                  claude_args: >-
-                      --model opus
-                      --allowedTools Read,Write,Glob,Grep,Bash
-                  prompt: |
-                      Работай строго по инструкции ${{ runner.temp }}/verify/verifier.md.
-                      Входные файлы - в ${{ runner.temp }}/verify/: meta.txt (PR, HEAD_SHA, PREVIEW_URL, MODE, DIFF_FROM), issue.md, pr.md, diff.patch, а в лёгком режиме ещё last-report.md и owner-comments.md.
-                      PREVIEW_URL и VERCEL_AUTOMATION_BYPASS_SECRET уже в окружении.
-                      Отчёт - один комментарий в PR через `gh pr comment`.
-
-            - name: Require a new verifier report
+                  MODE: ${{ steps.input.outputs.mode }}
+                  # verdict.json validation: prints one error per line, nothing if valid.
+                  VALIDATE_JQ: |
+                      def oneof($xs): . as $v | any($xs[]; . == $v);
+                      def filled: type == "string" and (gsub("\\s"; "") | length > 0);
+                      def arr($k): if (.[$k] | type) == "array" then empty else "\($k): ожидается массив" end;
+                      def finding_errors($p):
+                          (if (.id | type) == "string" and (.id | test("^F[1-9][0-9]*$")) then empty else "\($p).id: ожидается F1, F2..." end),
+                          (if .severity | oneof(["blocker", "should", "nit"]) then empty else "\($p).severity: blocker/should/nit" end),
+                          (if .category | oneof(["spec", "coding", "security", "data", "tests", "layout"]) then empty else "\($p).category: spec/coding/security/data/tests/layout" end),
+                          (if .title | filled then empty else "\($p).title: непустая строка" end),
+                          (if has("file") and (.file == null or (.file | type) == "string") then empty else "\($p).file: строка или null" end),
+                          (if has("line") and (.line == null or (.line | type) == "number") then empty else "\($p).line: число или null" end),
+                          (if (.basis | type) != "object" then "\($p).basis: объект {type, ref}"
+                           else
+                              (if .basis.type | oneof(["criterion", "edge_case", "coding", "decision", "security", "owner"]) then empty else "\($p).basis.type: criterion/edge_case/coding/decision/security/owner" end),
+                              (if (.basis.ref | type) == "string" then empty else "\($p).basis.ref: строка" end)
+                           end),
+                          (if (.evidence | type) == "string" then empty else "\($p).evidence: строка" end),
+                          (if .status | oneof(["new", "still_open", "fixed"]) then empty else "\($p).status: new/still_open/fixed" end),
+                          (if (.severity | oneof(["blocker", "should"])) and ((.basis.ref? | filled | not) or (.evidence | filled | not))
+                           then "\($p): у blocker/should обязательны непустые basis.ref и evidence (нет основания - перенеси в suggestions)" else empty end);
+                      def qa_errors($p; $ids):
+                          (if .scenario | filled then empty else "\($p).scenario: непустая строка" end),
+                          (if (.basis_ref | type) == "string" then empty else "\($p).basis_ref: строка" end),
+                          (if .result | oneof(["pass", "fail", "not_checked"]) then empty else "\($p).result: pass/fail/not_checked" end),
+                          (if .result == "fail" and (.finding_id as $f | any($ids[]; . == $f) | not) then "\($p).finding_id: при fail - id существующего замечания" else empty end),
+                          (if .result == "not_checked" and (.reason | filled | not) then "\($p).reason: при not_checked - непустая причина" else empty end);
+                      def errors($rules; $prev):
+                          if type != "object" then "корень: ожидается объект"
+                          else
+                              (if .schema_version == 1 then empty else "schema_version: ожидается 1" end),
+                              arr("findings"), arr("qa"), arr("suggestions"), arr("not_verified"),
+                              (if .rules_assessment == null or (.rules_assessment | type) == "string" then empty else "rules_assessment: строка или null" end),
+                              (if ($rules | length) > 0 and (.rules_assessment | filled | not)
+                               then "rules_assessment: дифф меняет правила verifier (\($rules | join(", "))) - нужна оценка" else empty end),
+                              (if (.findings | type) == "array" then
+                                  (.findings | to_entries[] | "findings[\(.key)]" as $p | .value |
+                                      if type == "object" then finding_errors($p) else "\($p): ожидается объект" end),
+                                  ([.findings[] | objects | .id] | group_by(.)[] | select(length > 1) | "findings: id \(.[0]) повторяется")
+                               else empty end),
+                              (if (.qa | type) == "array" then
+                                  [.findings[]? | objects | .id] as $ids |
+                                  (.qa | to_entries[] | "qa[\(.key)]" as $p | .value |
+                                      if type == "object" then qa_errors($p; $ids) else "\($p): ожидается объект" end)
+                               else empty end),
+                              (if $prev != null and (.findings | type) == "array" then
+                                  .findings as $cur |
+                                  [$prev.findings[]? | objects | .id] as $old_ids |
+                                  ($prev.findings[]? | objects | select(.severity | oneof(["blocker", "should"])) | .id as $id |
+                                      [$cur[] | objects | select(.id == $id)] as $m |
+                                      if ($m | length) == 0 then "лёгкий режим: прошлое замечание \($id) не вернулось (нужен status fixed/still_open)"
+                                      elif ($m[0].status | oneof(["fixed", "still_open"]) | not) then "лёгкий режим: \($id) - status fixed или still_open"
+                                      else empty end),
+                                  ($cur[] | objects | select(.status == "new") | .id as $id | select(any($old_ids[]; . == $id)) |
+                                      "лёгкий режим: новое замечание с прошлым id \($id) - нужен id больше максимального")
+                               else empty end)
+                          end;
+                      errors($rules; $prev[0])
+                  # A format retry must keep every original finding with its severity.
+                  RETAIN_JQ: |
+                      (.findings? // []) as $cur |
+                      $orig[0].findings[]? | objects | . as $f |
+                      [$cur[]? | objects | select(.id == $f.id)] as $m |
+                      if ($m | length) == 0 then "автоповтор: пропало замечание \($f.id)"
+                      elif $m[0].severity != $f.severity then "автоповтор: у \($f.id) изменился severity"
+                      else empty end
               run: |
-                  found=$(gh api --paginate "repos/$GH_REPO/issues/$PR/comments?per_page=100" \
-                      --jq ".[] | select(.user.login == \"github-actions[bot]\" and .created_at >= \"${{ steps.start.outputs.at }}\" and (.body | startswith(\"[verifier]\")) and (.body | contains(\"проверен коммит \`$HEAD_SHA\`\"))) | .html_url")
-                  if [ -z "$found" ]; then
-                      echo "::error::No new [verifier] report with «проверен коммит \`$HEAD_SHA\`» in the PR"
+                  DIR="$RUNNER_TEMP/verify"
+                  OUT="$DIR/out"
+                  LOGS="$RUNNER_TEMP/verifier-cli"
+                  ERRORS="$RUNNER_TEMP/verdict-errors.txt"
+                  mkdir -p "$OUT" "$LOGS"
+                  prev=/dev/null
+                  [ -f "$DIR/last-verdict.json" ] && prev="$DIR/last-verdict.json"
+
+                  # Untrusted text is printed only with a prefix, so it can't be a workflow command.
+                  quote() { cut -c1-300 | sed 's/^/  > /'; }
+
+                  run_cli() {
+                      local label=$1 prompt=$2
+                      shift 2
+                      local code=0
+                      claude -p "$prompt" \
+                          --model opus \
+                          --allowedTools Read,Write,Glob,Grep,Bash \
+                          --permission-mode dontAsk \
+                          --add-dir "$DIR" \
+                          --output-format json \
+                          "$@" > "$LOGS/$label.json" 2> "$LOGS/$label.err" || code=$?
+                      echo "CLI $label: exit $code"
+                      if jq -e 'type == "object"' "$LOGS/$label.json" > /dev/null 2>&1; then
+                          jq -r '"  subtype=\(.subtype // "-") is_error=\(.is_error) turns=\(.num_turns // "-") duration_ms=\(.duration_ms // "-") permission_denials=\([.permission_denials[]?.tool_name] | join(","))"' "$LOGS/$label.json"
+                          if [ "$code" -ne 0 ] || [ "$(jq -r '.is_error // false' "$LOGS/$label.json")" = true ]; then
+                              jq -r '.result // empty | tostring' "$LOGS/$label.json" | head -n 3 | quote
+                          fi
+                          session=$(jq -r '.session_id // empty' "$LOGS/$label.json")
+                          model=$(jq -r '[.modelUsage // {} | keys[]] | join(",")' "$LOGS/$label.json")
+                          [ -n "$model" ] && echo "model=$model" >> "$GITHUB_OUTPUT"
+                      else
+                          echo "  output is not JSON"
+                      fi
+                      if [ "$code" -ne 0 ]; then tail -n 5 "$LOGS/$label.err" | quote; fi
+                      return 0
+                  }
+
+                  validate() {
+                      : > "$ERRORS"
+                      if [ ! -s "$OUT/verdict.json" ]; then
+                          echo "verdict.json не найден или пуст" >> "$ERRORS"
+                      elif ! jq -e . "$OUT/verdict.json" > /dev/null 2> "$RUNNER_TEMP/jq.err"; then
+                          echo "verdict.json - невалидный JSON: $(head -n1 "$RUNNER_TEMP/jq.err")" >> "$ERRORS"
+                      else
+                          # A crashed check must not pass as "no errors".
+                          jq -r --argjson rules "$(cat "$DIR/rules-changed.json")" --slurpfile prev "$prev" \
+                              "$VALIDATE_JQ" "$OUT/verdict.json" >> "$ERRORS" 2> "$RUNNER_TEMP/jq.err" \
+                              || echo "проверка verdict.json упала: $(head -n1 "$RUNNER_TEMP/jq.err")" >> "$ERRORS"
+                          if [ -s "$RUNNER_TEMP/verdict.orig.json" ]; then
+                              jq -r --slurpfile orig "$RUNNER_TEMP/verdict.orig.json" "$RETAIN_JQ" "$OUT/verdict.json" >> "$ERRORS" 2> "$RUNNER_TEMP/jq.err" \
+                                  || echo "сравнение с исходным verdict.json упало: $(head -n1 "$RUNNER_TEMP/jq.err")" >> "$ERRORS"
+                          fi
+                      fi
+                      [ ! -s "$ERRORS" ]
+                  }
+
+                  session=""
+                  echo "model=opus" >> "$GITHUB_OUTPUT"
+                  run_cli review "Работай строго по инструкции .claude/agents/verifier.md (из текущего checkout).
+                  Входные файлы - в $DIR/: meta.txt (PR, HEAD_SHA, PREVIEW_URL, MODE, DIFF_FROM, RULES_CHANGED), issue.md, pr.md, diff.patch, rules-changed.json, а в лёгком режиме ещё last-report.md, owner-comments.md и, если есть, last-verdict.json.
+                  PREVIEW_URL и VERCEL_AUTOMATION_BYPASS_SECRET уже в окружении.
+                  Результат - два файла в $OUT/: report.md и verdict.json (раздел «Report» инструкции). В PR ничего не публикуй: токена GitHub у тебя нет, комментарий опубликует workflow."
+
+                  retries=0
+                  if [ ! -s "$OUT/report.md" ]; then
+                      status=no_files
+                  else
+                      # The baseline for "a retry must not drop findings" - only if it parses.
+                      if jq -e . "$OUT/verdict.json" > /dev/null 2>&1; then cp "$OUT/verdict.json" "$RUNNER_TEMP/verdict.orig.json"; fi
+                      status=valid
+                      until validate; do
+                          if [ "$retries" -ge 2 ]; then status=invalid; break; fi
+                          retries=$((retries + 1))
+                          echo "verdict.json: $(wc -l < "$ERRORS") format errors, retry $retries"
+                          cp "$ERRORS" "$DIR/verdict-errors.txt"
+                          fix_prompt="Файл $OUT/verdict.json не прошёл проверку формата, ошибки - в $DIR/verdict-errors.txt.
+                  Исправь только формат verdict.json по схеме из раздела «Report» .claude/agents/verifier.md. Ревью и QA заново не проводи, замечания не удаляй, их severity не меняй. Если у blocker/should нет основания (basis.ref, evidence) - добавь его из своего ревью или QA. report.md меняй, только если без этого он расходится с verdict.json."
+                          if [ -n "$session" ]; then
+                              run_cli "fix-$retries" "$fix_prompt" --resume "$session"
+                          else
+                              run_cli "fix-$retries" "$fix_prompt"
+                          fi
+                      done
+                  fi
+                  echo "Verifier status: $status, format retries: $retries"
+                  echo "status=$status" >> "$GITHUB_OUTPUT"
+                  echo "retries=$retries" >> "$GITHUB_OUTPUT"
+
+            - name: Publish report
+              if: always() && steps.input.outcome == 'success'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  STATUS: ${{ steps.agent.outputs.status }}
+                  RETRIES: ${{ steps.agent.outputs.retries }}
+                  MODEL: ${{ steps.agent.outputs.model }}
+                  MODE: ${{ steps.input.outputs.mode }}
+                  DIFF_FROM: ${{ steps.input.outputs.diff_from }}
+                  STARTED_AT: ${{ steps.start.outputs.at }}
+                  STARTED_EPOCH: ${{ steps.start.outputs.epoch }}
+                  RUN_ID: ${{ github.run_id }}
+              run: |
+                  DIR="$RUNNER_TEMP/verify"
+                  OUT="$DIR/out"
+                  BODY="$RUNNER_TEMP/comment.md"
+                  LIMIT=65536
+                  export LC_ALL=C.UTF-8
+                  [ "$MODE" = light ] && mode_ru="лёгкая" || mode_ru="полная"
+
+                  if [ "$STATUS" != valid ] && [ "$STATUS" != invalid ]; then
+                      reason="агент не записал report.md"
+                      [ -z "$STATUS" ] && reason="шаг агента не завершился (таймаут или сбой)"
+                      gh pr comment "$PR" --body "[verifier] отчёт не сформирован · коммит \`$HEAD_SHA\`: $reason. Прогон: $RUN_URL"
+                      echo "::error title=verifier::Report not produced ($reason)"
                       exit 1
                   fi
-                  echo "Report: $found"
+
+                  if [ "$STATUS" = invalid ]; then
+                      {
+                          echo "[verifier] отчёт некорректен · $mode_ru проверка · коммит \`$HEAD_SHA\`"
+                          echo
+                          echo "verdict.json не прошёл проверку после $RETRIES автоповторов. Прогон: $RUN_URL (файлы - артефакт \`verifier-report\`)."
+                          echo
+                          echo "Ошибки:"
+                          echo
+                          head -n 50 "$RUNNER_TEMP/verdict-errors.txt" | sed 's/^/- /'
+                          echo
+                          echo "<details><summary>Текст отчёта агента</summary>"
+                          echo
+                          head -c 40000 "$OUT/report.md"
+                          echo
+                          echo "</details>"
+                      } > "$BODY"
+                      gh pr comment "$PR" --body-file "$BODY"
+                      echo "::error title=verifier::verdict.json is invalid after $RETRIES retries"
+                      exit 1
+                  fi
+
+                  # Final JSON: the agent's judgments + fields computed here (they win over the agent's).
+                  jq --slurpfile rules "$DIR/rules-changed.json" \
+                      --arg pr "$PR" --arg sha "$HEAD_SHA" --arg mode "$MODE" --arg diff_from "$DIFF_FROM" \
+                      --arg run_id "$RUN_ID" --arg started_at "$STARTED_AT" \
+                      --argjson duration "$(( $(date +%s) - STARTED_EPOCH ))" --arg model "${MODEL:-opus}" \
+                      '. + {
+                          run: {pr: ($pr | tonumber), sha: $sha, mode: $mode, diff_from: $diff_from,
+                                run_id: ($run_id | tonumber), started_at: $started_at, duration_s: $duration, model: $model},
+                          rules_changed: $rules[0],
+                          verdict: (if any(.findings[]; (.severity == "blocker" or .severity == "should")
+                                          and (.status == "new" or .status == "still_open"))
+                                    then "changes" else "ok" end)
+                      }' "$OUT/verdict.json" > "$OUT/verdict.final.json"
+                  verdict=$(jq -r .verdict "$OUT/verdict.final.json")
+                  [ "$verdict" = ok ] && verdict_ru="ок" || verdict_ru="правки"
+
+                  header() {
+                      echo "[verifier] $verdict_ru · $mode_ru проверка"
+                      echo
+                      echo "проверен коммит \`$HEAD_SHA\` · [прогон]($RUN_URL) · автоповторов формата: $RETRIES"
+                      if [ "$(jq 'length' "$DIR/rules-changed.json")" -gt 0 ]; then
+                          echo
+                          echo "**PR меняет правила verifier:** $(jq -r 'map("`\(.)`") | join(", ")' "$DIR/rules-changed.json")"
+                      fi
+                      echo
+                  }
+                  {
+                      header
+                      cat "$OUT/report.md"
+                      echo
+                      echo
+                      echo "<!-- verifier:json"
+                      # < and > only occur inside JSON strings; escaping them keeps the HTML comment closed.
+                      jq -c . "$OUT/verdict.final.json" | sed 's/</\\u003c/g; s/>/\\u003e/g'
+                      echo "-->"
+                  } > "$BODY"
+                  if [ "$(wc -m < "$BODY")" -gt "$LIMIT" ]; then
+                      note="> JSON не влез в лимит комментария - он в артефакте \`verifier-report\` прогона."
+                      {
+                          header
+                          echo "$note"
+                          echo
+                          cat "$OUT/report.md"
+                      } > "$BODY"
+                      if [ "$(wc -m < "$BODY")" -gt "$LIMIT" ]; then
+                          { header; echo "$note Текст обрезан, полный - там же."; echo; head -c 50000 "$OUT/report.md"; } > "$BODY"
+                      fi
+                      echo "::warning title=verifier::Comment too long, JSON is only in the artifact"
+                  fi
+                  gh pr comment "$PR" --body-file "$BODY"
+
+                  if [ "$verdict" != ok ]; then
+                      # Titles are agent text: one line, escaped for the workflow command.
+                      list=$(jq -r '[.findings[] | select((.severity == "blocker" or .severity == "should")
+                              and (.status == "new" or .status == "still_open"))
+                          | "\(.id) \(.severity): \(.title | tostring | gsub("[\\r\\n]+"; " ") | .[0:150])"] | join("; ")' "$OUT/verdict.final.json")
+                      list=${list//'%'/'%25'}
+                      echo "::error title=verifier: changes requested::$list"
+                      exit 1
+                  fi
+                  echo "Verdict: ok"
+
+            - name: Upload verifier files
+              if: always() && steps.input.outcome == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: verifier-report
+                  path: ${{ runner.temp }}/verify/out/
+                  if-no-files-found: ignore
