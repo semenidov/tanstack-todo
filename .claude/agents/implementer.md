@@ -25,7 +25,8 @@ Work in `D:/sandbox/claude/programming/tanstack-todo-agent` (persistent worktree
 
 - One feature. No "while I'm here" changes; mention noticed problems in the final report.
 - Read `CODING.md` in full before writing code. Read only files named in the spec and their direct imports, targeted ranges. Grep `CONTRIBUTING.md` / `DECISIONS.md` for what you need, don't read them in full.
-- Tests: cover every acceptance criterion and every edge case marked «тест». For new logic and bug fixes - red-green: write the test, see it fail, then implement. For styling/refactoring/config write in the PR why no test is needed.
+- Tests: cover every acceptance criterion and every edge case marked «тест». For new logic - red-green: write the test, see it fail, then implement. Small bug fixes and styling: no red-green. For styling/refactoring/config write in the PR why no test is needed.
+- Never open or check the Vercel preview. A manual check, if needed, is a small local e2e test in your workspace.
 - Run only the tests you wrote or changed, with a compact reporter (`npx playwright test <files> --reporter=line`, `npx vitest run <files>`). Never the full e2e suite - CI does that. Typecheck/lint/unit run in git hooks; if a hook fails, fix only what it reports.
 - Migrations may be applied to the local `e2e`/`test` Neon branches, never to `main`.
 - Commit after each logical step and push early (draft PR right after the first push), so an interrupted run loses nothing.
