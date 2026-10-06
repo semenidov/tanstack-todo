@@ -5,6 +5,7 @@ import { boards, cards, lists, session, user } from '#/db/schema';
 import { DEMO_BOARD } from '#/lib/demo-board';
 import { GUEST_CAP_CODE } from '#/lib/guest';
 import { MAX_ACTIVE_GUESTS } from '#/lib/quotas';
+import { addCardAs, addListAs, createBoardAs } from '#/server/board-writes';
 import { getBoard } from '#/server/boards-repo';
 import { seedUser } from '#/test/db';
 import { count, eq, inArray, sql } from 'drizzle-orm';
@@ -259,5 +260,26 @@ describe('guest sign-out', () => {
         // Lists and cards of the demo board went with it (nothing else exists).
         expect(await db.select().from(lists)).toEqual([]);
         expect(await db.select().from(cards)).toEqual([]);
+    });
+});
+
+// The session cookie cache (5 min) can still carry a guest that was deleted
+// (expired, or signed out in another tab).
+describe('deleted guest with a cached session', () => {
+    it('is refused as unauthorized, nothing is inserted', async () => {
+        const row = await seedGuest(daysAgo(1));
+        const { board, list } = await seedContent(row.id);
+        await db.delete(user).where(eq(user.id, row.id));
+        const deleted = { id: row.id, isAnonymous: true };
+
+        await expect(createBoardAs(deleted, 'After delete')).rejects.toThrow(
+            /^Unauthorized$/,
+        );
+        // Its boards went with it, so these find nothing to insert into.
+        expect(await addListAs(deleted, board.id, 'After delete')).toBeNull();
+        expect(await addCardAs(deleted, list.id, 'After delete')).toBeNull();
+        expect(
+            await db.select().from(boards).where(eq(boards.ownerId, row.id)),
+        ).toEqual([]);
     });
 });
