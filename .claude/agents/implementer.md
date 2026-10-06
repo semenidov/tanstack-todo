@@ -51,4 +51,4 @@ Title in English (Conventional Commit); body in Russian by `.github/pull_request
 
 ## Final report
 
-At most 10 lines: PR link, CI status, deviations from the spec, open questions / disagreements, blockers, and a line «правила: PR меняет `<files>`» if the diff touches `.github/workflows/verify.yml`, `.claude/agents/verifier.md`, `CODING.md` or `DECISIONS.md`. Nothing else.
+At most 10 lines: PR link, head SHA of the last push, CI status, deviations from the spec, open questions / disagreements, blockers, and a line «правила: PR меняет `<files>`» if the diff touches `.github/workflows/verify.yml`, `.claude/agents/verifier.md`, `CODING.md` or `DECISIONS.md`. Nothing else.
