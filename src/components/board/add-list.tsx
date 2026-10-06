@@ -3,6 +3,7 @@ import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
 import { addListToBoard } from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
+import { createErrorMessage } from '#/lib/quotas';
 import { addListServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Loader2Icon, PlusIcon } from 'lucide-react';
@@ -27,8 +28,13 @@ function useAddList(boardId: string) {
                 old ? addListToBoard(old, { ...list, cards: [] }) : old,
             );
         },
-        onError: () => {
-            toast.error("Couldn't add the list. Please try again.");
+        onError: (error) => {
+            toast.error(
+                createErrorMessage(
+                    error,
+                    "Couldn't add the list. Please try again.",
+                ),
+            );
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: key });

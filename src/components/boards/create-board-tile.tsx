@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Input } from '#/components/ui/input';
 import { boardsListQueryOptions } from '#/lib/boards-query';
+import { createErrorMessage } from '#/lib/quotas';
 import { createBoardServer } from '#/server/boards';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
@@ -32,8 +33,13 @@ export function CreateBoardTile({ className }: CreateBoardTileProps) {
                 params: { boardId: board.id },
             });
         },
-        onError: () => {
-            toast.error("Couldn't create the board. Please try again.");
+        onError: (error) => {
+            toast.error(
+                createErrorMessage(
+                    error,
+                    "Couldn't create the board. Please try again.",
+                ),
+            );
         },
     });
 

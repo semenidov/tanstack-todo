@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { QuotaExceededError, QuotaKind } from '#/lib/quotas';
 import { AddCard } from '#/components/board/add-card';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { BoardData, Card } from '#/lib/boards-query';
@@ -133,9 +134,32 @@ describe('AddCard', () => {
         const input = screen.getByLabelText('New card title');
         await user.type(input, 'Buy milk{Enter}');
 
-        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "Couldn't add the card. Please try again.",
+            ),
+        );
         expect(input).toHaveValue('Buy milk');
         expect(queryClient.getQueryData(boardKey)?.lists[0]?.cards).toEqual([]);
+    });
+
+    it('names the card quota and keeps the typed text when the limit is reached', async () => {
+        addCardSpy.mockRejectedValueOnce(
+            new Error(new QuotaExceededError(QuotaKind.Cards, 200).message),
+        );
+        const user = userEvent.setup();
+        renderAddCard();
+
+        await user.click(screen.getByText('Add card'));
+        const input = screen.getByLabelText('New card title');
+        await user.type(input, 'Buy milk{Enter}');
+
+        await vi.waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "You've reached the limit of 200 cards in this list.",
+            ),
+        );
+        expect(input).toHaveValue('Buy milk');
     });
 
     it('closes the field on Escape without adding a card', async () => {

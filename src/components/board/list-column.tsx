@@ -17,6 +17,7 @@ import {
 } from '#/components/ui/dropdown-menu';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { ListWithCards } from '#/lib/boards-query';
+import { restoreErrorMessage } from '#/lib/quotas';
 import {
     removeListFromBoard,
     renameListInBoard,
@@ -96,9 +97,14 @@ function useDeleteList(boardId: string) {
         returnToCache(list);
         try {
             await restoreList({ data: { listId: list.id } });
-        } catch {
+        } catch (error) {
             removeFromCache(list.id);
-            toast.error("Couldn't restore the list. Please try again.");
+            toast.error(
+                restoreErrorMessage(
+                    error,
+                    "Couldn't restore the list. Please try again.",
+                ),
+            );
         } finally {
             invalidate();
         }

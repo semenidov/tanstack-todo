@@ -64,6 +64,13 @@
             "when": 1790946015327,
             "tag": "0008_cold_aqueduct",
             "breakpoints": true
+        },
+        {
+            "idx": 9,
+            "version": "7",
+            "when": 1791219463601,
+            "tag": "0009_hard_ender_wiggin",
+            "breakpoints": true
         }
     ]
 }

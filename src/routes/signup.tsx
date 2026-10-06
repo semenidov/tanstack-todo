@@ -1,5 +1,6 @@
 import { AuthForm } from '#/components/auth-form';
 import { authClient } from '#/lib/auth-client';
+import { SIGN_UP_LIMIT, authErrorMessage } from '#/lib/auth-rate-limit';
 import { pageMeta } from '#/lib/seo';
 import {
     createFileRoute,
@@ -27,7 +28,9 @@ function SignupPage() {
             name: values.email.split('@')[0] || values.email,
         });
         if (error) {
-            toast.error(error.message ?? 'Sign up failed');
+            toast.error(
+                authErrorMessage(error, SIGN_UP_LIMIT, 'Sign up failed'),
+            );
             return;
         }
         // Re-running this route's beforeLoad redirects the now signed-in user

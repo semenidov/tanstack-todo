@@ -12,6 +12,11 @@ import { boardQueryOptions } from '#/lib/boards-query';
 import type { Card } from '#/lib/boards-query';
 import type { CardMoveNeighbors } from '#/lib/boards';
 import {
+    createErrorMessage,
+    moveErrorMessage,
+    restoreErrorMessage,
+} from '#/lib/quotas';
+import {
     addCardServer,
     deleteCardServer,
     moveCardServer,
@@ -76,8 +81,13 @@ export function useAddCard(boardId: string, listId: string) {
                 old ? addCardToList(old, listId, card) : old,
             );
         },
-        onError: () => {
-            toast.error("Couldn't add the card. Please try again.");
+        onError: (error) => {
+            toast.error(
+                createErrorMessage(
+                    error,
+                    "Couldn't add the card. Please try again.",
+                ),
+            );
         },
         onSettled: () => invalidateAfterLastCardOrder(queryClient, boardId),
     });
@@ -138,8 +148,13 @@ export function useMoveCard(boardId: string) {
         },
         // No snapshot rollback: later moves in the queue were applied on top of it.
         // The server state is the truth, so refetch it.
-        onError: () => {
-            toast.error("Couldn't move the card. Please try again.");
+        onError: (error) => {
+            toast.error(
+                moveErrorMessage(
+                    error,
+                    "Couldn't move the card. Please try again.",
+                ),
+            );
             void queryClient.invalidateQueries({ queryKey: key });
         },
         onSettled: () => invalidateAfterLastCardOrder(queryClient, boardId),
@@ -238,9 +253,14 @@ export function useDeleteCard(boardId: string) {
         returnToCache(card);
         try {
             await restoreCard({ data: { cardId: card.id } });
-        } catch {
+        } catch (error) {
             removeFromCache(card.id);
-            toast.error("Couldn't restore the card. Please try again.");
+            toast.error(
+                restoreErrorMessage(
+                    error,
+                    "Couldn't restore the card. Please try again.",
+                ),
+            );
         } finally {
             invalidate();
         }

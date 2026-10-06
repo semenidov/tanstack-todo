@@ -4,19 +4,29 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
+    useDeleteCard,
     useIsCardSyncing,
     useMoveCard,
 } from '#/components/board/card-mutations';
+import { QuotaExceededError, QuotaKind } from '#/lib/quotas';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { BoardData, Card, ListWithCards } from '#/lib/boards-query';
 
-const { moveCardSpy } = vi.hoisted(() => ({
+const { moveCardSpy, deleteCardSpy, restoreCardSpy } = vi.hoisted(() => ({
     moveCardSpy: vi.fn<(args: unknown) => Promise<void>>(),
+    deleteCardSpy: vi.fn<(args: unknown) => Promise<void>>(),
+    restoreCardSpy: vi.fn<(args: unknown) => Promise<void>>(),
 }));
 
 vi.mock('#/server/boards', () => ({
     moveCardServer: moveCardSpy,
+    deleteCardServer: deleteCardSpy,
+    restoreCardServer: restoreCardSpy,
 }));
+
+/** A quota error as the client gets it: only the message survives the wire. */
+const quotaError = (kind: QuotaKind, limit: number) =>
+    new Error(new QuotaExceededError(kind, limit).message);
 
 vi.mock('@tanstack/react-start', () => ({
     useServerFn: (fn: unknown) => fn,
@@ -209,5 +219,53 @@ describe('useMoveCard', () => {
             ),
         );
         expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+    });
+
+    it('says the target list is full when the server refuses by quota', async () => {
+        moveCardSpy.mockRejectedValue(quotaError(QuotaKind.Cards, 200));
+        const { result, invalidate } = setup();
+
+        act(() => result.current.moveCard('c1', 'b', 0));
+
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "Can't move: this list already has 200 cards.",
+            ),
+        );
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+    });
+});
+
+describe('useDeleteCard', () => {
+    it('explains a reached quota when Undo is refused and keeps the card deleted', async () => {
+        deleteCardSpy.mockResolvedValue(undefined);
+        restoreCardSpy.mockRejectedValue(quotaError(QuotaKind.Cards, 200));
+        const { queryClient } = setup();
+        const wrapper = ({ children }: { children: ReactNode }) => (
+            <QueryClientProvider client={queryClient}>
+                {children}
+            </QueryClientProvider>
+        );
+        const { result } = renderHook(() => useDeleteCard('board-1'), {
+            wrapper,
+        });
+        const card = board.lists[0].cards[0];
+
+        await act(() => result.current.deleteWithUndo(card));
+        const undo = vi.mocked(toast.warning).mock.calls[0]?.[1]?.action;
+        expect(undo).toBeDefined();
+        act(() => {
+            if (undo && typeof undo === 'object' && 'onClick' in undo)
+                undo.onClick({} as never);
+        });
+
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                "Can't restore: you've reached the limit of 200 cards in this list.",
+            ),
+        );
+        expect(
+            queryClient.getQueryData(key)?.lists[0].cards.map((c) => c.id),
+        ).not.toContain(card.id);
     });
 });

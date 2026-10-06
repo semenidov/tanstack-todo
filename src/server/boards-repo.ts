@@ -1,4 +1,6 @@
 import { db } from '#/db';
+import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
+import type { Quotas } from '#/lib/quotas';
 import { boards, cards, lists } from '#/db/schema';
 import {
     and,
@@ -53,7 +55,44 @@ export function listBoards(userId: string) {
         .orderBy(asc(boards.createdAt));
 }
 
-export async function createBoard(userId: string, title: string) {
+// Quotas: count the live rows, then insert. Without a transaction (neon-http) two
+// parallel creates at the boundary can overshoot by one - acceptable.
+
+async function assertBelowQuota(
+    kind: QuotaKind,
+    quotas: Quotas,
+    countLive: () => Promise<Array<{ n: number }>>,
+) {
+    const [{ n }] = await countLive();
+    if (n >= quotas[kind]) throw new QuotaExceededError(kind, quotas[kind]);
+}
+
+function countLiveLists(boardId: string) {
+    return db
+        .select({ n: count() })
+        .from(lists)
+        .where(and(eq(lists.boardId, boardId), isNull(lists.deletedAt)));
+}
+
+function countLiveCards(listId: string) {
+    return db
+        .select({ n: count() })
+        .from(cards)
+        .where(and(eq(cards.listId, listId), isNull(cards.deletedAt)));
+}
+
+export async function createBoard(
+    userId: string,
+    title: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    // Boards are deleted for real, so every row counts.
+    await assertBelowQuota(QuotaKind.Boards, quotas, () =>
+        db
+            .select({ n: count() })
+            .from(boards)
+            .where(eq(boards.ownerId, userId)),
+    );
     const [board] = await db
         .insert(boards)
         .values({ ownerId: userId, title })
@@ -101,11 +140,19 @@ export async function getBoard(userId: string, boardId: string) {
     return { board: boardFields, lists: boardLists };
 }
 
-export async function addList(userId: string, boardId: string, title: string) {
+export async function addList(
+    userId: string,
+    boardId: string,
+    title: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
     const board = await db.query.boards.findFirst({
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
     });
     if (!board) return null;
+    await assertBelowQuota(QuotaKind.Lists, quotas, () =>
+        countLiveLists(boardId),
+    );
 
     const [row] = await db.insert(lists).values({ boardId, title }).returning();
     return row;
@@ -141,7 +188,22 @@ export function deleteList(userId: string, listId: string) {
         .returning();
 }
 
-export function restoreList(userId: string, listId: string) {
+// Restore makes a row live again, so it passes the same quota check as create.
+// The deleted row itself is not among the live ones it counts.
+export async function restoreList(
+    userId: string,
+    listId: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    const list = await db.query.lists.findFirst({
+        where: (l) => eq(l.id, listId),
+        with: { board: true },
+    });
+    if (list?.deletedAt && list.board.ownerId === userId) {
+        await assertBelowQuota(QuotaKind.Lists, quotas, () =>
+            countLiveLists(list.boardId),
+        );
+    }
     return db
         .update(lists)
         .set({ deletedAt: null })
@@ -168,12 +230,20 @@ async function firstPositionKey(listId: string) {
     return generateKeyBetween(null, first.position);
 }
 
-export async function addCard(userId: string, listId: string, title: string) {
+export async function addCard(
+    userId: string,
+    listId: string,
+    title: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
     const list = await db.query.lists.findFirst({
         where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
         with: { board: true },
     });
     if (!list || list.board.ownerId !== userId) return null;
+    await assertBelowQuota(QuotaKind.Cards, quotas, () =>
+        countLiveCards(listId),
+    );
 
     const position = await firstPositionKey(listId);
     const [row] = await db
@@ -259,6 +329,7 @@ export async function moveCard(
     toListId: string,
     prevCardId: string | null,
     nextCardId: string | null,
+    quotas: Quotas = USER_QUOTAS,
 ) {
     if (prevCardId === cardId || nextCardId === cardId) return null;
     if (prevCardId !== null && prevCardId === nextCardId) return null;
@@ -276,6 +347,12 @@ export async function moveCard(
     });
     if (!targetList || targetList.board.ownerId !== userId) return null;
     if (targetList.boardId !== card.list.boardId) return null;
+    // A move into another list adds a live card to it; within one list the count stays.
+    if (toListId !== card.listId) {
+        await assertBelowQuota(QuotaKind.Cards, quotas, () =>
+            countLiveCards(toListId),
+        );
+    }
 
     const neighborIds = [prevCardId, nextCardId].filter((id) => id !== null);
     const positionOf = (map: Map<string, string>, id: string | null) =>
@@ -324,7 +401,24 @@ export function deleteCard(userId: string, cardId: string) {
 }
 
 // A card in a deleted list stays hidden: ownedListIds skips deleted lists.
-export function restoreCard(userId: string, cardId: string) {
+export async function restoreCard(
+    userId: string,
+    cardId: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    const card = await db.query.cards.findFirst({
+        where: (c) => eq(c.id, cardId),
+        with: { list: { with: { board: true } } },
+    });
+    if (
+        card?.deletedAt &&
+        !card.list.deletedAt &&
+        card.list.board.ownerId === userId
+    ) {
+        await assertBelowQuota(QuotaKind.Cards, quotas, () =>
+            countLiveCards(card.listId),
+        );
+    }
     return db
         .update(cards)
         .set({ deletedAt: null })
