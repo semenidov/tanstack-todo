@@ -42,16 +42,29 @@ function parseQuotaError(
     return { kind: quotaKind, limit: quotaLimit };
 }
 
-const QUOTA_TEXT: Record<QuotaKind, (limit: number) => string> = {
-    [QuotaKind.Boards]: (n) => `You've reached the limit of ${n} boards.`,
-    [QuotaKind.Lists]: (n) =>
-        `You've reached the limit of ${n} lists on this board.`,
-    [QuotaKind.Cards]: (n) =>
-        `You've reached the limit of ${n} cards in this list.`,
+const QUOTA_LIMIT_TEXT: Record<QuotaKind, (limit: number) => string> = {
+    [QuotaKind.Boards]: (n) => `the limit of ${n} boards`,
+    [QuotaKind.Lists]: (n) => `the limit of ${n} lists on this board`,
+    [QuotaKind.Cards]: (n) => `the limit of ${n} cards in this list`,
 };
 
 /** Toast text for a failed create: the quota reason, or `fallback` for any other error. */
 export function createErrorMessage(error: unknown, fallback: string) {
     const quota = parseQuotaError(error);
-    return quota ? QUOTA_TEXT[quota.kind](quota.limit) : fallback;
+    if (!quota) return fallback;
+    return `You've reached ${QUOTA_LIMIT_TEXT[quota.kind](quota.limit)}.`;
+}
+
+/** Toast text for a failed Undo (restore of a deleted list or card). */
+export function restoreErrorMessage(error: unknown, fallback: string) {
+    const quota = parseQuotaError(error);
+    if (!quota) return fallback;
+    return `Can't restore: you've reached ${QUOTA_LIMIT_TEXT[quota.kind](quota.limit)}.`;
+}
+
+/** Toast text for a refused card move: only a full target list has its own text. */
+export function moveErrorMessage(error: unknown, fallback: string) {
+    const quota = parseQuotaError(error);
+    if (quota?.kind !== QuotaKind.Cards) return fallback;
+    return `Can't move: this list already has ${quota.limit} cards.`;
 }

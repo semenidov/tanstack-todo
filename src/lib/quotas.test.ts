@@ -4,6 +4,8 @@ import {
     QuotaKind,
     USER_QUOTAS,
     createErrorMessage,
+    moveErrorMessage,
+    restoreErrorMessage,
 } from '#/lib/quotas';
 
 /** What the client gets: a server fn error keeps only its message on the wire. */
@@ -58,6 +60,47 @@ describe('createErrorMessage', () => {
                 new Error('quota-exceeded:unknown:5'),
                 'fallback',
             ),
+        ).toBe('fallback');
+    });
+});
+
+describe('restoreErrorMessage', () => {
+    it.each([
+        [
+            QuotaKind.Lists,
+            30,
+            "Can't restore: you've reached the limit of 30 lists on this board.",
+        ],
+        [
+            QuotaKind.Cards,
+            200,
+            "Can't restore: you've reached the limit of 200 cards in this list.",
+        ],
+    ])('names the %s quota that blocks Undo', (kind, limit, text) => {
+        const error = overTheWire(new QuotaExceededError(kind, limit));
+
+        expect(restoreErrorMessage(error, 'fallback')).toBe(text);
+    });
+
+    it('returns the fallback for any other error', () => {
+        expect(restoreErrorMessage(new Error('network'), 'fallback')).toBe(
+            'fallback',
+        );
+    });
+});
+
+describe('moveErrorMessage', () => {
+    it('says the target list is full', () => {
+        const error = overTheWire(new QuotaExceededError(QuotaKind.Cards, 200));
+
+        expect(moveErrorMessage(error, 'fallback')).toBe(
+            "Can't move: this list already has 200 cards.",
+        );
+    });
+
+    it('returns the fallback for any other error', () => {
+        expect(
+            moveErrorMessage(new Error('Card was not moved'), 'fallback'),
         ).toBe('fallback');
     });
 });
