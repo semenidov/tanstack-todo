@@ -29,9 +29,10 @@ export const auth = betterAuth({
         cookieCache: { enabled: true, maxAge: 5 * 60 },
     },
     rateLimit: {
-        // E2E signs up many users from one IP and trips the sign-up limit (429).
-        // Only the Playwright web server sets this flag.
-        enabled: process.env.E2E_DISABLE_RATE_LIMIT !== 'true',
+        // E2E and the verifier sign up many users from one IP and trip the sign-up
+        // limit (429). The Playwright web server and the Vercel Preview env set this
+        // flag; production does not have it.
+        enabled: process.env.AUTH_RATE_LIMIT_DISABLED !== 'true',
         // Counters in Postgres: in-memory ones live per serverless instance and
         // barely limit anything on Vercel.
         storage: 'database',
