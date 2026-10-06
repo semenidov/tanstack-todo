@@ -41,6 +41,10 @@ export function GuestSignInButton() {
             variant="outline"
             className="w-full"
             disabled={isPending}
+            // Keeps focus in the autofocused email field: its blur would show
+            // a validation error, shift the layout and lose the click (like
+            // the Sign up link).
+            onMouseDown={(e) => e.preventDefault()}
             onClick={handleClick}
         >
             <UserRoundIcon />
