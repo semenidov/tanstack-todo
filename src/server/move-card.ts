@@ -1,3 +1,5 @@
+import type { SessionUser } from '#/lib/auth-server';
+import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
 
 export interface MoveCardInput {
@@ -12,13 +14,14 @@ export interface MoveCardInput {
  * has no Start runtime). Imported only inside the server fn handler: the client
  * build drops it together with the handler.
  */
-export async function moveCardOrThrow(userId: string, data: MoveCardInput) {
+export async function moveCardOrThrow(user: SessionUser, data: MoveCardInput) {
     const row = await repo.moveCard(
-        userId,
+        user.id,
         data.cardId,
         data.toListId,
         data.prevCardId,
         data.nextCardId,
+        quotasFor(user),
     );
     // A refusal (foreign or stale neighbors, deleted list) must reach the client
     // as an error: it shows a toast and refetches the board.
