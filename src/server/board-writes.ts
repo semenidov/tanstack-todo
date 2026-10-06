@@ -8,8 +8,26 @@ import * as repo from '#/server/boards-repo';
 // calls these functions for a guest (vitest has no Start runtime). Imported only
 // inside server fn handlers: the client build drops it with them.
 
-export function createBoardAs(user: SessionUser, title: string) {
-    return repo.createBoard(user.id, title, quotasFor(user));
+/** Postgres foreign_key_violation, anywhere in the cause chain (drizzle wraps the driver error). */
+function isForeignKeyViolation(error: unknown): boolean {
+    for (let e = error; e instanceof Error; e = e.cause) {
+        if ('code' in e && e.code === '23503') return true;
+    }
+    return false;
+}
+
+export async function createBoardAs(user: SessionUser, title: string) {
+    try {
+        return await repo.createBoard(user.id, title, quotasFor(user));
+    } catch (error) {
+        // The session cookie cache (5 min) can outlive a deleted user (an
+        // expired guest, a guest signed out in another tab). The board insert
+        // is the one write without an owned row to check first, so it hits the
+        // FK: refuse it as unauthorized, without the SQL text. Caught here, not
+        // checked in requireUser: no extra query on every server fn.
+        if (isForeignKeyViolation(error)) throw new Error('Unauthorized');
+        throw error;
+    }
 }
 
 export function addListAs(user: SessionUser, boardId: string, title: string) {
