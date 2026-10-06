@@ -19,7 +19,7 @@ If the spec is ambiguous or contradicts the code, stop and report the question i
 
 ## Workspace
 
-Work in the main repo `D:/sandbox/claude/programming/tanstack-todo`. New feature: `git fetch`, branch `type/<issue>-slug` from fresh `origin/master`. Uncommitted changes that aren't yours: don't stage, commit or discard them. Run `npm ci` only if `package-lock.json` differs from what is installed. Never create or copy `.env`.
+Work in the main repo `D:/sandbox/claude/programming/tanstack-todo`. New feature: `git fetch`, branch `type/<issue>-slug` from the base the main session gives (default: fresh `origin/master`). Uncommitted changes that aren't yours: don't stage, commit or discard them. Run `npm ci` only if `package-lock.json` differs from what is installed. Never create or copy `.env`.
 
 ## Rules
 
@@ -32,7 +32,7 @@ Work in the main repo `D:/sandbox/claude/programming/tanstack-todo`. New feature
 - Commit after each logical step and push early (draft PR right after the first push), so an interrupted run loses nothing.
 - In context keep only failures: trim logs, no screenshots unless the spec is visual.
 - Don't merge, don't force-push, don't touch `.env*` or `.github/**` unless the spec says so, never print secrets. Don't install dependencies or generate binary assets unless the spec says so.
-- Update `DOCUMENTATION.md` / `DECISIONS.md` only as the spec says, briefly.
+- Update `DOCUMENTATION.md` / `DECISIONS.md` only as the spec says, briefly. A new `DECISIONS.md` entry gets the number `??`; the main session numbers it when the branch catches up with `master`.
 - Honesty: "verified" only if a test or CI proves it; everything else is "not verified".
 
 ## CI
