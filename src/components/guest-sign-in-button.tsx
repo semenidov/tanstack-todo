@@ -24,13 +24,19 @@ export function GuestSignInButton() {
             return;
         }
         // The sign-in response has no board id; the new guest owns only the
-        // demo board, so the list gives it. No board (seeding failed) - /boards.
+        // demo board, so the list gives it. No board (seeding failed) or the
+        // list failed - /boards. The guest exists by now, so no toast and the
+        // button stays blocked: the plugin refuses a second guest sign-in.
         queryClient.clear();
-        const boards = await listBoardsServer();
-        const demo = boards.at(0);
+        let demoId: string | undefined;
+        try {
+            demoId = (await listBoardsServer()).at(0)?.id;
+        } catch {
+            demoId = undefined;
+        }
         await router.navigate(
-            demo
-                ? { to: '/b/$boardId', params: { boardId: demo.id } }
+            demoId
+                ? { to: '/b/$boardId', params: { boardId: demoId } }
                 : { to: '/boards' },
         );
     }

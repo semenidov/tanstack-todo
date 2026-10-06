@@ -70,6 +70,21 @@ describe('GuestSignInButton', () => {
         );
     });
 
+    it('opens /boards without a toast when the demo board id cannot be read', async () => {
+        mocks.anonymous.mockResolvedValue({ data: {}, error: null });
+        mocks.listBoards.mockRejectedValue(new Error('Network error'));
+        render(<GuestSignInButton />);
+
+        await userEvent.click(
+            screen.getByRole('button', { name: 'Try as guest' }),
+        );
+
+        await waitFor(() =>
+            expect(mocks.navigate).toHaveBeenCalledWith({ to: '/boards' }),
+        );
+        expect(mocks.toastError).not.toHaveBeenCalled();
+    });
+
     it('shows the rate limit text and unblocks the button', async () => {
         mocks.anonymous.mockResolvedValue({
             data: null,
