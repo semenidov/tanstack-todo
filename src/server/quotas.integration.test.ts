@@ -15,6 +15,9 @@ import {
     deleteBoard,
     deleteCard,
     deleteList,
+    moveCard,
+    restoreCard,
+    restoreList,
 } from '#/server/boards-repo';
 import { seedUser } from '#/test/db';
 import { and, count, eq, isNull } from 'drizzle-orm';
@@ -148,5 +151,108 @@ describe('card quota', () => {
 
         const row = await addCard(user.id, other.id, 'Other list');
         expect(row?.listId).toBe(other.id);
+    });
+});
+
+describe('restore and quotas', () => {
+    it('refuses to restore a list when the board is full again', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [first] = await seedLists(board.id, MAX_LISTS_PER_BOARD);
+        await deleteList(user.id, first.id);
+        await addList(user.id, board.id, 'Took the place');
+
+        await expect(restoreList(user.id, first.id)).rejects.toThrow(
+            new QuotaExceededError(QuotaKind.Lists, MAX_LISTS_PER_BOARD),
+        );
+        const [row] = await db
+            .select()
+            .from(lists)
+            .where(eq(lists.id, first.id));
+        expect(row.deletedAt).not.toBeNull();
+    });
+
+    it('restores a list while the board is under the limit', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [first] = await seedLists(board.id, MAX_LISTS_PER_BOARD);
+        await deleteList(user.id, first.id);
+
+        const rows = await restoreList(user.id, first.id);
+        expect(rows[0]?.deletedAt).toBeNull();
+    });
+
+    it('refuses to restore a card when the list is full again', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [list] = await seedLists(board.id, 1);
+        const [first] = await seedCards(list.id, MAX_CARDS_PER_LIST);
+        await deleteCard(user.id, first.id);
+        await addCard(user.id, list.id, 'Took the place');
+
+        await expect(restoreCard(user.id, first.id)).rejects.toThrow(
+            new QuotaExceededError(QuotaKind.Cards, MAX_CARDS_PER_LIST),
+        );
+        expect(await liveCardCount(list.id)).toBe(MAX_CARDS_PER_LIST);
+    });
+
+    it('restores a card while the list is under the limit', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [list] = await seedLists(board.id, 1);
+        const [first] = await seedCards(list.id, MAX_CARDS_PER_LIST);
+        await deleteCard(user.id, first.id);
+
+        const rows = await restoreCard(user.id, first.id);
+        expect(rows[0]?.deletedAt).toBeNull();
+    });
+});
+
+describe('move and quotas', () => {
+    it('refuses to move a card into a full list', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [full, other] = await seedLists(board.id, 2);
+        await seedCards(full.id, MAX_CARDS_PER_LIST);
+        const [card] = await seedCards(other.id, 1);
+
+        await expect(
+            moveCard(user.id, card.id, full.id, null, null),
+        ).rejects.toThrow(
+            new QuotaExceededError(QuotaKind.Cards, MAX_CARDS_PER_LIST),
+        );
+        const [row] = await db
+            .select()
+            .from(cards)
+            .where(eq(cards.id, card.id));
+        expect(row.listId).toBe(other.id);
+        expect(await liveCardCount(full.id)).toBe(MAX_CARDS_PER_LIST);
+    });
+
+    it('moves a card within a full list', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [full] = await seedLists(board.id, 1);
+        const seeded = await seedCards(full.id, MAX_CARDS_PER_LIST);
+
+        const row = await moveCard(
+            user.id,
+            seeded[0].id,
+            full.id,
+            seeded[1].id,
+            seeded[2].id,
+        );
+        expect(row?.listId).toBe(full.id);
+    });
+
+    it('moves a card into a list one below the limit', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const [target, other] = await seedLists(board.id, 2);
+        await seedCards(target.id, MAX_CARDS_PER_LIST - 1);
+        const [card] = await seedCards(other.id, 1);
+
+        const row = await moveCard(user.id, card.id, target.id, null, null);
+        expect(row?.listId).toBe(target.id);
     });
 });

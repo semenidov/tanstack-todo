@@ -67,6 +67,20 @@ async function assertBelowQuota(
     if (n >= quotas[kind]) throw new QuotaExceededError(kind, quotas[kind]);
 }
 
+function countLiveLists(boardId: string) {
+    return db
+        .select({ n: count() })
+        .from(lists)
+        .where(and(eq(lists.boardId, boardId), isNull(lists.deletedAt)));
+}
+
+function countLiveCards(listId: string) {
+    return db
+        .select({ n: count() })
+        .from(cards)
+        .where(and(eq(cards.listId, listId), isNull(cards.deletedAt)));
+}
+
 export async function createBoard(
     userId: string,
     title: string,
@@ -137,10 +151,7 @@ export async function addList(
     });
     if (!board) return null;
     await assertBelowQuota(QuotaKind.Lists, quotas, () =>
-        db
-            .select({ n: count() })
-            .from(lists)
-            .where(and(eq(lists.boardId, boardId), isNull(lists.deletedAt))),
+        countLiveLists(boardId),
     );
 
     const [row] = await db.insert(lists).values({ boardId, title }).returning();
@@ -177,7 +188,22 @@ export function deleteList(userId: string, listId: string) {
         .returning();
 }
 
-export function restoreList(userId: string, listId: string) {
+// Restore makes a row live again, so it passes the same quota check as create.
+// The deleted row itself is not among the live ones it counts.
+export async function restoreList(
+    userId: string,
+    listId: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    const list = await db.query.lists.findFirst({
+        where: (l) => eq(l.id, listId),
+        with: { board: true },
+    });
+    if (list?.deletedAt && list.board.ownerId === userId) {
+        await assertBelowQuota(QuotaKind.Lists, quotas, () =>
+            countLiveLists(list.boardId),
+        );
+    }
     return db
         .update(lists)
         .set({ deletedAt: null })
@@ -216,10 +242,7 @@ export async function addCard(
     });
     if (!list || list.board.ownerId !== userId) return null;
     await assertBelowQuota(QuotaKind.Cards, quotas, () =>
-        db
-            .select({ n: count() })
-            .from(cards)
-            .where(and(eq(cards.listId, listId), isNull(cards.deletedAt))),
+        countLiveCards(listId),
     );
 
     const position = await firstPositionKey(listId);
@@ -306,6 +329,7 @@ export async function moveCard(
     toListId: string,
     prevCardId: string | null,
     nextCardId: string | null,
+    quotas: Quotas = USER_QUOTAS,
 ) {
     if (prevCardId === cardId || nextCardId === cardId) return null;
     if (prevCardId !== null && prevCardId === nextCardId) return null;
@@ -323,6 +347,12 @@ export async function moveCard(
     });
     if (!targetList || targetList.board.ownerId !== userId) return null;
     if (targetList.boardId !== card.list.boardId) return null;
+    // A move into another list adds a live card to it; within one list the count stays.
+    if (toListId !== card.listId) {
+        await assertBelowQuota(QuotaKind.Cards, quotas, () =>
+            countLiveCards(toListId),
+        );
+    }
 
     const neighborIds = [prevCardId, nextCardId].filter((id) => id !== null);
     const positionOf = (map: Map<string, string>, id: string | null) =>
@@ -371,7 +401,24 @@ export function deleteCard(userId: string, cardId: string) {
 }
 
 // A card in a deleted list stays hidden: ownedListIds skips deleted lists.
-export function restoreCard(userId: string, cardId: string) {
+export async function restoreCard(
+    userId: string,
+    cardId: string,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    const card = await db.query.cards.findFirst({
+        where: (c) => eq(c.id, cardId),
+        with: { list: { with: { board: true } } },
+    });
+    if (
+        card?.deletedAt &&
+        !card.list.deletedAt &&
+        card.list.board.ownerId === userId
+    ) {
+        await assertBelowQuota(QuotaKind.Cards, quotas, () =>
+            countLiveCards(card.listId),
+        );
+    }
     return db
         .update(cards)
         .set({ deletedAt: null })
