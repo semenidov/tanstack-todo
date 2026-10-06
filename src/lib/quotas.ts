@@ -19,6 +19,21 @@ export const USER_QUOTAS: Quotas = {
     [QuotaKind.Cards]: MAX_CARDS_PER_LIST,
 };
 
+// Guest sandbox (#84): smaller limits, a lifetime and a cap on live guests.
+export const GUEST_TTL_DAYS = 7;
+export const MAX_ACTIVE_GUESTS = 100;
+
+export const GUEST_QUOTAS: Quotas = {
+    [QuotaKind.Boards]: 3,
+    [QuotaKind.Lists]: 10,
+    [QuotaKind.Cards]: 50,
+};
+
+/** Limits for the session user: picked on the server, never sent by the client. */
+export function quotasFor(user: { isAnonymous: boolean }): Quotas {
+    return user.isAnonymous ? GUEST_QUOTAS : USER_QUOTAS;
+}
+
 // A server fn error reaches the client as `new Error(message)` (the rest is
 // dropped), so the kind and the limit travel in the message.
 const PREFIX = 'quota-exceeded';
