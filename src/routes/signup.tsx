@@ -2,6 +2,7 @@ import { AuthForm } from '#/components/auth-form';
 import { authClient } from '#/lib/auth-client';
 import { SIGN_UP_LIMIT, authErrorMessage } from '#/lib/auth-rate-limit';
 import { pageMeta } from '#/lib/seo';
+import { useQueryClient } from '@tanstack/react-query';
 import {
     createFileRoute,
     Link,
@@ -15,12 +16,17 @@ export const Route = createFileRoute('/signup')({
     head: () => ({ meta: pageMeta('Sign up') }),
     component: SignupPage,
     beforeLoad: ({ context }) => {
-        if (context.session) throw redirect({ to: '/' });
+        // A guest may sign up (the banner links here); Better Auth then deletes
+        // the guest and its data (#84).
+        if (context.session && !context.session.user.isAnonymous) {
+            throw redirect({ to: '/' });
+        }
     },
 });
 
 function SignupPage() {
     const router = useRouter();
+    const queryClient = useQueryClient();
 
     async function handleSubmit(values: { email: string; password: string }) {
         const { error } = await authClient.signUp.email({
@@ -33,6 +39,8 @@ function SignupPage() {
             );
             return;
         }
+        // A guest's cached boards are gone with the guest.
+        queryClient.clear();
         // Re-running this route's beforeLoad redirects the now signed-in user
         // to `/` and on to `/boards`. A separate navigate('/') raced that
         // redirect and could leave the URL at `/`.

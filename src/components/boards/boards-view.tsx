@@ -4,8 +4,9 @@ import {
     useRenameBoard,
 } from '#/components/boards/board-mutations';
 import { CreateBoardTile } from '#/components/boards/create-board-tile';
+import { GuestBanner } from '#/components/guest-banner';
+import { SignOutButton } from '#/components/sign-out-button';
 import { ThemeToggle } from '#/components/theme-toggle';
-import { Button } from '#/components/ui/button';
 import {
     Empty,
     EmptyContent,
@@ -14,25 +15,16 @@ import {
     EmptyMedia,
     EmptyTitle,
 } from '#/components/ui/empty';
-import { authClient } from '#/lib/auth-client';
 import type { BoardSummary } from '#/lib/boards-query';
-import { useRouter } from '@tanstack/react-router';
-import { LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
+import { LayoutDashboardIcon } from 'lucide-react';
 
 interface BoardsViewProps {
     boards: BoardSummary[];
 }
 
 export function BoardsView({ boards }: BoardsViewProps) {
-    const router = useRouter();
     const renameBoard = useRenameBoard();
     const deleteBoard = useDeleteBoard();
-
-    async function handleSignOut() {
-        await authClient.signOut();
-        await router.invalidate();
-        await router.navigate({ to: '/login' });
-    }
 
     return (
         <div className="flex min-h-screen flex-col bg-muted/30">
@@ -42,16 +34,10 @@ export function BoardsView({ boards }: BoardsViewProps) {
                 </h1>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleSignOut}
-                        aria-label="Sign out"
-                    >
-                        <LogOutIcon />
-                    </Button>
+                    <SignOutButton />
                 </div>
             </header>
+            <GuestBanner />
 
             {boards.length === 0 ? (
                 <div className="p-4">

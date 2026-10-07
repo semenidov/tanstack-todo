@@ -48,6 +48,10 @@ function signUp(ip?: string) {
     );
 }
 
+function signInAsGuest(ip?: string) {
+    return post('/sign-in/anonymous', {}, ip);
+}
+
 /** Statuses of `count` sequential calls (sequential: each one sees the previous counter). */
 async function statuses(count: number, call: () => Promise<Response>) {
     const result: Array<number> = [];
@@ -116,6 +120,18 @@ describe('auth rate limit', () => {
         const first = await statuses(3, () => signUp(ip));
         expect(first).not.toContain(429);
         const blocked = await signUp(ip);
+        expect(blocked.status).toBe(429);
+        expect(Number(blocked.headers.get('X-Retry-After'))).toBeGreaterThan(
+            60,
+        );
+    });
+
+    it('lets 3 guest sign-ins from one IP through and answers 429 to the 4th, for 10 minutes', async () => {
+        const ip = '203.0.113.17';
+
+        const first = await statuses(3, () => signInAsGuest(ip));
+        expect(first).toEqual([200, 200, 200]);
+        const blocked = await signInAsGuest(ip);
         expect(blocked.status).toBe(429);
         expect(Number(blocked.headers.get('X-Retry-After'))).toBeGreaterThan(
             60,

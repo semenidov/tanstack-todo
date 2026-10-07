@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+    GUEST_QUOTAS,
     QuotaExceededError,
     QuotaKind,
     USER_QUOTAS,
     createErrorMessage,
     moveErrorMessage,
+    quotasFor,
     restoreErrorMessage,
 } from '#/lib/quotas';
 
@@ -20,6 +22,41 @@ describe('USER_QUOTAS', () => {
             [QuotaKind.Lists]: 30,
             [QuotaKind.Cards]: 200,
         });
+    });
+});
+
+describe('GUEST_QUOTAS', () => {
+    it('limits a guest to 3 boards, 10 lists per board and 50 cards per list', () => {
+        expect(GUEST_QUOTAS).toEqual({
+            [QuotaKind.Boards]: 3,
+            [QuotaKind.Lists]: 10,
+            [QuotaKind.Cards]: 50,
+        });
+    });
+
+    it('shows the guest numbers in the toasts', () => {
+        const error = (kind: QuotaKind) =>
+            overTheWire(new QuotaExceededError(kind, GUEST_QUOTAS[kind]));
+
+        expect(createErrorMessage(error(QuotaKind.Boards), 'x')).toBe(
+            "You've reached the limit of 3 boards.",
+        );
+        expect(restoreErrorMessage(error(QuotaKind.Lists), 'x')).toBe(
+            "Can't restore: you've reached the limit of 10 lists on this board.",
+        );
+        expect(moveErrorMessage(error(QuotaKind.Cards), 'x')).toBe(
+            "Can't move: this list already has 50 cards.",
+        );
+    });
+});
+
+describe('quotasFor', () => {
+    it('gives a guest the guest limits', () => {
+        expect(quotasFor({ isAnonymous: true })).toBe(GUEST_QUOTAS);
+    });
+
+    it('gives a regular user the regular limits', () => {
+        expect(quotasFor({ isAnonymous: false })).toBe(USER_QUOTAS);
     });
 });
 

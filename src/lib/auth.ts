@@ -1,7 +1,13 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
+import { anonymous } from 'better-auth/plugins';
 import { db } from '#/db';
-import { SIGN_IN_LIMIT, SIGN_UP_LIMIT } from '#/lib/auth-rate-limit';
+import {
+    GUEST_SIGN_IN_LIMIT,
+    SIGN_IN_LIMIT,
+    SIGN_UP_LIMIT,
+} from '#/lib/auth-rate-limit';
+import { prepareGuestSignIn, seedGuest } from '#/server/guests';
 
 const PROD_HOST = 'todo-semenidov.vercel.app';
 const PREVIEW_HOSTS = ['tanstack-todo-*-ssemenidov.vercel.app'];
@@ -41,6 +47,7 @@ export const auth = betterAuth({
         customRules: {
             '/sign-in/email': SIGN_IN_LIMIT,
             '/sign-up/email': SIGN_UP_LIMIT,
+            '/sign-in/anonymous': GUEST_SIGN_IN_LIMIT,
         },
     },
     advanced: {
@@ -48,5 +55,23 @@ export const auth = betterAuth({
         // usable IP is not let through: Better Auth counts it in one shared
         // per-path bucket.
         ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
+    },
+    // Guest sandbox (#84). Signing up from guest mode deletes the guest and its
+    // data (plugin default, no transfer).
+    plugins: [anonymous({ generateName: () => 'Guest' })],
+    databaseHooks: {
+        user: {
+            create: {
+                // Database hook, not hooks.before on the path: here the data
+                // says for sure that this is a guest (`isAnonymous`), and the
+                // check runs after the plugin's "already a guest" refusal.
+                before: async (user) => {
+                    if (user.isAnonymous === true) await prepareGuestSignIn();
+                },
+                after: async (user) => {
+                    if (user.isAnonymous === true) await seedGuest(user.id);
+                },
+            },
+        },
     },
 });
