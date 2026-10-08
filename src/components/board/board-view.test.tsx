@@ -10,8 +10,11 @@ vi.mock('@tanstack/react-router', () => ({
 vi.mock('#/components/boards/board-mutations', () => ({
     useRenameBoard: () => ({ mutate: vi.fn(), isPending: false }),
 }));
-vi.mock('#/lib/auth-client', () => ({
-    authClient: { signOut: vi.fn() },
+vi.mock('#/components/sign-out-button', () => ({
+    SignOutButton: () => null,
+}));
+vi.mock('#/components/guest-banner', () => ({
+    GuestBanner: () => null,
 }));
 vi.mock('#/components/theme-toggle', () => ({
     ThemeToggle: () => null,

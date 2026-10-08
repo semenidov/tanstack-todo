@@ -3,6 +3,8 @@ import { BoardDnd } from '#/components/board/board-dnd';
 import { ListColumn } from '#/components/board/list-column';
 import { EditableTitle } from '#/components/editable-title';
 import { useRenameBoard } from '#/components/boards/board-mutations';
+import { GuestBanner } from '#/components/guest-banner';
+import { SignOutButton } from '#/components/sign-out-button';
 import { ThemeToggle } from '#/components/theme-toggle';
 import { Button } from '#/components/ui/button';
 import {
@@ -13,12 +15,11 @@ import {
     EmptyMedia,
     EmptyTitle,
 } from '#/components/ui/empty';
-import { authClient } from '#/lib/auth-client';
 import type { BoardData } from '#/lib/boards-query';
 import { useDragScroll } from '#/lib/use-drag-scroll';
 import { Link, useRouter } from '@tanstack/react-router';
 import { cn } from 'cn';
-import { ArrowLeftIcon, LayoutDashboardIcon, LogOutIcon } from 'lucide-react';
+import { ArrowLeftIcon, LayoutDashboardIcon } from 'lucide-react';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 
 export function BoardView({ board, lists }: BoardData) {
@@ -54,12 +55,6 @@ export function BoardView({ board, lists }: BoardData) {
             block: 'nearest',
         });
     }, [lists.length]);
-
-    async function handleSignOut() {
-        await authClient.signOut();
-        await router.invalidate();
-        await router.navigate({ to: '/login' });
-    }
 
     return (
         <div className="flex min-h-screen flex-col bg-muted/30">
@@ -97,16 +92,10 @@ export function BoardView({ board, lists }: BoardData) {
                 </div>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={handleSignOut}
-                        aria-label="Sign out"
-                    >
-                        <LogOutIcon />
-                    </Button>
+                    <SignOutButton />
                 </div>
             </header>
+            <GuestBanner />
 
             {lists.length === 0 ? (
                 <div className="p-4">

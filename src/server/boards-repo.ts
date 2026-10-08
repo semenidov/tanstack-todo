@@ -1,4 +1,5 @@
 import { db } from '#/db';
+import { DEMO_BOARD } from '#/lib/demo-board';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import { boards, cards, lists } from '#/db/schema';
@@ -97,6 +98,40 @@ export async function createBoard(
         .insert(boards)
         .values({ ownerId: userId, title })
         .returning();
+    return board;
+}
+
+/** The guest's demo board (#84): board, lists in order, cards in the given order. */
+export async function seedDemoBoard(userId: string) {
+    const [board] = await db
+        .insert(boards)
+        .values({ ownerId: userId, title: DEMO_BOARD.title })
+        .returning();
+    // Lists are shown by createdAt; one insert gives them the same now(), so
+    // the order is set explicitly, a millisecond apart.
+    const start = Date.now();
+    const listRows = await db
+        .insert(lists)
+        .values(
+            DEMO_BOARD.lists.map((list, i) => ({
+                boardId: board.id,
+                title: list.title,
+                createdAt: new Date(start + i),
+            })),
+        )
+        .returning();
+    // RETURNING order is not guaranteed by Postgres; createdAt is.
+    listRows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    const cardRows = DEMO_BOARD.lists.flatMap((list, i) => {
+        const keys = generateNKeysBetween(null, null, list.cards.length);
+        return list.cards.map((card, j) => ({
+            listId: listRows[i].id,
+            title: card.title,
+            description: card.description,
+            position: keys[j],
+        }));
+    });
+    await db.insert(cards).values(cardRows);
     return board;
 }
 

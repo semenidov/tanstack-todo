@@ -1,4 +1,5 @@
 import { AuthForm } from '#/components/auth-form';
+import { GuestSignInButton } from '#/components/guest-sign-in-button';
 import { authClient } from '#/lib/auth-client';
 import { SIGN_IN_LIMIT, authErrorMessage } from '#/lib/auth-rate-limit';
 import { pageMeta } from '#/lib/seo';
@@ -48,6 +49,7 @@ function LoginPage() {
                     onSubmit={handleSubmit}
                     icon={<LogInIcon />}
                 />
+                <GuestSignInButton />
                 <p className="text-center text-sm text-muted-foreground">
                     No account?{' '}
                     <Link

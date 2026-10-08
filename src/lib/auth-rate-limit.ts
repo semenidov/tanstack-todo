@@ -9,6 +9,10 @@ export interface RateLimitRule {
 
 export const SIGN_IN_LIMIT = { window: 60, max: 5 } satisfies RateLimitRule;
 export const SIGN_UP_LIMIT = { window: 600, max: 3 } satisfies RateLimitRule;
+export const GUEST_SIGN_IN_LIMIT = {
+    window: 600,
+    max: 3,
+} satisfies RateLimitRule;
 
 function retryIn(windowSeconds: number) {
     const minutes = Math.ceil(windowSeconds / 60);
