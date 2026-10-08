@@ -2,7 +2,7 @@
 // Draft of the run report (schema.md): implementer transcript(s) + gh + git -> draft JSON.
 // Read-only: publishes nothing. Fields marked "сессия" in schema.md are left for the main session.
 //
-//   node collect.mjs --pr 110 --transcript <tasks/<agent>.output> [--transcript ...] [--approved <iso>] [--out draft.json]
+//   node collect.mjs --pr 110 --transcript <subagents/agent-<id>.jsonl> [--transcript ...] [--approved <iso>] [--out draft.json]
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -52,11 +52,36 @@ const minutes = (a, b) => Math.round((ms(b) - ms(a)) / 6000) / 10;
 
 // ---------- transcript ----------
 
+// Wrong path (empty Windows `output_file`, not a transcript): fail with the path, not a TypeError later.
+function badTranscript(path, why) {
+    console.error(
+        `collect: ${path}: ${why}. Expected an implementer transcript: ~/.claude/projects/<project>/<session>/subagents/agent-<id>.jsonl`,
+    );
+    process.exit(2);
+}
+
 function loadTranscript(path) {
-    const recs = readFileSync(path, 'utf8')
+    let raw;
+    try {
+        raw = readFileSync(path, 'utf8');
+    } catch (err) {
+        badTranscript(path, err.code ?? err.message);
+    }
+    const recs = raw
         .split('\n')
-        .filter(Boolean)
-        .map((l) => JSON.parse(l));
+        .filter((l) => l.trim())
+        .map((l, i) => {
+            let rec;
+            try {
+                rec = JSON.parse(l);
+            } catch {
+                return badTranscript(path, `line ${i + 1} is not JSON`);
+            }
+            if (rec === null || typeof rec !== 'object' || Array.isArray(rec))
+                return badTranscript(path, `line ${i + 1} is not a JSON object`);
+            return rec;
+        });
+    if (recs.length === 0) badTranscript(path, 'empty file');
     const calls = [];
     const byId = new Map();
     // message id -> { at, u, model, chars, final }: one message spans several records (one per
@@ -133,6 +158,8 @@ function loadTranscript(path) {
         cur.end = cur.calls.at(-1).end;
         segments.push(cur);
     }
+    if (segments.length === 0 || !segments[0].start)
+        badTranscript(path, 'no assistant tool calls');
     return { segments, usage: [...usage.values()] };
 }
 
