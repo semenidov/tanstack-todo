@@ -2,6 +2,7 @@ import { requireUser } from '#/lib/auth-server';
 import * as writes from '#/server/board-writes';
 import * as repo from '#/server/boards-repo';
 import { moveCardOrThrow } from '#/server/move-card';
+import { moveListOrThrow } from '#/server/move-list';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 
@@ -100,6 +101,17 @@ export const moveCardServer = createServerFn({ method: 'POST' })
         }),
     )
     .handler(async ({ data }) => moveCardOrThrow(await requireUser(), data));
+
+export const moveListServer = createServerFn({ method: 'POST' })
+    .validator(
+        z.object({
+            listId: z.uuid(),
+            toBoardId: z.uuid(),
+            prevListId: z.uuid().nullable(),
+            nextListId: z.uuid().nullable(),
+        }),
+    )
+    .handler(async ({ data }) => moveListOrThrow(await requireUser(), data));
 
 export const deleteCardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ cardId: z.uuid() }))
