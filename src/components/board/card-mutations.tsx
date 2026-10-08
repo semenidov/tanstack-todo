@@ -1,4 +1,9 @@
 import {
+    boardOrderMutationKey,
+    boardOrderMutationOptions,
+    invalidateAfterLastBoardOrder,
+} from '#/components/board/board-order';
+import {
     addCardToList,
     cardIndexAfterNeighbors,
     cardMoveNeighbors,
@@ -28,39 +33,11 @@ import {
     useMutationState,
     useQueryClient,
 } from '@tanstack/react-query';
-import type { QueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Trash2Icon } from 'lucide-react';
 import { toast } from 'sonner';
 
 const UNDO_WINDOW_MS = 5000;
-
-const cardOrderMutationKey = (boardId: string) =>
-    ['card-order', boardId] as const;
-
-// Card creation and moves of one board run one after another: the server makes
-// each key from the positions the previous requests already saved.
-const cardOrderMutationOptions = (boardId: string) => ({
-    mutationKey: cardOrderMutationKey(boardId),
-    scope: { id: `card-order-${boardId}` },
-});
-
-// Refetch only after the last queued request: an earlier refetch would bring back
-// the server state without the moves still in the queue, and cards would jump.
-function invalidateAfterLastCardOrder(
-    queryClient: QueryClient,
-    boardId: string,
-) {
-    const isLast =
-        queryClient.isMutating({
-            mutationKey: cardOrderMutationKey(boardId),
-        }) === 1;
-    if (isLast) {
-        void queryClient.invalidateQueries({
-            queryKey: boardQueryOptions(boardId).queryKey,
-        });
-    }
-}
 
 export function useAddCard(boardId: string, listId: string) {
     const queryClient = useQueryClient();
@@ -68,7 +45,7 @@ export function useAddCard(boardId: string, listId: string) {
 
     // Not optimistic: the card enters the cache only with the id the server gave it.
     return useMutation({
-        ...cardOrderMutationOptions(boardId),
+        ...boardOrderMutationOptions(boardId),
         mutationFn: async (title: string) => {
             const card = await addCardServer({ data: { listId, title } });
             // null: the list is gone or belongs to someone else.
@@ -89,7 +66,7 @@ export function useAddCard(boardId: string, listId: string) {
                 ),
             );
         },
-        onSettled: () => invalidateAfterLastCardOrder(queryClient, boardId),
+        onSettled: () => invalidateAfterLastBoardOrder(queryClient, boardId),
     });
 }
 
@@ -142,7 +119,7 @@ export function useMoveCard(boardId: string) {
     const key = boardQueryOptions(boardId).queryKey;
 
     const { mutate } = useMutation({
-        ...cardOrderMutationOptions(boardId),
+        ...boardOrderMutationOptions(boardId),
         mutationFn: async (vars: MoveCardVars) => {
             await moveCardServer({ data: vars });
         },
@@ -157,7 +134,7 @@ export function useMoveCard(boardId: string) {
             );
             void queryClient.invalidateQueries({ queryKey: key });
         },
-        onSettled: () => invalidateAfterLastCardOrder(queryClient, boardId),
+        onSettled: () => invalidateAfterLastBoardOrder(queryClient, boardId),
     });
 
     /**
@@ -215,7 +192,7 @@ export function useMoveCard(boardId: string) {
 export function useIsCardSyncing(boardId: string, cardId: string) {
     const pending = useMutationState({
         filters: {
-            mutationKey: cardOrderMutationKey(boardId),
+            mutationKey: boardOrderMutationKey(boardId),
             status: 'pending',
             predicate: (mutation) => {
                 const vars = mutation.state.variables;
