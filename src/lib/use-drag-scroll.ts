@@ -33,6 +33,10 @@ function getSnapLefts(container: HTMLElement): number[] {
     const box = container.getBoundingClientRect();
     const viewportLeft = box.left + container.clientLeft;
     const maxLeft = container.scrollWidth - container.clientWidth;
+    // CSS snap aligns to the snapport inset by scroll-padding; 'auto' parses to NaN -> 0.
+    const style = getComputedStyle(container);
+    const padLeft = parseFloat(style.scrollPaddingLeft) || 0;
+    const padRight = parseFloat(style.scrollPaddingRight) || 0;
     const lefts: number[] = [];
     for (const child of container.children) {
         const align = getComputedStyle(child).scrollSnapAlign.split(' ').at(-1);
@@ -42,10 +46,10 @@ function getSnapLefts(container: HTMLElement): number[] {
         const offset = rect.left - viewportLeft + container.scrollLeft;
         const left =
             align === 'start'
-                ? offset
+                ? offset - padLeft
                 : align === 'center'
                   ? offset + rect.width / 2 - container.clientWidth / 2
-                  : offset + rect.width - container.clientWidth;
+                  : offset + rect.width - container.clientWidth + padRight;
         lefts.push(Math.min(Math.max(left, 0), maxLeft));
     }
     return lefts;
