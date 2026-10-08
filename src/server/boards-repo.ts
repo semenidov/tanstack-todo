@@ -11,6 +11,7 @@ import {
     eq,
     inArray,
     isNull,
+    max,
     min,
 } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
@@ -107,25 +108,25 @@ export async function seedDemoBoard(userId: string) {
         .insert(boards)
         .values({ ownerId: userId, title: DEMO_BOARD.title })
         .returning();
-    // Lists are shown by createdAt; one insert gives them the same now(), so
-    // the order is set explicitly, a millisecond apart.
-    const start = Date.now();
+    const listKeys = generateNKeysBetween(null, null, DEMO_BOARD.lists.length);
     const listRows = await db
         .insert(lists)
         .values(
             DEMO_BOARD.lists.map((list, i) => ({
                 boardId: board.id,
                 title: list.title,
-                createdAt: new Date(start + i),
+                position: listKeys[i],
             })),
         )
         .returning();
-    // RETURNING order is not guaranteed by Postgres; createdAt is.
-    listRows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    // RETURNING order is not guaranteed by Postgres: match the rows by key.
+    const listIdByKey = new Map(listRows.map((l) => [l.position, l.id]));
     const cardRows = DEMO_BOARD.lists.flatMap((list, i) => {
         const keys = generateNKeysBetween(null, null, list.cards.length);
+        const listId = listIdByKey.get(listKeys[i]);
+        if (!listId) throw new Error('Demo list was not inserted');
         return list.cards.map((card, j) => ({
-            listId: listRows[i].id,
+            listId,
             title: card.title,
             description: card.description,
             position: keys[j],
@@ -158,7 +159,7 @@ export async function getBoard(userId: string, boardId: string) {
             lists: {
                 columns: { deletedAt: false },
                 where: (l) => isNull(l.deletedAt),
-                orderBy: (l) => asc(l.createdAt),
+                orderBy: (l) => [asc(l.position), asc(l.id)],
                 with: {
                     cards: {
                         columns: { deletedAt: false },
@@ -175,6 +176,22 @@ export async function getBoard(userId: string, boardId: string) {
     return { board: boardFields, lists: boardLists };
 }
 
+// List order: like cards, `position` is a fractional-indexing key compared
+// byte-wise (COLLATE "C"), ties broken by id; keys are made only here.
+
+/**
+ * Key after the last list of the board, deleted ones included: a new list goes
+ * last, and Undo of a deleted list never finds its key taken by a newer one.
+ */
+async function lastListPositionKey(boardId: string) {
+    // An aggregate always returns one row; max is null for a board without lists.
+    const [last] = await db
+        .select({ position: max(lists.position) })
+        .from(lists)
+        .where(eq(lists.boardId, boardId));
+    return generateKeyBetween(last.position, null);
+}
+
 export async function addList(
     userId: string,
     boardId: string,
@@ -189,7 +206,11 @@ export async function addList(
         countLiveLists(boardId),
     );
 
-    const [row] = await db.insert(lists).values({ boardId, title }).returning();
+    const position = await lastListPositionKey(boardId);
+    const [row] = await db
+        .insert(lists)
+        .values({ boardId, title, position })
+        .returning();
     return row;
 }
 
@@ -249,6 +270,113 @@ export async function restoreList(
             ),
         )
         .returning();
+}
+
+/**
+ * Live neighbor lists on the target board, by id. Undefined if any given id is
+ * not a live list of that board (another board, deleted, missing).
+ */
+async function readListNeighbors(
+    boardId: string,
+    neighborIds: Array<string>,
+): Promise<Map<string, string> | undefined> {
+    if (neighborIds.length === 0) return new Map();
+    const rows = await db
+        .select({ id: lists.id, position: lists.position })
+        .from(lists)
+        .where(
+            and(
+                inArray(lists.id, neighborIds),
+                eq(lists.boardId, boardId),
+                isNull(lists.deletedAt),
+            ),
+        );
+    if (rows.length !== new Set(neighborIds).size) return undefined;
+    return new Map(rows.map((r) => [r.id, r.position]));
+}
+
+/**
+ * Gives every list of the board (deleted included, so Undo restores to the same
+ * place) a fresh key in the current order. Like renumberList: sequential updates
+ * without a transaction, a rare path.
+ */
+async function renumberLists(boardId: string) {
+    const rows = await db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(eq(lists.boardId, boardId))
+        .orderBy(asc(lists.position), asc(lists.id));
+    const keys = generateNKeysBetween(null, null, rows.length);
+    for (const [i, row] of rows.entries()) {
+        await db
+            .update(lists)
+            .set({ position: keys[i] })
+            .where(eq(lists.id, row.id));
+    }
+}
+
+/**
+ * Moves a list between two neighbors on the target board: its own board or
+ * another one of the same owner. Cards point at the list only, so they move with
+ * it untouched. Null on any refusal.
+ */
+export async function moveList(
+    userId: string,
+    listId: string,
+    toBoardId: string,
+    prevListId: string | null,
+    nextListId: string | null,
+    quotas: Quotas = USER_QUOTAS,
+) {
+    if (prevListId === listId || nextListId === listId) return null;
+    if (prevListId !== null && prevListId === nextListId) return null;
+
+    const list = await db.query.lists.findFirst({
+        where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
+        with: { board: true },
+    });
+    if (!list || list.board.ownerId !== userId) return null;
+
+    const targetBoard = await db.query.boards.findFirst({
+        where: (b) => and(eq(b.id, toBoardId), eq(b.ownerId, userId)),
+    });
+    if (!targetBoard) return null;
+    // A move onto another board adds a live list to it; within one board the count stays.
+    if (toBoardId !== list.boardId) {
+        await assertBelowQuota(QuotaKind.Lists, quotas, () =>
+            countLiveLists(toBoardId),
+        );
+    }
+
+    const neighborIds = [prevListId, nextListId].filter((id) => id !== null);
+    const positionOf = (map: Map<string, string>, id: string | null) =>
+        id === null ? null : (map.get(id) ?? null);
+
+    let neighbors = await readListNeighbors(toBoardId, neighborIds);
+    if (!neighbors) return null;
+    let position = keyBetween(
+        positionOf(neighbors, prevListId),
+        positionOf(neighbors, nextListId),
+    );
+    if (position === undefined) {
+        // Equal keys (two tabs, Undo onto a reused key): renumber and try once more.
+        await renumberLists(toBoardId);
+        neighbors = await readListNeighbors(toBoardId, neighborIds);
+        if (!neighbors) return null;
+        position = keyBetween(
+            positionOf(neighbors, prevListId),
+            positionOf(neighbors, nextListId),
+        );
+        // Still out of order: the client sent neighbors in a stale order.
+        if (position === undefined) return null;
+    }
+
+    const rows = await db
+        .update(lists)
+        .set({ boardId: toBoardId, position })
+        .where(and(eq(lists.id, listId), isNull(lists.deletedAt)))
+        .returning();
+    return rows.at(0) ?? null;
 }
 
 // Card order: `position` is a fractional-indexing key compared byte-wise (the column

@@ -29,6 +29,9 @@ export const lists = pgTable(
             .notNull()
             .references(() => boards.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
+        // Fractional-indexing key like cards.position: COLLATE "C" is set in the
+        // migration (drizzle has no column collation).
+        position: text('position').notNull(),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
         updatedAt: timestamp({ withTimezone: true })
             .defaultNow()
@@ -36,7 +39,7 @@ export const lists = pgTable(
             .$onUpdate(() => new Date()),
         deletedAt: timestamp('deleted_at', { withTimezone: true }),
     },
-    (t) => [index('lists_board_id_created_at_idx').on(t.boardId, t.createdAt)],
+    (t) => [index('lists_board_id_position_idx').on(t.boardId, t.position)],
 );
 
 export const cards = pgTable(

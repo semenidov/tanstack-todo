@@ -1,3 +1,4 @@
+import type { Ref } from 'react';
 import { Badge } from '#/components/ui/badge';
 import { EditableTitle } from '#/components/editable-title';
 
@@ -8,12 +9,16 @@ interface ListTitleProps {
     onStartEditing: () => void;
     onCancelEditing: () => void;
     onSave: (title: string) => void;
+    /** The title button is the list's drag handle: see `EditableTitle`. */
+    buttonRef?: Ref<HTMLButtonElement>;
+    'aria-describedby'?: string;
 }
 
 export function ListTitle({ count, ...props }: ListTitleProps) {
     return (
         <EditableTitle
             {...props}
+            spaceStartsDrag
             aria-label="List title"
             className="flex flex-1 items-center gap-2 rounded-sm text-sm font-medium"
             inputClassName="h-7 min-w-0 flex-1 px-2 text-sm font-medium"

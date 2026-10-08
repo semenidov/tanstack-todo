@@ -134,3 +134,17 @@ export async function pickUpWithMouse(page: Page, title: string) {
     });
     await expect(dndAnnouncement(page)).toHaveText(`Picked up card ${title}`);
 }
+
+/** List titles in board order (the board title button is in the h1). */
+export function listTitles(page: Page) {
+    return page
+        .locator('button:not(h1 button) > span[title]')
+        .allTextContents();
+}
+
+/** The title button of a list: its drag handle for the keyboard. */
+export function listTitleButton(page: Page, title: string) {
+    return page.locator('button:not(h1 button)', {
+        has: page.locator(`span[title="${title}"]`),
+    });
+}

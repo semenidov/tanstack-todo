@@ -5,11 +5,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '#/components/ui/select';
-import type { ListWithCards } from '#/lib/boards-query';
 
 interface ListSelectProps {
     id: string;
-    lists: Array<ListWithCards>;
+    /** Lists, or boards in the list's Move… window: only id and title are read. */
+    lists: Array<{ id: string; title: string }>;
     value: string;
     onValueChange: (listId: string) => void;
 }

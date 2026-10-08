@@ -47,6 +47,28 @@ describe('GUEST_QUOTAS', () => {
         expect(moveErrorMessage(error(QuotaKind.Cards), 'x')).toBe(
             "Can't move: this list already has 50 cards.",
         );
+        expect(moveErrorMessage(error(QuotaKind.Lists), 'x')).toBe(
+            "Can't move: this board already has 10 lists.",
+        );
+    });
+});
+
+describe('moveErrorMessage', () => {
+    it('says the target board is full for a refused list move', () => {
+        const error = overTheWire(new QuotaExceededError(QuotaKind.Lists, 30));
+        expect(moveErrorMessage(error, 'fallback')).toBe(
+            "Can't move: this board already has 30 lists.",
+        );
+    });
+
+    it('falls back for a board quota or any other error', () => {
+        const boards = overTheWire(
+            new QuotaExceededError(QuotaKind.Boards, 20),
+        );
+        expect(moveErrorMessage(boards, 'fallback')).toBe('fallback');
+        expect(
+            moveErrorMessage(new Error('List was not moved'), 'fallback'),
+        ).toBe('fallback');
     });
 });
 

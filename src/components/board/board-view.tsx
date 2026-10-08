@@ -43,8 +43,8 @@ export function BoardView({ board, lists }: BoardData) {
         [dragScrollRef],
     );
 
-    // Scroll to a newly added list after it is rendered. Lists are ordered by createdAt,
-    // so the new one is always the last column before AddList.
+    // Scroll to a newly added list after it is rendered. A new list gets a key after
+    // all others, so it is always the last column before AddList.
     useLayoutEffect(() => {
         const prevCount = prevListCountRef.current;
         prevListCountRef.current = lists.length;
@@ -133,7 +133,7 @@ export function BoardView({ board, lists }: BoardData) {
                             {shownLists.map((list) => (
                                 <ListColumn
                                     key={list.id}
-                                    boardId={board.id}
+                                    board={board}
                                     list={list}
                                     allLists={shownLists}
                                 />

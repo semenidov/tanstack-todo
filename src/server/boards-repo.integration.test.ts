@@ -18,17 +18,16 @@ import {
     updateCard,
 } from '#/server/boards-repo';
 import { seedUser } from '#/test/db';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 
 const MISSING_ID = '00000000-0000-0000-0000-000000000000';
 
 /** A board with «To do» and «Done» lists; `createBoard` itself creates an empty board. */
 async function seedBoard(userId: string, title: string) {
     const board = await createBoard(userId, title);
-    const now = Date.now();
     await db.insert(lists).values([
-        { boardId: board.id, title: 'To do', createdAt: new Date(now) },
-        { boardId: board.id, title: 'Done', createdAt: new Date(now + 1) },
+        { boardId: board.id, title: 'To do', position: 'a0' },
+        { boardId: board.id, title: 'Done', position: 'a1' },
     ]);
     return board;
 }
@@ -39,7 +38,7 @@ function listsOf(boardId: string) {
         .select()
         .from(lists)
         .where(eq(lists.boardId, boardId))
-        .orderBy(lists.createdAt);
+        .orderBy(asc(lists.position), asc(lists.id));
 }
 
 async function cardRow(cardId: string) {
@@ -230,14 +229,10 @@ describe('deleteBoard', () => {
 });
 
 describe('getBoard', () => {
-    it('returns lists ascending by createdAt and cards in their position order', async () => {
+    it('returns lists and cards in their position order', async () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
-        const boardLists = await db
-            .select()
-            .from(lists)
-            .where(eq(lists.boardId, board.id))
-            .orderBy(lists.createdAt);
+        const boardLists = await listsOf(board.id);
         const [todoList] = boardLists;
 
         const older = await addCard(a.id, todoList.id, 'older');
@@ -550,7 +545,11 @@ describe('moveCard', () => {
             .returning();
         const [otherList] = await db
             .insert(lists)
-            .values({ boardId: otherBoard.id, title: 'Other list' })
+            .values({
+                boardId: otherBoard.id,
+                title: 'Other list',
+                position: 'a0',
+            })
             .returning();
 
         const row = await moveCard(a.id, card!.id, otherList.id, null, null);

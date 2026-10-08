@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { Input } from '#/components/ui/input';
 import { cn } from 'cn';
 
@@ -14,6 +14,14 @@ interface EditableTitleProps {
     'aria-label': string;
     /** Extra button content next to the title, e.g. a counter. */
     children?: ReactNode;
+    /**
+     * The button is a drag handle (a list column): Space picks it up, so the
+     * native Space click must not start editing. Enter and click still do.
+     */
+    spaceStartsDrag?: boolean;
+    buttonRef?: Ref<HTMLButtonElement>;
+    /** The drag instructions of a drag handle. */
+    'aria-describedby'?: string;
     onStartEditing: () => void;
     onCancelEditing: () => void;
     onSave: (title: string) => void;
@@ -28,6 +36,9 @@ export function EditableTitle({
     inputClassName,
     'aria-label': ariaLabel,
     children,
+    spaceStartsDrag = false,
+    buttonRef,
+    'aria-describedby': ariaDescribedBy,
     onStartEditing,
     onCancelEditing,
     onSave,
@@ -66,8 +77,14 @@ export function EditableTitle({
 
     return (
         <button
+            ref={buttonRef}
             type="button"
             onClick={onStartEditing}
+            // A button clicks on Space keyup; cancelling the keyup cancels the click.
+            onKeyUp={(e) => {
+                if (spaceStartsDrag && e.key === ' ') e.preventDefault();
+            }}
+            aria-describedby={ariaDescribedBy}
             disabled={disabled}
             className={cn('min-w-0 text-left', className)}
         >

@@ -77,3 +77,45 @@ describe('EditableTitle', () => {
         expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
     });
 });
+
+describe('EditableTitle as a drag handle', () => {
+    function renderHandle() {
+        const onStartEditing = vi.fn();
+        render(
+            <EditableTitle
+                title="To do"
+                isEditing={false}
+                aria-label="List title"
+                spaceStartsDrag
+                onStartEditing={onStartEditing}
+                onCancelEditing={() => {}}
+                onSave={() => {}}
+            />,
+        );
+        return {
+            onStartEditing,
+            button: screen.getByRole('button', { name: 'To do' }),
+        };
+    }
+
+    it('does not start editing on Space: Space picks the list up', async () => {
+        const user = userEvent.setup();
+        const { onStartEditing, button } = renderHandle();
+
+        button.focus();
+        await user.keyboard(' ');
+
+        expect(onStartEditing).not.toHaveBeenCalled();
+    });
+
+    it('still starts editing on Enter and on click', async () => {
+        const user = userEvent.setup();
+        const { onStartEditing, button } = renderHandle();
+
+        button.focus();
+        await user.keyboard('{Enter}');
+        await user.click(button);
+
+        expect(onStartEditing).toHaveBeenCalledTimes(2);
+    });
+});
