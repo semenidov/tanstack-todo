@@ -48,6 +48,7 @@ const board: BoardData = {
         {
             id: 'list-1',
             boardId: 'board-1',
+            position: 'a0',
             title: 'Todo',
             createdAt: new Date(0),
             updatedAt: new Date(0),

@@ -28,6 +28,7 @@ const boardKey = boardQueryOptions('board-1').queryKey;
 const savedList: SavedList = {
     id: 'server-list-id',
     boardId: 'board-1',
+    position: 'a0',
     title: 'Done',
     createdAt: new Date(0),
     updatedAt: new Date(0),

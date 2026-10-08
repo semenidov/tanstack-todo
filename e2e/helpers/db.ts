@@ -31,11 +31,9 @@ export async function seedBoard(email: string, title = 'My tasks') {
         .insert(boards)
         .values({ ownerId: owner.id, title })
         .returning({ id: boards.id });
-    // Explicit createdAt keeps list order stable.
-    const now = Date.now();
     await db.insert(lists).values([
-        { boardId: board.id, title: 'To do', createdAt: new Date(now) },
-        { boardId: board.id, title: 'Done', createdAt: new Date(now + 1) },
+        { boardId: board.id, title: 'To do', position: 'a0' },
+        { boardId: board.id, title: 'Done', position: 'a1' },
     ]);
     return board.id;
 }

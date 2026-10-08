@@ -7,6 +7,7 @@ import { GUEST_CAP_CODE } from '#/lib/guest';
 import { MAX_ACTIVE_GUESTS } from '#/lib/quotas';
 import { addCardAs, addListAs, createBoardAs } from '#/server/board-writes';
 import { getBoard } from '#/server/boards-repo';
+import { moveListOrThrow } from '#/server/move-list';
 import { seedUser } from '#/test/db';
 import { count, eq, inArray, sql } from 'drizzle-orm';
 
@@ -61,7 +62,7 @@ async function seedContent(ownerId: string) {
         .returning();
     const [list] = await db
         .insert(lists)
-        .values({ boardId: board.id, title: 'List' })
+        .values({ boardId: board.id, title: 'List', position: 'a0' })
         .returning();
     const [card] = await db
         .insert(cards)
@@ -133,6 +134,32 @@ describe('guest sign-in', () => {
         expect(demo?.lists[1].cards[0].title).toBe(
             '👋 Try me: drag this card to Done',
         );
+    });
+
+    it('lets the guest move a list of the demo board', async () => {
+        const { res } = await signInAsGuest();
+        const body: { user: { id: string } } = await res.json();
+        const guest = { id: body.user.id, isAnonymous: true };
+        const [demoBoard] = await db
+            .select()
+            .from(boards)
+            .where(eq(boards.ownerId, guest.id));
+        const before = await getBoard(guest.id, demoBoard.id);
+        const [first, ...rest] = before?.lists.map((l) => l.id) ?? [];
+
+        await moveListOrThrow(guest, {
+            listId: first,
+            toBoardId: demoBoard.id,
+            prevListId: rest[0],
+            nextListId: rest[1] ?? null,
+        });
+
+        const after = await getBoard(guest.id, demoBoard.id);
+        expect(after?.lists.map((l) => l.id)).toEqual([
+            rest[0],
+            first,
+            ...rest.slice(1),
+        ]);
     });
 
     it('deletes only guests older than 7 days, with their data', async () => {

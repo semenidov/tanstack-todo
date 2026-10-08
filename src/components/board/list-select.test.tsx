@@ -13,6 +13,7 @@ const lists: Array<ListWithCards> = [
     {
         id: 'a',
         boardId: 'board-1',
+        position: 'a0',
         title: LONG_TITLE,
         createdAt: new Date(0),
         updatedAt: new Date(0),

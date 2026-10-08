@@ -10,6 +10,8 @@ import {
     dragCardWithKeys,
     gotoBoard,
     listColumn,
+    listTitleButton,
+    listTitles,
     moveCardTo,
     pickUpWithMouse,
     waitForSavedMoves,
@@ -388,4 +390,85 @@ test('a card dropped outside the lists or cancelled with Esc stays in place', as
     await expect
         .poll(() => cardTitles(page, 'To do'))
         .toEqual(['Card 1', 'Card 2']);
+});
+
+test('drags a list by its header with the mouse and keeps the order after reload', async ({
+    page,
+}) => {
+    await addCard(page, 'To do', 'Rides along');
+    const saved = waitForSavedMoves(page, 1);
+    const from = await listTitleButton(page, 'To do').boundingBox();
+    const to = await listColumn(page, 'Done').boundingBox();
+    if (!from || !to) throw new Error('No lists');
+
+    await page.mouse.move(from.x + 10, from.y + from.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 20, from.y + from.height / 2, { steps: 3 });
+    await expect(dndAnnouncement(page)).toHaveText('Picked up list To do');
+    await page.mouse.move(to.x + to.width / 2 + 10, from.y + from.height / 2, {
+        steps: 15,
+    });
+    await expect(dndAnnouncement(page)).toHaveText(
+        'List To do, position 2 of 2',
+    );
+    await page.mouse.up();
+
+    await expect.poll(() => listTitles(page)).toEqual(['Done', 'To do']);
+    // The drag started on the title button, but the rename did not open.
+    await expect(
+        page.getByRole('textbox', { name: 'List title', exact: true }),
+    ).toHaveCount(0);
+    await saved;
+    await page.reload();
+    await expect.poll(() => listTitles(page)).toEqual(['Done', 'To do']);
+    await expect.poll(() => cardTitles(page, 'To do')).toEqual(['Rides along']);
+});
+
+test('drags a list with the keyboard: Space picks it up instead of renaming', async ({
+    page,
+}) => {
+    await addList(page, 'Later');
+    await expect
+        .poll(() => listTitles(page))
+        .toEqual(['To do', 'Done', 'Later']);
+    await page.getByLabel('New list title').press('Escape');
+    const saved = waitForSavedMoves(page, 1);
+
+    await listTitleButton(page, 'To do').focus();
+    await page.keyboard.press('Space');
+    await expect(dndAnnouncement(page)).toHaveText('Picked up list To do');
+    await expect(
+        page.getByRole('textbox', { name: 'List title', exact: true }),
+    ).toHaveCount(0);
+    await page.keyboard.press('ArrowRight');
+    await expect(dndAnnouncement(page)).toHaveText(
+        'List To do, position 2 of 3',
+    );
+    await page.keyboard.press('ArrowRight');
+    await expect(dndAnnouncement(page)).toHaveText(
+        'List To do, position 3 of 3',
+    );
+    await page.keyboard.press('Space');
+    await expect(dndAnnouncement(page)).toHaveText(
+        'List To do dropped, position 3 of 3',
+    );
+
+    await expect
+        .poll(() => listTitles(page))
+        .toEqual(['Done', 'Later', 'To do']);
+    await expect(
+        page.getByRole('textbox', { name: 'List title', exact: true }),
+    ).toHaveCount(0);
+    // Enter still renames.
+    await listTitleButton(page, 'Done').focus();
+    await page.keyboard.press('Enter');
+    await expect(
+        page.getByRole('textbox', { name: 'List title', exact: true }),
+    ).toBeFocused();
+    await page.keyboard.press('Escape');
+    await saved;
+    await page.reload();
+    await expect
+        .poll(() => listTitles(page))
+        .toEqual(['Done', 'Later', 'To do']);
 });

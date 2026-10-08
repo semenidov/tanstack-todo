@@ -17,6 +17,7 @@ import {
     deleteCard,
     deleteList,
     moveCard,
+    moveList,
     restoreCard,
     restoreList,
 } from '#/server/boards-repo';
@@ -28,6 +29,7 @@ import {
     restoreListAs,
 } from '#/server/board-writes';
 import { moveCardOrThrow } from '#/server/move-card';
+import { moveListOrThrow } from '#/server/move-list';
 import { seedUser } from '#/test/db';
 import { and, count, eq, isNull } from 'drizzle-orm';
 import { generateNKeysBetween } from 'fractional-indexing';
@@ -42,9 +44,16 @@ async function seedBoards(userId: string, n: number) {
 }
 
 async function seedLists(boardId: string, n: number) {
+    const keys = generateNKeysBetween(null, null, n);
     return db
         .insert(lists)
-        .values(range(n).map((i) => ({ boardId, title: `List ${i}` })))
+        .values(
+            keys.map((position, i) => ({
+                boardId,
+                title: `List ${i}`,
+                position,
+            })),
+        )
         .returning();
 }
 
@@ -264,6 +273,49 @@ describe('move and quotas', () => {
         const row = await moveCard(user.id, card.id, target.id, null, null);
         expect(row?.listId).toBe(target.id);
     });
+
+    it('refuses to move a list onto a full board', async () => {
+        const user = await seedUser();
+        const [full, other] = await seedBoards(user.id, 2);
+        await seedLists(full.id, MAX_LISTS_PER_BOARD);
+        const [list] = await seedLists(other.id, 1);
+
+        await expect(
+            moveList(user.id, list.id, full.id, null, null),
+        ).rejects.toThrow(
+            new QuotaExceededError(QuotaKind.Lists, MAX_LISTS_PER_BOARD),
+        );
+        const [row] = await db
+            .select()
+            .from(lists)
+            .where(eq(lists.id, list.id));
+        expect([row.boardId, row.position]).toEqual([other.id, list.position]);
+    });
+
+    it('moves a list within a full board', async () => {
+        const user = await seedUser();
+        const [board] = await seedBoards(user.id, 1);
+        const seeded = await seedLists(board.id, MAX_LISTS_PER_BOARD);
+
+        const row = await moveList(
+            user.id,
+            seeded[0].id,
+            board.id,
+            seeded[1].id,
+            seeded[2].id,
+        );
+        expect(row?.boardId).toBe(board.id);
+    });
+
+    it('moves a list onto a board one below the limit', async () => {
+        const user = await seedUser();
+        const [target, other] = await seedBoards(user.id, 2);
+        await seedLists(target.id, MAX_LISTS_PER_BOARD - 1);
+        const [list] = await seedLists(other.id, 1);
+
+        const row = await moveList(user.id, list.id, target.id, null, null);
+        expect(row?.boardId).toBe(target.id);
+    });
 });
 
 // The server fns call these with the session user; each insert path is checked
@@ -337,6 +389,22 @@ describe('guest quotas on every insert path', () => {
                 nextCardId: null,
             }),
         ).rejects.toThrow(guestLimit(QuotaKind.Cards));
+    });
+
+    it('moveList: refuses a move onto a board with 10 lists', async () => {
+        const guest = await seedGuest();
+        const [full, other] = await seedBoards(guest.id, 2);
+        await seedLists(full.id, GUEST_QUOTAS[QuotaKind.Lists]);
+        const [list] = await seedLists(other.id, 1);
+
+        await expect(
+            moveListOrThrow(guest, {
+                listId: list.id,
+                toBoardId: full.id,
+                prevListId: null,
+                nextListId: null,
+            }),
+        ).rejects.toThrow(guestLimit(QuotaKind.Lists));
     });
 
     it('restoreCard: refuses when the list is full again', async () => {

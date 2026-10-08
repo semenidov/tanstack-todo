@@ -4,10 +4,14 @@ import {
     addListToBoard,
     cardIndexAfterNeighbors,
     cardMoveNeighbors,
+    compareListOrder,
     findCardInBoard,
     isSameCardSpot,
+    isSameListSpot,
     cardLinkId,
+    listMoveNeighbors,
     moveCardInBoard,
+    moveListInBoard,
     removeCardFromBoard,
     removeBoardFromList,
     removeListFromBoard,
@@ -39,6 +43,7 @@ function makeList(
     return {
         id,
         boardId: 'board-1',
+        position: 'a0',
         title,
         createdAt: new Date(0),
         updatedAt: new Date(0),
@@ -395,23 +400,39 @@ describe('boards list cache', () => {
     });
 });
 
-function at<T extends { createdAt: Date }>(item: T, ms: number): T {
-    return { ...item, createdAt: new Date(ms) };
+function at<T extends { position: string }>(item: T, position: string): T {
+    return { ...item, position };
 }
 
 describe('restoreListToBoard', () => {
-    it('puts the list back between older and newer lists', () => {
-        const board = makeBoard([at(makeList('a'), 1), at(makeList('c'), 3)]);
-        const next = restoreListToBoard(board, at(makeList('b'), 2));
+    it('puts the list back by position, compared byte-wise', () => {
+        const board = makeBoard([
+            at(makeList('a'), 'Zz'),
+            at(makeList('c'), 'a1'),
+        ]);
+        const next = restoreListToBoard(board, at(makeList('b'), 'a0'));
         expect(next.lists.map((l) => l.id)).toEqual(['a', 'b', 'c']);
     });
 
-    it('puts the newest list at the end and the oldest at the start', () => {
-        const board = makeBoard([at(makeList('b'), 2)]);
-        const withNewest = restoreListToBoard(board, at(makeList('c'), 3));
-        const withOldest = restoreListToBoard(board, at(makeList('a'), 1));
-        expect(withNewest.lists.map((l) => l.id)).toEqual(['b', 'c']);
-        expect(withOldest.lists.map((l) => l.id)).toEqual(['a', 'b']);
+    it('puts the list back at its key after other lists moved', () => {
+        // Created first, but its key is now after the others.
+        const board = makeBoard([
+            at(makeList('a'), 'a0'),
+            at(makeList('c'), 'a2'),
+        ]);
+        const next = restoreListToBoard(board, {
+            ...at(makeList('b'), 'a1'),
+            createdAt: new Date(-1),
+        });
+        expect(next.lists.map((l) => l.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('puts the last list at the end and the first at the start', () => {
+        const board = makeBoard([at(makeList('b'), 'a1')]);
+        const withLast = restoreListToBoard(board, at(makeList('c'), 'a2'));
+        const withFirst = restoreListToBoard(board, at(makeList('a'), 'a0'));
+        expect(withLast.lists.map((l) => l.id)).toEqual(['b', 'c']);
+        expect(withFirst.lists.map((l) => l.id)).toEqual(['a', 'b']);
     });
 
     it('keeps the cards of the restored list', () => {
@@ -472,5 +493,107 @@ describe('restoreCardToBoard', () => {
     it('does nothing if the card is already on the board', () => {
         const board = makeBoard([makeList('list-1', 'List', [makeCard('a')])]);
         expect(restoreCardToBoard(board, makeCard('a'))).toBe(board);
+    });
+});
+
+describe('compareListOrder', () => {
+    it('orders by position byte-wise, then by id', () => {
+        const lists = [
+            at(makeList('b'), 'a0'),
+            at(makeList('c'), 'Zz'),
+            at(makeList('a'), 'a0'),
+        ];
+        expect(lists.sort(compareListOrder).map((l) => l.id)).toEqual([
+            'c',
+            'a',
+            'b',
+        ]);
+    });
+});
+
+describe('moveListInBoard', () => {
+    const board = makeBoard([makeList('a'), makeList('b'), makeList('c')]);
+    const listIds = (b: BoardData) => b.lists.map((l) => l.id);
+
+    it('moves a list right and left by the index without it', () => {
+        expect(listIds(moveListInBoard(board, 'a', 2))).toEqual([
+            'b',
+            'c',
+            'a',
+        ]);
+        expect(listIds(moveListInBoard(board, 'c', 0))).toEqual([
+            'c',
+            'a',
+            'b',
+        ]);
+        expect(listIds(moveListInBoard(board, 'a', 1))).toEqual([
+            'b',
+            'a',
+            'c',
+        ]);
+    });
+
+    it('keeps the cards of the moved list', () => {
+        const withCards = makeBoard([
+            makeList('a', 'a', [makeCard('x')]),
+            makeList('b'),
+        ]);
+        const next = moveListInBoard(withCards, 'a', 1);
+        expect(next.lists[1].cards.map((c) => c.id)).toEqual(['x']);
+    });
+
+    it('returns the board as is for an unknown list', () => {
+        expect(moveListInBoard(board, 'missing', 0)).toBe(board);
+    });
+});
+
+describe('listMoveNeighbors', () => {
+    const board = makeBoard([makeList('a'), makeList('b'), makeList('c')]);
+
+    it('gives the lists around the index, counted without the moved list', () => {
+        expect(listMoveNeighbors(board, 'a', 0)).toEqual({
+            prevListId: null,
+            nextListId: 'b',
+        });
+        expect(listMoveNeighbors(board, 'a', 1)).toEqual({
+            prevListId: 'b',
+            nextListId: 'c',
+        });
+        expect(listMoveNeighbors(board, 'a', 2)).toEqual({
+            prevListId: 'c',
+            nextListId: null,
+        });
+    });
+
+    it('gives neighbors on another board, where the list is not yet', () => {
+        expect(listMoveNeighbors(board, 'other', 0)).toEqual({
+            prevListId: null,
+            nextListId: 'a',
+        });
+        expect(listMoveNeighbors(board, 'other', 3)).toEqual({
+            prevListId: 'c',
+            nextListId: null,
+        });
+    });
+
+    it('gives no neighbors on an empty board', () => {
+        expect(listMoveNeighbors(makeBoard([]), 'other', 0)).toEqual({
+            prevListId: null,
+            nextListId: null,
+        });
+    });
+});
+
+describe('isSameListSpot', () => {
+    const board = makeBoard([makeList('a'), makeList('b')]);
+
+    it('is true for the current index and false for another', () => {
+        expect(isSameListSpot(board, 'a', 0)).toBe(true);
+        expect(isSameListSpot(board, 'a', 1)).toBe(false);
+        expect(isSameListSpot(board, 'b', 1)).toBe(true);
+    });
+
+    it('is true for a list not on the board: nothing to move', () => {
+        expect(isSameListSpot(board, 'missing', 0)).toBe(true);
     });
 });

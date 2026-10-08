@@ -49,6 +49,7 @@ function makeList(id: string, cardIds: Array<string>): ListWithCards {
     return {
         id,
         boardId: 'board-1',
+        position: 'a0',
         title: `List ${id}`,
         createdAt: new Date(0),
         updatedAt: new Date(0),
