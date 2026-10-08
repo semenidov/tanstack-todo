@@ -22,6 +22,7 @@ export default [
             '.nitro/**',
             '.vercel/**',
             'dist/**',
+            'src/routeTree.gen.ts',
         ],
     },
 ];

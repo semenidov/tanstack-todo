@@ -8,202 +8,202 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root';
-import { Route as IndexRouteImport } from './routes/index';
-import { Route as LoginRouteImport } from './routes/login';
-import { Route as SignupRouteImport } from './routes/signup';
-import { Route as BBoardIdRouteRouteImport } from './routes/b/$boardId/route';
-import { Route as BoardsIndexRouteImport } from './routes/boards/index';
-import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$';
-import { Route as BBoardIdCCardIdRouteImport } from './routes/b/$boardId/c/$cardId';
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as BBoardIdRouteRouteImport } from './routes/b/$boardId/route'
+import { Route as BoardsIndexRouteImport } from './routes/boards/index'
+import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as BBoardIdCCardIdRouteImport } from './routes/b/$boardId/c/$cardId'
 
 const IndexRoute = IndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
-    id: '/login',
-    path: '/login',
-    getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
-    id: '/signup',
-    path: '/signup',
-    getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BBoardIdRouteRoute = BBoardIdRouteRouteImport.update({
-    id: '/b/$boardId',
-    path: '/b/$boardId',
-    getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/b/$boardId',
+  path: '/b/$boardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BoardsIndexRoute = BoardsIndexRouteImport.update({
-    id: '/boards/',
-    path: '/boards/',
-    getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/boards/',
+  path: '/boards/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
-    id: '/api/auth/$',
-    path: '/api/auth/$',
-    getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BBoardIdCCardIdRoute = BBoardIdCCardIdRouteImport.update({
-    id: '/c/$cardId',
-    path: '/c/$cardId',
-    getParentRoute: () => BBoardIdRouteRoute,
-} as any);
+  id: '/c/$cardId',
+  path: '/c/$cardId',
+  getParentRoute: () => BBoardIdRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-    '/': typeof IndexRoute;
-    '/login': typeof LoginRoute;
-    '/signup': typeof SignupRoute;
-    '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
-    '/boards/': typeof BoardsIndexRoute;
-    '/api/auth/$': typeof ApiAuthSplatRoute;
-    '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/b/$boardId': typeof BBoardIdRouteRouteWithChildren
+  '/boards/': typeof BoardsIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute
 }
 export interface FileRoutesByTo {
-    '/': typeof IndexRoute;
-    '/login': typeof LoginRoute;
-    '/signup': typeof SignupRoute;
-    '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
-    '/boards': typeof BoardsIndexRoute;
-    '/api/auth/$': typeof ApiAuthSplatRoute;
-    '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/b/$boardId': typeof BBoardIdRouteRouteWithChildren
+  '/boards': typeof BoardsIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute
 }
 export interface FileRoutesById {
-    __root__: typeof rootRouteImport;
-    '/': typeof IndexRoute;
-    '/login': typeof LoginRoute;
-    '/signup': typeof SignupRoute;
-    '/b/$boardId': typeof BBoardIdRouteRouteWithChildren;
-    '/boards/': typeof BoardsIndexRoute;
-    '/api/auth/$': typeof ApiAuthSplatRoute;
-    '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/signup': typeof SignupRoute
+  '/b/$boardId': typeof BBoardIdRouteRouteWithChildren
+  '/boards/': typeof BoardsIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/b/$boardId/c/$cardId': typeof BBoardIdCCardIdRoute
 }
 export interface FileRouteTypes {
-    fileRoutesByFullPath: FileRoutesByFullPath;
-    fullPaths:
-        | '/'
-        | '/login'
-        | '/signup'
-        | '/b/$boardId'
-        | '/boards/'
-        | '/api/auth/$'
-        | '/b/$boardId/c/$cardId';
-    fileRoutesByTo: FileRoutesByTo;
-    to:
-        | '/'
-        | '/login'
-        | '/signup'
-        | '/b/$boardId'
-        | '/boards'
-        | '/api/auth/$'
-        | '/b/$boardId/c/$cardId';
-    id:
-        | '__root__'
-        | '/'
-        | '/login'
-        | '/signup'
-        | '/b/$boardId'
-        | '/boards/'
-        | '/api/auth/$'
-        | '/b/$boardId/c/$cardId';
-    fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/b/$boardId'
+    | '/boards/'
+    | '/api/auth/$'
+    | '/b/$boardId/c/$cardId'
+  fileRoutesByTo: FileRoutesByTo
+  to:
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/b/$boardId'
+    | '/boards'
+    | '/api/auth/$'
+    | '/b/$boardId/c/$cardId'
+  id:
+    | '__root__'
+    | '/'
+    | '/login'
+    | '/signup'
+    | '/b/$boardId'
+    | '/boards/'
+    | '/api/auth/$'
+    | '/b/$boardId/c/$cardId'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-    IndexRoute: typeof IndexRoute;
-    LoginRoute: typeof LoginRoute;
-    SignupRoute: typeof SignupRoute;
-    BBoardIdRouteRoute: typeof BBoardIdRouteRouteWithChildren;
-    BoardsIndexRoute: typeof BoardsIndexRoute;
-    ApiAuthSplatRoute: typeof ApiAuthSplatRoute;
+  IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
+  SignupRoute: typeof SignupRoute
+  BBoardIdRouteRoute: typeof BBoardIdRouteRouteWithChildren
+  BoardsIndexRoute: typeof BoardsIndexRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
 declare module '@tanstack/react-router' {
-    interface FileRoutesByPath {
-        '/': {
-            id: '/';
-            path: '/';
-            fullPath: '/';
-            preLoaderRoute: typeof IndexRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/login': {
-            id: '/login';
-            path: '/login';
-            fullPath: '/login';
-            preLoaderRoute: typeof LoginRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/signup': {
-            id: '/signup';
-            path: '/signup';
-            fullPath: '/signup';
-            preLoaderRoute: typeof SignupRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/b/$boardId': {
-            id: '/b/$boardId';
-            path: '/b/$boardId';
-            fullPath: '/b/$boardId';
-            preLoaderRoute: typeof BBoardIdRouteRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/boards/': {
-            id: '/boards/';
-            path: '/boards';
-            fullPath: '/boards/';
-            preLoaderRoute: typeof BoardsIndexRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/api/auth/$': {
-            id: '/api/auth/$';
-            path: '/api/auth/$';
-            fullPath: '/api/auth/$';
-            preLoaderRoute: typeof ApiAuthSplatRouteImport;
-            parentRoute: typeof rootRouteImport;
-        };
-        '/b/$boardId/c/$cardId': {
-            id: '/b/$boardId/c/$cardId';
-            path: '/c/$cardId';
-            fullPath: '/b/$boardId/c/$cardId';
-            preLoaderRoute: typeof BBoardIdCCardIdRouteImport;
-            parentRoute: typeof BBoardIdRouteRoute;
-        };
+  interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/b/$boardId': {
+      id: '/b/$boardId'
+      path: '/b/$boardId'
+      fullPath: '/b/$boardId'
+      preLoaderRoute: typeof BBoardIdRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/boards/': {
+      id: '/boards/'
+      path: '/boards'
+      fullPath: '/boards/'
+      preLoaderRoute: typeof BoardsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/b/$boardId/c/$cardId': {
+      id: '/b/$boardId/c/$cardId'
+      path: '/c/$cardId'
+      fullPath: '/b/$boardId/c/$cardId'
+      preLoaderRoute: typeof BBoardIdCCardIdRouteImport
+      parentRoute: typeof BBoardIdRouteRoute
+    }
+  }
 }
 
 interface BBoardIdRouteRouteChildren {
-    BBoardIdCCardIdRoute: typeof BBoardIdCCardIdRoute;
+  BBoardIdCCardIdRoute: typeof BBoardIdCCardIdRoute
 }
 
 const BBoardIdRouteRouteChildren: BBoardIdRouteRouteChildren = {
-    BBoardIdCCardIdRoute: BBoardIdCCardIdRoute,
-};
+  BBoardIdCCardIdRoute: BBoardIdCCardIdRoute,
+}
 
 const BBoardIdRouteRouteWithChildren = BBoardIdRouteRoute._addFileChildren(
-    BBoardIdRouteRouteChildren,
-);
+  BBoardIdRouteRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
-    IndexRoute: IndexRoute,
-    LoginRoute: LoginRoute,
-    SignupRoute: SignupRoute,
-    BBoardIdRouteRoute: BBoardIdRouteRouteWithChildren,
-    BoardsIndexRoute: BoardsIndexRoute,
-    ApiAuthSplatRoute: ApiAuthSplatRoute,
-};
+  IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
+  SignupRoute: SignupRoute,
+  BBoardIdRouteRoute: BBoardIdRouteRouteWithChildren,
+  BoardsIndexRoute: BoardsIndexRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
+}
 export const routeTree = rootRouteImport
-    ._addFileChildren(rootRouteChildren)
-    ._addFileTypes<FileRouteTypes>();
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from './router.tsx';
-import type { startInstance } from './start.ts';
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
-    interface Register {
-        ssr: true;
-        router: Awaited<ReturnType<typeof getRouter>>;
-        config: Awaited<ReturnType<typeof startInstance.getOptions>>;
-    }
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
 }
