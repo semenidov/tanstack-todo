@@ -128,19 +128,19 @@ JSON прогона фичи - скрытый блок `<!-- run-stats:json ... 
 
 ### kind (режим: W работа, ⏳ ожидание)
 
-| kind      | режим | что                                   | как определяется (collect)                                         |
-| --------- | ----- | ------------------------------------- | ------------------------------------------------------------------ |
-| `explore` | W     | чтение до первой правки               | вызовы без правок до первой правки захода                          |
-| `schema`  | W     | схема, миграции                       | `drizzle-kit`, `db:generate`, `ALTER`, файлы `drizzle/`, `src/db/` |
-| `build`   | W     | код + unit/integration одного куска   | остальная работа                                                   |
-| `e2e`     | W     | e2e-тесты                             | файлы `e2e/`, `playwright`                                         |
-| `docs`    | W     | DOCUMENTATION, DECISIONS, описание PR | эти файлы, `gh pr edit --body`                                     |
-| `ship`    | W     | commit, push, PR, метки               | `git commit/push`, `gh pr create`, метки                           |
-| `wait_ci` | ⏳    | implementer ждёт CI                   | `gh pr checks --watch`, `gh run watch`                             |
-| `ci`      | ⏳    | прогон CI                             | `gh run list` (workflow CI)                                        |
-| `verify`  | ⏳    | прогон verifier                       | `gh run list` (workflow Verify)                                    |
-| `triage`  | W     | основная сессия: вердикт → правки     | от комментария `[verifier]` до старта следующего захода impl       |
-| `accept`  | ⏳    | приёмка владельцем                    | ready → апрув                                                      |
+| kind      | режим | что                                                                                          | как определяется (collect)                                         |
+| --------- | ----- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `explore` | W     | чтение до первой правки                                                                      | вызовы без правок до первой правки захода                          |
+| `schema`  | W     | схема, миграции                                                                              | `drizzle-kit`, `db:generate`, `ALTER`, файлы `drizzle/`, `src/db/` |
+| `build`   | W     | код + unit/integration одного куска                                                          | остальная работа                                                   |
+| `e2e`     | W     | e2e-тесты                                                                                    | файлы `e2e/`, `playwright`                                         |
+| `docs`    | W     | DOCUMENTATION, DECISIONS, описание PR                                                        | эти файлы, `gh pr edit --body`                                     |
+| `ship`    | W     | commit, push, PR, метки                                                                      | `git commit/push`, `gh pr create`, метки                           |
+| `wait_ci` | ⏳    | старый цикл: implementer ждёт CI сам; в новом ждёт основная сессия, в транскрипт не попадает | `gh pr checks --watch`, `gh run watch`                             |
+| `ci`      | ⏳    | прогон CI                                                                                    | `gh run list` (workflow CI)                                        |
+| `verify`  | ⏳    | прогон verifier                                                                              | `gh run list` (workflow Verify)                                    |
+| `triage`  | W     | основная сессия: вердикт → правки                                                            | от комментария `[verifier]` до старта следующего захода impl       |
+| `accept`  | ⏳    | приёмка владельцем                                                                           | ready → апрув                                                      |
 
 Чтение посреди работы относится к текущему этапу. Время между вызовами (размышления модели) относится к этапу следующего вызова.
 

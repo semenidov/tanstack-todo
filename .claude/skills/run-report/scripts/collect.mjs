@@ -71,11 +71,15 @@ function loadTranscript(path) {
         .split('\n')
         .filter((l) => l.trim())
         .map((l, i) => {
+            let rec;
             try {
-                return JSON.parse(l);
+                rec = JSON.parse(l);
             } catch {
                 return badTranscript(path, `line ${i + 1} is not JSON`);
             }
+            if (rec === null || typeof rec !== 'object' || Array.isArray(rec))
+                return badTranscript(path, `line ${i + 1} is not a JSON object`);
+            return rec;
         });
     if (recs.length === 0) badTranscript(path, 'empty file');
     const calls = [];
