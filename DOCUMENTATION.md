@@ -56,7 +56,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/lib/guest.ts` - код и текст отказа по потолку гостей, `guestSignInErrorMessage` (тост кнопки гостя). `src/lib/demo-board.ts` - содержимое демо-доски (чистые данные). `src/lib/use-is-guest.ts` - `useIsGuest()` из сессии в контексте root.
 - `src/server/guests.ts` - жизненный цикл гостя для хуков Better Auth: `deleteExpiredGuests` (строго `is_anonymous AND created_at < now - 7 дней`), `prepareGuestSignIn` (очистка + потолок), `seedGuest` (демо-доска, ошибка - в Sentry).
 - `src/server/board-writes.ts` - тела server fns, добавляющих живую строку (`createBoardAs/addListAs/restoreListAs/addCardAs/restoreCardAs`): передают в репо `quotasFor(user)`; `moveCardOrThrow(user, data)` в `move-card.ts` - так же. Отдельно ради integration-теста на каждый путь.
-- `src/components/guest-sign-in-button.tsx` («Try as guest» на `/login`), `guest-banner.tsx` (баннер гостя на `/boards` и доске), `sign-out-button.tsx` (выход в шапках: гость - `deleteAnonymousUser`, иначе `signOut`; затем `/login` и `queryClient.clear()`).
+- `src/components/guest-sign-in-button.tsx` («Try as guest» на `/login`), `guest-banner.tsx` (баннер гостя на `/boards` и доске: одна строка, ✕ закрывает навсегда в этом браузере - `localStorage` `guest-banner-dismissed:<userId>`, рендер после гидрации), `sign-out-button.tsx` (выход в шапках: гость - `deleteAnonymousUser`, иначе `signOut`; затем `/login` и `queryClient.clear()`).
 - `src/components/auth-form.tsx` - презентационная форма email+password (login/signup).
 - `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
 - `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.

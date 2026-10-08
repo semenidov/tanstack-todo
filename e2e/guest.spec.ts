@@ -23,7 +23,7 @@ test('a guest gets the demo board with a hint and a banner, and a move is saved'
         .poll(async () => (await cardTitles(page, 'In progress'))[0])
         .toBe(TRY_ME);
     await expect(page.getByRole('note')).toContainText(
-        'Guest mode - your boards are deleted after 7 days or when you sign out.',
+        'Guest mode: boards are deleted after 7 days.',
     );
 
     await moveCardTo(page, TRY_ME, 'Done', 1);
