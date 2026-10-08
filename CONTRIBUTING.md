@@ -2,7 +2,7 @@
 
 Конвенции для задач, веток, коммитов и PR. Процесс: обсуждение → спека в issue → implementer → verifier → приёмка владельцем → squash-мерж (подробно - «Процесс фичи»).
 
-- Язык: заголовок issue, ветки, коммиты и заголовок PR - на английском; тело issue (Context, Goal, Acceptance criteria, Out of scope, поля Bug-формы) и тело PR - на русском. Доки (`DOCUMENTATION.md`, `DECISIONS.md`) - на русском.
+- Язык: заголовок issue, ветки, коммиты и заголовок PR - на английском; тело issue (блоки Task-формы, поля Bug-формы) и тело PR - на русском. Доки (`DOCUMENTATION.md`, `DECISIONS.md`) - на русском.
 - Сначала issue: черновик показываю владельцу, создаю после «ок». Шаблоны - `.github/ISSUE_TEMPLATE/` (Task, Bug); метки `feature`, `bug`, `chore`, `docs`, `refactor`.
 - Ветка от свежего `master`: `type/<issue>-short-slug` (`feat/12-todo-owner-index`).
 - Коммиты - Conventional Commits: `type(scope): summary` (feat, fix, refactor, test, docs, chore, perf, ci, build), повелительное наклонение, до ~72 символов. Сгенерированное (миграции, lock-файл) и механическое (переименования, форматирование) - отдельными коммитами. Порядок коммитов - для чтения: schema/migration → core → tests → docs.
@@ -51,15 +51,7 @@
 
 ### Формат спеки (issue)
 
-Перед спекой - `git fetch`, код читаем с `origin/master`, не с локальной ветки.
-
-1. Зачем - 1-2 предложения.
-2. Скоуп / не входит.
-3. Критерии приёмки - пронумерованные сценарии «делаю X → вижу Y». По ним пишет тесты implementer, проверяет verifier, принимает владелец.
-4. Краевые случаи - у каждого «тест» или «руками».
-5. План реализации - файлы, подход, контракты (типы, сигнатуры server fns, схема БД). Без готового кода: решения фиксирует спека, реализацию внутри них - implementer.
-6. Миграции и чувствительные места.
-7. Документация - какие записи в `DOCUMENTATION.md` / `DECISIONS.md`.
+Спека прорабатывается по этапам скилла `task-design` (`.claude/skills/task-design/SKILL.md`): брейншторм → product design → system design → code design → слайсы. Блоки issue - по шаблону Task: Context, Product design, System design, Code design, Slices. Перед спекой - `git fetch`, код читаем с `origin/master`, не с локальной ветки. Критерии приёмки - пронумерованные сценарии «делаю X → вижу Y»: по ним пишет тесты implementer, проверяет verifier, принимает владелец.
 
 ### Журнал исходов
 
