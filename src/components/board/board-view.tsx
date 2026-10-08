@@ -123,7 +123,7 @@ export function BoardView({ board, lists }: BoardData) {
                         <div
                             ref={setContainerRef}
                             className={cn(
-                                'flex flex-1 items-start gap-4 overflow-x-auto px-[7.5vw] py-4 sm:p-4 md:cursor-grab md:*:cursor-auto',
+                                'flex flex-1 items-start gap-4 overflow-x-auto px-[7.5vw] py-4 sm:scroll-px-4 sm:p-4 md:cursor-grab md:*:cursor-auto',
                                 // No snapping while a card is dragged: it would fight auto-scroll.
                                 isDragging
                                     ? 'snap-none'
