@@ -14,7 +14,7 @@ description: Отчёт о прогоне фичи (implementer → CI → verif
 
 ## Шаги
 
-1. **Транскрипты implementer.** Путь - `output_file` из результата запуска агента (`.../tasks/<agentId>.output`). Продолжение через SendMessage пишет в тот же файл; новый запуск агента на тот же PR - ещё один `--transcript`.
+1. **Транскрипты implementer.** Путь - `~/.claude/projects/<проект>/<сессия>/subagents/agent-<agentId>.jsonl` (`output_file` из результата запуска на Windows пустой). Каждый запуск implementer на этот PR (первый и каждая починка) - свой файл и свой `--transcript`, в порядке запусков. Пустой, не-JSONL или файл без вызовов инструментов collect отклоняет с кодом 2.
 2. **Черновик** (только чтение: транскрипт, `gh`, `git`):
     ```bash
     node .claude/skills/run-report/scripts/collect.mjs --pr <N> --transcript <path> --out <scratchpad>/draft.json

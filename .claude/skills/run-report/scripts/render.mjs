@@ -98,17 +98,19 @@ function errorsCell(list) {
     const byClass = new Map();
     // Red phases are counted in the summary line; the cell lists real failures only.
     for (const run of notOk(list).filter((x) => x.result !== 'expected_red')) {
-        const e = byClass.get(run.error.class) ?? {
-            n: 0,
-            text: run.error.text,
-        };
+        // Grouped stages merge runs: keep every distinct text, not just the first one.
+        const e = byClass.get(run.error.class) ?? { n: 0, texts: new Set() };
         e.n += 1;
+        e.texts.add(run.error.text);
         byClass.set(run.error.class, e);
     }
     return (
         [...byClass]
-            .map(([cls, e]) => `${cls}${e.n > 1 ? ` ×${e.n}` : ''}: ${e.text}`)
-            .join('; ') || '-'
+            .map(
+                ([cls, e]) =>
+                    `${cls}${e.n > 1 ? ` ×${e.n}` : ''}: ${[...e.texts].join('; ')}`,
+            )
+            .join(' · ') || '-'
     );
 }
 
