@@ -7,6 +7,7 @@ import {
     addCardToList,
     cardIndexAfterNeighbors,
     cardMoveNeighbors,
+    findCardInBoard,
     isSameCardSpot,
     moveCardInBoard,
     removeCardFromBoard,
@@ -109,6 +110,8 @@ export function useUpdateCard(boardId: string) {
 
 export interface MoveCardVars {
     cardId: string;
+    /** The list the card leaves, for `useIsListSyncing`; not sent. */
+    fromListId: string;
     toListId: string;
     prevCardId: string | null;
     nextCardId: string | null;
@@ -120,8 +123,15 @@ export function useMoveCard(boardId: string) {
 
     const { mutate } = useMutation({
         ...boardOrderMutationOptions(boardId),
-        mutationFn: async (vars: MoveCardVars) => {
-            await moveCardServer({ data: vars });
+        mutationFn: async ({
+            cardId,
+            toListId,
+            prevCardId,
+            nextCardId,
+        }: MoveCardVars) => {
+            await moveCardServer({
+                data: { cardId, toListId, prevCardId, nextCardId },
+            });
         },
         // No snapshot rollback: later moves in the queue were applied on top of it.
         // The server state is the truth, so refetch it.
@@ -154,13 +164,14 @@ export function useMoveCard(boardId: string) {
             return false;
         }
         const neighbors = cardMoveNeighbors(board, cardId, toListId, index);
-        if (!neighbors) return false;
+        const from = findCardInBoard(board, cardId);
+        if (!neighbors || !from) return false;
 
         queryClient.setQueryData(
             key,
             moveCardInBoard(board, cardId, toListId, index),
         );
-        mutate({ cardId, toListId, ...neighbors });
+        mutate({ cardId, fromListId: from.list.id, toListId, ...neighbors });
         return true;
     };
 

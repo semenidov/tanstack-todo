@@ -40,18 +40,72 @@ export function removeListFromBoard(
     };
 }
 
-// Undo of a list delete: back to its place, lists are ordered asc(createdAt).
+// List order on the board, same as the server and as compareCardOrder:
+// position byte-wise, then id.
+export function compareListOrder(
+    a: Pick<ListWithCards, 'id' | 'position'>,
+    b: Pick<ListWithCards, 'id' | 'position'>,
+): number {
+    if (a.position !== b.position) return a.position < b.position ? -1 : 1;
+    if (a.id === b.id) return 0;
+    return a.id < b.id ? -1 : 1;
+}
+
+// Undo of a list delete: back to its place on the board by position.
 export function restoreListToBoard(
     board: BoardData,
     list: ListWithCards,
 ): BoardData {
     if (board.lists.some((l) => l.id === list.id)) return board;
-    const index = board.lists.findIndex(
-        (l) => l.createdAt.getTime() > list.createdAt.getTime(),
-    );
+    const index = board.lists.findIndex((l) => compareListOrder(l, list) > 0);
     const lists = [...board.lists];
     lists.splice(index === -1 ? lists.length : index, 0, list);
     return { ...board, lists };
+}
+
+// `index` counts in the board without the moved list, as for cards: the same
+// index works for moves left and right. Move dialog position N is index N - 1.
+export function moveListInBoard(
+    board: BoardData,
+    listId: string,
+    index: number,
+): BoardData {
+    const list = board.lists.find((l) => l.id === listId);
+    if (!list) return board;
+    const lists = board.lists.filter((l) => l.id !== listId);
+    lists.splice(Math.max(0, Math.min(index, lists.length)), 0, list);
+    return { ...board, lists };
+}
+
+export interface ListMoveNeighbors {
+    prevListId: string | null;
+    nextListId: string | null;
+}
+
+// Neighbors of `index` on `board` without the list: its own board or the target
+// board of a move, where the list is not yet.
+export function listMoveNeighbors(
+    board: BoardData,
+    listId: string,
+    index: number,
+): ListMoveNeighbors {
+    const lists = board.lists.filter((l) => l.id !== listId);
+    const at = Math.max(0, Math.min(index, lists.length));
+    return {
+        // .at(-1) would wrap to the last list, so index 0 has no prev explicitly.
+        prevListId: at === 0 ? null : (lists.at(at - 1)?.id ?? null),
+        nextListId: lists.at(at)?.id ?? null,
+    };
+}
+
+// True when the move would leave the list where it is (no request needed).
+export function isSameListSpot(
+    board: BoardData,
+    listId: string,
+    index: number,
+): boolean {
+    const current = board.lists.findIndex((l) => l.id === listId);
+    return current === -1 || current === index;
 }
 
 // New cards sort first: the server gives them a key before the first card.

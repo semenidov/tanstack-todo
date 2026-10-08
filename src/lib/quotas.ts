@@ -77,9 +77,17 @@ export function restoreErrorMessage(error: unknown, fallback: string) {
     return `Can't restore: you've reached ${QUOTA_LIMIT_TEXT[quota.kind](quota.limit)}.`;
 }
 
-/** Toast text for a refused card move: only a full target list has its own text. */
+/**
+ * Toast text for a refused card or list move: only a full target (a list for a
+ * card, a board for a list) has its own text.
+ */
 export function moveErrorMessage(error: unknown, fallback: string) {
     const quota = parseQuotaError(error);
-    if (quota?.kind !== QuotaKind.Cards) return fallback;
-    return `Can't move: this list already has ${quota.limit} cards.`;
+    if (quota?.kind === QuotaKind.Cards) {
+        return `Can't move: this list already has ${quota.limit} cards.`;
+    }
+    if (quota?.kind === QuotaKind.Lists) {
+        return `Can't move: this board already has ${quota.limit} lists.`;
+    }
+    return fallback;
 }

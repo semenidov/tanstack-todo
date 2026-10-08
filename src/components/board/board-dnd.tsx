@@ -9,12 +9,18 @@ import {
     useSensor,
     useSensors,
 } from '@dnd-kit/core';
+import {
+    SortableContext,
+    horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import type {
+    Announcements,
     CollisionDetection,
     DragEndEvent,
     DragOverEvent,
     DragStartEvent,
     KeyboardCoordinateGetter,
+    UniqueIdentifier,
 } from '@dnd-kit/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
@@ -22,11 +28,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useMoveCard } from '#/components/board/card-mutations';
+import { useMoveList } from '#/components/board/list-mutations';
 import {
     cardMoveNeighbors,
     findCardInBoard,
     moveCardInBoard,
+    moveListInBoard,
 } from '#/lib/boards';
+import { Badge } from '#/components/ui/badge';
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { BoardData, ListWithCards } from '#/lib/boards-query';
 import type { CardDndAnnouncerState } from '#/lib/card-dnd';
@@ -36,10 +45,19 @@ import {
     cardKeyboardPoint,
     pickCardDropId,
 } from '#/lib/card-dnd';
+import type { ListDndAnnouncerState } from '#/lib/list-dnd';
+import {
+    isListId,
+    listDndAnnouncements,
+    listDropIndex,
+    listKeyboardPoint,
+    pickListDropId,
+} from '#/lib/list-dnd';
 import { useHydrated } from '#/lib/use-hydrated';
 import { usePrefersReducedMotion } from '#/lib/use-prefers-reduced-motion';
 
-// Space picks a card up: Enter stays with the card link and opens the card.
+// Space picks a card or a list up: Enter stays with the card link (opens the
+// card) and the list title button (renames the list).
 const KEYBOARD_CODES = {
     start: [KeyboardCode.Space],
     cancel: [KeyboardCode.Esc],
@@ -56,11 +74,20 @@ const ARROW_CODES: Array<string> = [
 // Lists change height while a card moves between them: measure them all the time.
 const MEASURING = { droppable: { strategy: MeasuringStrategy.Always } };
 
+enum DragType {
+    Card = 'card',
+    List = 'list',
+}
+
 interface DragState {
+    type: DragType;
     activeId: string;
     /** The lists at pick-up: the card goes back here when it leaves all lists. */
     startLists: Array<ListWithCards>;
-    /** The lists shown while dragging, with the card moved between lists. */
+    /**
+     * The lists shown while dragging, with the card moved between lists. A list
+     * is shown moved by the sortable transforms only: these stay as at pick-up.
+     */
     lists: Array<ListWithCards>;
 }
 
@@ -80,14 +107,17 @@ interface BoardDndProps {
 }
 
 /**
- * Drag-and-drop of cards inside and between lists (mouse, touch, keyboard).
- * While a card is dragged, the board shows a local copy of the lists: server data
- * that arrives meanwhile is applied after the drop. The drop goes through the same
- * move queue as the Move window.
+ * Drag-and-drop of cards inside and between lists and of lists inside the board
+ * (mouse, touch, keyboard), in one context: nested contexts would not share the
+ * sensors. Collision detection, arrow keys and announcements branch on the type
+ * of the dragged item. While dragging, the board shows a local copy of the lists:
+ * server data that arrives meanwhile is applied after the drop. The drop goes
+ * through the same move queue as the Move windows.
  */
 export function BoardDnd({ board, lists, children }: BoardDndProps) {
     const queryClient = useQueryClient();
     const { moveCardNextTo } = useMoveCard(board.id);
+    const { moveList } = useMoveList(board.id);
     const reducedMotion = usePrefersReducedMotion();
     const hydrated = useHydrated();
     const [drag, setDrag] = useState<DragState | null>(null);
@@ -121,6 +151,14 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     const collisionDetection = useMemo<CollisionDetection>(
         () =>
             ({ active, collisionRect, droppableRects, pointerCoordinates }) => {
+                if (isListId(shownLists, active.id)) {
+                    // A list goes by the center of the dragged column, by x only.
+                    const id = pickListDropId(shownLists, droppableRects, {
+                        x: collisionRect.left + collisionRect.width / 2,
+                        y: collisionRect.top + collisionRect.height / 2,
+                    });
+                    return id === null ? [] : [{ id }];
+                }
                 if (justMovedToListRef.current) return [{ id: active.id }];
                 const point = pointerCoordinates ?? {
                     x: collisionRect.left + collisionRect.width / 2,
@@ -146,6 +184,22 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
                 if (!ARROW_CODES.includes(event.code)) return undefined;
                 event.preventDefault();
                 if (!collisionRect) return undefined;
+                if (isListId(shownListsRef.current, active)) {
+                    const point = listKeyboardPoint(
+                        shownListsRef.current,
+                        droppableRects,
+                        String(active),
+                        over ? String(over.id) : null,
+                        event.code,
+                    );
+                    // Sideways only: columns differ in height.
+                    return (
+                        point && {
+                            x: point.x - collisionRect.width / 2,
+                            y: collisionRect.top,
+                        }
+                    );
+                }
                 const point = cardKeyboardPoint(
                     shownListsRef.current,
                     droppableRects,
@@ -174,13 +228,30 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
         }),
     );
 
-    const announcerStateRef = useRef<CardDndAnnouncerState>({
+    const announcerStateRef = useRef<
+        CardDndAnnouncerState & ListDndAnnouncerState
+    >({
         quietOverId: null,
     });
-    const announcements = useMemo(
-        () => cardDndAnnouncements(shownLists, announcerStateRef.current),
-        [shownLists],
-    );
+    const announcements = useMemo<Announcements>(() => {
+        const cards = cardDndAnnouncements(
+            shownLists,
+            announcerStateRef.current,
+        );
+        const columns = listDndAnnouncements(
+            shownLists,
+            announcerStateRef.current,
+        );
+        const pick = (id: UniqueIdentifier) =>
+            isListId(shownLists, id) ? columns : cards;
+        return {
+            onDragStart: (args) => pick(args.active.id).onDragStart(args),
+            onDragMove: (args) => pick(args.active.id).onDragMove?.(args),
+            onDragOver: (args) => pick(args.active.id).onDragOver(args),
+            onDragEnd: (args) => pick(args.active.id).onDragEnd(args),
+            onDragCancel: (args) => pick(args.active.id).onDragCancel(args),
+        };
+    }, [shownLists]);
 
     const moveInLists = (
         from: Array<ListWithCards>,
@@ -196,6 +267,9 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
         });
         setDropped(null);
         setDrag({
+            type: isListId(shownLists, active.id)
+                ? DragType.List
+                : DragType.Card,
             activeId: String(active.id),
             startLists: shownLists,
             lists: shownLists,
@@ -203,7 +277,8 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     }
 
     function handleDragOver({ over }: DragOverEvent) {
-        if (!drag) return;
+        // A list is shown at its target by the sortable row itself.
+        if (!drag || drag.type === DragType.List) return;
         if (!over) {
             // Outside the lists: the placeholder goes back where the card was.
             if (drag.lists !== drag.startLists) {
@@ -245,6 +320,10 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     function handleDragEnd({ over }: DragEndEvent) {
         setDrag(null);
         if (!drag || !over) return;
+        if (drag.type === DragType.List) {
+            handleListDrop(drag, String(over.id));
+            return;
+        }
         const target = cardDropTarget(
             drag.lists,
             drag.activeId,
@@ -274,9 +353,27 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
         }
     }
 
-    const activeCard = drag
-        ? findCardInBoard({ board, lists: drag.lists }, drag.activeId)?.card
-        : undefined;
+    function handleListDrop(state: DragState, overId: string) {
+        const index = listDropIndex(state.lists, state.activeId, overId);
+        if (index === undefined || !moveList(state.activeId, index)) return;
+        setDropped({
+            base: lists,
+            lists: moveListInBoard(
+                { board, lists: state.lists },
+                state.activeId,
+                index,
+            ).lists,
+        });
+    }
+
+    const activeCard =
+        drag?.type === DragType.Card
+            ? findCardInBoard({ board, lists: drag.lists }, drag.activeId)?.card
+            : undefined;
+    const activeList =
+        drag?.type === DragType.List
+            ? drag.lists.find((l) => l.id === drag.activeId)
+            : undefined;
 
     return (
         <DndContext
@@ -291,7 +388,13 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
             onDragEnd={handleDragEnd}
             onDragCancel={() => setDrag(null)}
         >
-            {children({ lists: shownLists, isDragging: drag !== null })}
+            <SortableContext
+                id="lists"
+                items={shownLists.map((l) => l.id)}
+                strategy={horizontalListSortingStrategy}
+            >
+                {children({ lists: shownLists, isDragging: drag !== null })}
+            </SortableContext>
             {hydrated &&
                 createPortal(
                     <DragOverlay
@@ -300,6 +403,12 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
                         {activeCard && (
                             <CardPreview
                                 title={activeCard.title}
+                                tilted={!reducedMotion}
+                            />
+                        )}
+                        {activeList && (
+                            <ListPreview
+                                list={activeList}
                                 tilted={!reducedMotion}
                             />
                         )}
@@ -320,6 +429,42 @@ function CardPreview({ title, tilted }: { title: string; tilted: boolean }) {
             )}
         >
             <div className="truncate px-3 py-2 pr-8 text-sm">{title}</div>
+        </div>
+    );
+}
+
+// The column under the pointer while dragging: a static copy with all its cards,
+// without the menu, AddCard and links.
+function ListPreview({
+    list,
+    tilted,
+}: {
+    list: ListWithCards;
+    tilted: boolean;
+}) {
+    return (
+        <div
+            className={cn(
+                'flex h-full cursor-grabbing flex-col overflow-hidden rounded-lg border bg-card shadow-lg',
+                tilted && 'rotate-2',
+            )}
+        >
+            <div className="flex items-center gap-2 border-b px-3 py-2 text-sm font-medium">
+                <span className="truncate">{list.title}</span>
+                <Badge variant="secondary" className="shrink-0 tabular-nums">
+                    {list.cards.length}
+                </Badge>
+            </div>
+            <ul className="min-h-0 flex-1 space-y-2 overflow-hidden p-3">
+                {list.cards.map((card) => (
+                    <li
+                        key={card.id}
+                        className="truncate rounded-md border bg-background px-3 py-2 text-sm shadow-xs"
+                    >
+                        {card.title}
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }
