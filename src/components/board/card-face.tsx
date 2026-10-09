@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { DueBadge } from '#/components/board/due/due-badge';
+import { LabelStrip } from '#/components/board/labels/label-strip';
 import type { Card } from '#/lib/boards-query';
 import { CheckIcon, TextIcon } from 'lucide-react';
 
@@ -36,7 +37,14 @@ export function CardFace({ card, title }: CardFaceProps) {
 
     return (
         <div className="flex flex-col gap-1.5 px-3 py-2 pr-8 text-sm select-none">
-            {/* Labels zone: strips (labels slice). */}
+            {card.labelIds.length > 0 && (
+                // A title link means a card on the board: its labels toggle
+                // the titles; a drag preview shows them static.
+                <LabelStrip
+                    labelIds={card.labelIds}
+                    interactive={title !== undefined}
+                />
+            )}
             <div className="flex min-w-0 items-start gap-1.5">
                 {card.completedAt && (
                     // h-5: one line of text-sm, so the check stays on the first line.

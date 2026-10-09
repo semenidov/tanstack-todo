@@ -36,6 +36,12 @@ test('a guest gets the demo board with a hint and a banner, and a move is saved'
         'Due today: Today',
     );
     await expect(cardRow(page, 'Drag-and-drop lists')).toContainText('Overdue');
+    // Labels: color strips in creation order.
+    await expect(
+        cardRow(page, 'Drag-and-drop lists').getByRole('button', {
+            name: 'Labels: Feature, UX',
+        }),
+    ).toBeVisible();
 
     await moveCardTo(page, TRY_ME, 'Done', 1);
     await page.reload();

@@ -25,6 +25,10 @@ import {
     AddDueDateButton,
     DueDateField,
 } from '#/components/board/due/due-date-field';
+import {
+    AddLabelsButton,
+    CardLabelsField,
+} from '#/components/board/labels/card-labels-field';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 import { formatCardDate } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
@@ -69,9 +73,20 @@ export function CardDialog({
         onOpenChange: setIsDueOpen,
     };
 
+    const hasLabels = card.labelIds.length > 0;
+    const [isLabelsOpen, setIsLabelsOpen] = useState(false);
+    const labelsProps = {
+        boardId,
+        card,
+        open: isLabelsOpen,
+        onOpenChange: setIsLabelsOpen,
+    };
+
     // Blocks the card has, in one row: labels and due date.
     const blocks: Array<ReactNode> = [];
-    // Labels block - goes first here (labels slice).
+    if (hasLabels) {
+        blocks.push(<CardLabelsField key="labels" {...labelsProps} />);
+    }
     if (hasDue) {
         blocks.push(
             <DueDateField key="due" completed={isCompleted} {...dueProps} />,
@@ -80,7 +95,9 @@ export function CardDialog({
     // Buttons for the blocks the card doesn't have yet, in the order
     // Labels / Due date / Checklist; a block takes its place once added.
     const emptyBlocks: Array<ReactNode> = [];
-    // Labels button - goes first here (labels slice).
+    if (!hasLabels) {
+        emptyBlocks.push(<AddLabelsButton key="labels" {...labelsProps} />);
+    }
     if (!hasDue) {
         emptyBlocks.push(<AddDueDateButton key="due" {...dueProps} />);
     }
