@@ -93,8 +93,21 @@ export function useUpdateCard(boardId: string, cardId: string) {
 
     return useMutation({
         ...cardMutationOptions(cardId),
-        mutationFn: (vars: UpdateCardVars) =>
-            updateCardServer({ data: { cardId, ...vars } }),
+        mutationFn: ({ due, ...vars }: UpdateCardVars) =>
+            updateCardServer({
+                data: {
+                    cardId,
+                    ...vars,
+                    // The moment as an ISO string: a plain wire format that
+                    // doesn't depend on how Date objects are serialized.
+                    ...(due && {
+                        due: {
+                            dueDate: due.dueDate,
+                            dueAt: due.dueAt?.toISOString() ?? null,
+                        },
+                    }),
+                },
+            }),
         onMutate: async (vars) => {
             await queryClient.cancelQueries({ queryKey: key });
             queryClient.setQueryData(key, (old) =>

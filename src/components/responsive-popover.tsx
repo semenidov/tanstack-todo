@@ -80,7 +80,9 @@ export function ResponsivePopoverContent({
             <PopoverContent
                 align={align}
                 aria-labelledby={titleId}
-                className="w-72 p-0"
+                // A tall popover (the due date calendar) scrolls instead of
+                // leaving the viewport on short screens.
+                className="flex max-h-(--radix-popover-content-available-height) w-72 flex-col p-0"
             >
                 <div className="flex items-center gap-1 border-b px-2 py-1.5">
                     <BackButton onBack={onBack} />
@@ -94,7 +96,9 @@ export function ResponsivePopoverContent({
                         <CloseButton />
                     </PopoverPrimitive.Close>
                 </div>
-                <div className={cn('p-3', className)}>{children}</div>
+                <div className={cn('overflow-y-auto p-3', className)}>
+                    {children}
+                </div>
             </PopoverContent>
         );
     }
