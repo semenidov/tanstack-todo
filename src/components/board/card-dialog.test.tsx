@@ -22,6 +22,15 @@ vi.mock('#/server/boards', () => ({
     restoreCardServer: restoreCardSpy,
 }));
 
+// The labels server fns import the db: the window renders no labels here.
+vi.mock('#/server/labels', () => ({
+    getLabelsServer: vi.fn(),
+    createLabelServer: vi.fn(),
+    updateLabelServer: vi.fn(),
+    deleteLabelServer: vi.fn(),
+    setCardLabelServer: vi.fn(),
+}));
+
 vi.mock('@tanstack/react-start', () => ({
     useServerFn: (fn: unknown) => fn,
 }));
