@@ -128,6 +128,7 @@ describe('guest sign-in', () => {
                 cards: l.cards.map((c) => ({
                     title: c.title,
                     description: c.description,
+                    ...(c.completedAt && { completed: true }),
                 })),
             })),
         ).toEqual(DEMO_BOARD.lists);

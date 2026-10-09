@@ -115,6 +115,7 @@ export async function seedDemoBoard(userId: string) {
             listId,
             title: card.title,
             description: card.description,
+            completedAt: card.completed ? new Date() : null,
             position: keys[j],
         }));
     });
@@ -405,11 +406,18 @@ export async function addCard(
 export function updateCard(
     userId: string,
     cardId: string,
-    data: { title?: string; description?: string | null },
+    data: { title?: string; description?: string | null; completed?: boolean },
 ) {
+    const { completed, ...fields } = data;
+    // updatedAt is bumped by the column's $onUpdate on every write.
     return db
         .update(cards)
-        .set(data)
+        .set({
+            ...fields,
+            ...(completed !== undefined && {
+                completedAt: completed ? new Date() : null,
+            }),
+        })
         .where(
             and(
                 eq(cards.id, cardId),

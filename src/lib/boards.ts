@@ -127,7 +127,7 @@ export function addCardToList(
 export function updateCardInBoard(
     board: BoardData,
     cardId: string,
-    patch: Partial<Pick<Card, 'title' | 'description'>>,
+    patch: Partial<Pick<Card, 'title' | 'description' | 'completedAt'>>,
 ): BoardData {
     return {
         ...board,

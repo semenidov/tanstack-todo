@@ -4,6 +4,8 @@
 export interface DemoCard {
     title: string;
     description: string;
+    /** Marked done (#120): the demo shows one completed card. */
+    completed?: boolean;
 }
 
 export interface DemoList {
@@ -54,6 +56,7 @@ export const DEMO_BOARD: { title: string; lists: Array<DemoList> } = {
                     title: 'Boards, lists and cards',
                     description:
                         'TanStack Start + Drizzle + Postgres, every query scoped to the owner.',
+                    completed: true,
                 },
                 {
                     title: 'Undo on delete',

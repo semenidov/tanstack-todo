@@ -25,6 +25,12 @@ test('a guest gets the demo board with a hint and a banner, and a move is saved'
     await expect(page.getByRole('note')).toContainText(
         'Guest mode: boards are deleted after 7 days.',
     );
+    // The demo shows card enrichment (#120): one completed card.
+    await expect(
+        cardRow(page, 'Boards, lists and cards').getByRole('img', {
+            name: 'Completed',
+        }),
+    ).toBeVisible();
 
     await moveCardTo(page, TRY_ME, 'Done', 1);
     await page.reload();

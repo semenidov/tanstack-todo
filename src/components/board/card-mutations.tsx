@@ -4,6 +4,10 @@ import {
     invalidateAfterLastBoardOrder,
 } from '#/components/board/board-order';
 import {
+    cardMutationOptions,
+    invalidateAfterLastCardMutation,
+} from '#/components/board/card-queue';
+import {
     addCardToList,
     cardIndexAfterNeighbors,
     cardMoveNeighbors,
@@ -71,40 +75,48 @@ export function useAddCard(boardId: string, listId: string) {
     });
 }
 
-export function useUpdateCard(boardId: string) {
+export interface UpdateCardVars {
+    title?: string;
+    description?: string | null;
+    completed?: boolean;
+}
+
+// Edits of one card's content go through the card queue (card-queue.ts): fast
+// toggles of "completed" reach the server in the order they were made.
+export function useUpdateCard(boardId: string, cardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
 
     return useMutation({
-        mutationFn: (vars: {
-            cardId: string;
-            title?: string;
-            description?: string | null;
-        }) => updateCardServer({ data: vars }),
+        ...cardMutationOptions(cardId),
+        mutationFn: (vars: UpdateCardVars) =>
+            updateCardServer({ data: { cardId, ...vars } }),
         onMutate: async (vars) => {
             await queryClient.cancelQueries({ queryKey: key });
-            const previous = queryClient.getQueryData(key);
             queryClient.setQueryData(key, (old) =>
                 old
-                    ? updateCardInBoard(old, vars.cardId, {
+                    ? updateCardInBoard(old, cardId, {
                           ...(vars.title !== undefined && {
                               title: vars.title,
                           }),
                           ...(vars.description !== undefined && {
                               description: vars.description,
                           }),
+                          ...(vars.completed !== undefined && {
+                              completedAt: vars.completed ? new Date() : null,
+                          }),
                       })
                     : old,
             );
-            return { previous };
         },
-        onError: (_error, _vars, context) => {
-            queryClient.setQueryData(key, context?.previous);
+        // No snapshot rollback: later edits in the queue were applied on top of
+        // it. The server state is the truth, so refetch it.
+        onError: () => {
             toast.error("Couldn't save the card. Please try again.");
+            void queryClient.invalidateQueries({ queryKey: key });
         },
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: key });
-        },
+        onSettled: () =>
+            invalidateAfterLastCardMutation(queryClient, cardId, [key]),
     });
 }
 

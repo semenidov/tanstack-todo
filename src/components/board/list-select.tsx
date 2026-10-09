@@ -1,3 +1,4 @@
+import { cn } from 'cn';
 import {
     Select,
     SelectContent,
@@ -12,6 +13,8 @@ interface ListSelectProps {
     lists: Array<{ id: string; title: string }>;
     value: string;
     onValueChange: (listId: string) => void;
+    /** Extra trigger classes, e.g. the compact "in list" picker of the card window. */
+    className?: string;
 }
 
 // List picker of the Move… popover and the card dialog. Long names (up to 200
@@ -21,6 +24,7 @@ export function ListSelect({
     lists,
     value,
     onValueChange,
+    className,
 }: ListSelectProps) {
     const selected = lists.find((l) => l.id === value);
 
@@ -30,7 +34,10 @@ export function ListSelect({
                 id={id}
                 title={selected?.title}
                 // Radix SelectValue drops className: style it from the trigger.
-                className="w-full min-w-0 *:data-[slot=select-value]:min-w-0"
+                className={cn(
+                    'w-full min-w-0 *:data-[slot=select-value]:min-w-0',
+                    className,
+                )}
             >
                 <SelectValue>
                     <span className="min-w-0 truncate">{selected?.title}</span>

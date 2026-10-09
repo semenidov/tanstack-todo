@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Card } from '#/lib/boards-query';
-import { TextIcon } from 'lucide-react';
+import { CheckIcon, TextIcon } from 'lucide-react';
 
 interface CardFaceProps {
     card: Card;
@@ -9,9 +9,10 @@ interface CardFaceProps {
 }
 
 // The card on the board and in drag previews (#120). Zones top to bottom:
-// labels → title → footer badges; an empty zone is not rendered, so a card
-// without extras looks like a plain title. The menu is not part of the face:
-// CardItem puts it in the top right corner, over the right padding.
+// labels → [completed check] title (up to 2 lines) → footer badges. An empty
+// zone is not rendered, so a card without extras looks like a plain title.
+// The menu is not part of the face: CardItem puts it in the top right corner,
+// over the right padding.
 export function CardFace({ card, title }: CardFaceProps) {
     // Footer badges in a fixed order: due date → checklist → description.
     const badges: Array<ReactNode> = [];
@@ -27,6 +28,16 @@ export function CardFace({ card, title }: CardFaceProps) {
         <div className="flex flex-col gap-1.5 px-3 py-2 pr-8 text-sm select-none">
             {/* Labels zone: strips (labels slice). */}
             <div className="flex min-w-0 items-start gap-1.5">
+                {card.completedAt && (
+                    // h-5: one line of text-sm, so the check stays on the first line.
+                    <span
+                        role="img"
+                        aria-label="Completed"
+                        className="flex h-5 shrink-0 items-center text-green-600 dark:text-green-500"
+                    >
+                        <CheckIcon className="size-4" strokeWidth={3} />
+                    </span>
+                )}
                 <div
                     title={card.title}
                     className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]"

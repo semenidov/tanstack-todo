@@ -81,6 +81,7 @@ export const updateCardServer = createServerFn({ method: 'POST' })
             cardId: z.uuid(),
             title: titleSchema.optional(),
             description: descriptionSchema.nullable().optional(),
+            completed: z.boolean().optional(),
         }),
     )
     .handler(async ({ data }) => {
@@ -88,6 +89,7 @@ export const updateCardServer = createServerFn({ method: 'POST' })
         await repo.updateCard(userId, data.cardId, {
             title: data.title,
             description: data.description,
+            completed: data.completed,
         });
     });
 

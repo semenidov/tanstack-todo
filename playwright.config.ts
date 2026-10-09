@@ -25,7 +25,7 @@ export default defineConfig({
         { name: 'setup', testMatch: /auth\.setup\.ts/ },
         {
             name: 'crud',
-            testMatch: /boards?\.spec\.ts/,
+            testMatch: /(boards?|card-face)\.spec\.ts/,
             dependencies: ['setup'],
             use: {
                 ...devices['Desktop Chrome'],
