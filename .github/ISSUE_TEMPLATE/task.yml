@@ -1,31 +1,32 @@
 name: Task
-description: A feature, improvement, refactor or chore. Title in English, body in Russian.
+description: A feature, improvement, refactor or chore. Title in English, body in Russian. Filled stage by stage, see the task-design skill.
 body:
   - type: textarea
     id: context
     attributes:
       label: Context
-      description: Why this is needed. Link the discussion or a DECISIONS.md entry.
+      description: What we do and why. Link the discussion or a DECISIONS.md entry.
     validations:
       required: true
   - type: textarea
-    id: goal
+    id: product-design
     attributes:
-      label: Goal
-      description: What should be true when this is done.
+      label: Product design
+      description: Scenarios and UX, wireframes, acceptance criteria ("делаю X → вижу Y"), out of scope.
     validations:
       required: true
   - type: textarea
-    id: acceptance
+    id: system-design
     attributes:
-      label: Acceptance criteria
-      description: A checklist that makes "done" unambiguous.
-      placeholder: |
-        - [ ] ...
-    validations:
-      required: true
+      label: System design
+      description: Data, storage, reads, writes, consistency, access, hard cases, scale and compatibility. Optional for small tasks.
   - type: textarea
-    id: out-of-scope
+    id: code-design
     attributes:
-      label: Out of scope
-      description: What we deliberately don't do here.
+      label: Code design
+      description: File map - what lives where and what it is responsible for. Optional for small tasks.
+  - type: textarea
+    id: slices
+    attributes:
+      label: Slices
+      description: One task, one PR. Shared logic first, then features as separate commits from simple to complex. Optional for small tasks.
