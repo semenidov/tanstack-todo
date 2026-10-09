@@ -60,8 +60,11 @@ export function useAddCard(boardId: string, listId: string) {
         },
         onSuccess: async (card) => {
             await queryClient.cancelQueries({ queryKey: key });
+            // A new card has no labels; the server row doesn't list them.
             queryClient.setQueryData(key, (old) =>
-                old ? addCardToList(old, listId, card) : old,
+                old
+                    ? addCardToList(old, listId, { ...card, labelIds: [] })
+                    : old,
             );
         },
         onError: (error) => {

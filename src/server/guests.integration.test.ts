@@ -8,6 +8,7 @@ import { GUEST_CAP_CODE } from '#/lib/guest';
 import { MAX_ACTIVE_GUESTS } from '#/lib/quotas';
 import { addCardAs, addListAs, createBoardAs } from '#/server/board-writes';
 import { getBoard } from '#/server/boards-repo';
+import { listLabels } from '#/server/labels-repo';
 import { moveListOrThrow } from '#/server/move-list';
 import { seedUser } from '#/test/db';
 import { count, eq, inArray, sql } from 'drizzle-orm';
@@ -125,6 +126,11 @@ describe('guest sign-in', () => {
         // No time zone cookie in the request: due dates count from today in UTC.
         const today = Date.parse(localDateKey(new Date(), 'UTC'));
         expect(demo?.board.title).toBe('Todo app roadmap');
+        const demoLabels = await listLabels(guest.id, owned[0].id);
+        expect(
+            demoLabels.map((l) => ({ title: l.title, color: l.color })),
+        ).toEqual(DEMO_BOARD.labels);
+        const titleOf = new Map(demoLabels.map((l) => [l.id, l.title]));
         expect(
             demo?.lists.map((l) => ({
                 title: l.title,
@@ -134,6 +140,9 @@ describe('guest sign-in', () => {
                     ...(c.completedAt && { completed: true }),
                     ...(c.dueDate && {
                         dueInDays: (Date.parse(c.dueDate) - today) / DAY_MS,
+                    }),
+                    ...(c.labelIds.length > 0 && {
+                        labels: c.labelIds.map((id) => titleOf.get(id)),
                     }),
                 })),
             })),

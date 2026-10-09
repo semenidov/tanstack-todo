@@ -49,7 +49,7 @@ export function ownedChecklistIds(userId: string) {
  * within the card's board (a label of another board can't go on the card).
  */
 export async function findOwnedCard(userId: string, cardId: string) {
-    const [row] = await db
+    const rows = await db
         .select({ id: cards.id, boardId: lists.boardId })
         .from(cards)
         .innerJoin(lists, eq(cards.listId, lists.id))
@@ -62,5 +62,6 @@ export async function findOwnedCard(userId: string, cardId: string) {
                 eq(boards.ownerId, userId),
             ),
         );
-    return row;
+    // .at(0): a destructured [row] would be typed as always present.
+    return rows.at(0);
 }

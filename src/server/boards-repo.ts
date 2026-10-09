@@ -4,7 +4,7 @@ import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import { addDays, localDateKey } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
-import { boards, cards, lists } from '#/db/schema';
+import { boards, cardLabels, cards, labels, lists } from '#/db/schema';
 import { ownedBoardIds, ownedListIds } from '#/server/access';
 import {
     and,
@@ -131,9 +131,40 @@ export async function seedDemoBoard(
                     ? null
                     : addDays(today, card.dueInDays),
             position: keys[j],
+            labels: card.labels ?? [],
         }));
     });
-    await db.insert(cards).values(cardRows);
+    const insertedCards = await db
+        .insert(cards)
+        .values(cardRows.map(({ labels: _, ...card }) => card))
+        .returning();
+
+    // Labels in creation order: one insert would give them one created_at and
+    // leave the order to random ids, so each gets its own millisecond.
+    const labelRows = await db
+        .insert(labels)
+        .values(
+            DEMO_BOARD.labels.map((label, i) => ({
+                boardId: board.id,
+                title: label.title,
+                color: label.color,
+                createdAt: new Date(now.getTime() + i),
+            })),
+        )
+        .returning();
+    const labelIdByTitle = new Map(labelRows.map((l) => [l.title, l.id]));
+    const cardIdBySpot = new Map(
+        insertedCards.map((c) => [`${c.listId}:${c.position}`, c.id]),
+    );
+    const links = cardRows.flatMap((card) =>
+        card.labels.map((title) => {
+            const cardId = cardIdBySpot.get(`${card.listId}:${card.position}`);
+            const labelId = labelIdByTitle.get(title);
+            if (!cardId || !labelId) throw new Error('Demo label not seeded');
+            return { cardId, labelId };
+        }),
+    );
+    if (links.length > 0) await db.insert(cardLabels).values(links);
     return board;
 }
 
@@ -166,6 +197,9 @@ export async function getBoard(userId: string, boardId: string) {
                         columns: { deletedAt: false },
                         where: (c) => isNull(c.deletedAt),
                         orderBy: (c) => [asc(c.position), asc(c.id)],
+                        // Only the ids: colors and titles come from the board's
+                        // labels cache (labels-query.ts).
+                        with: { cardLabels: { columns: { labelId: true } } },
                     },
                 },
             },
@@ -174,7 +208,16 @@ export async function getBoard(userId: string, boardId: string) {
     if (!board) return null;
 
     const { lists: boardLists, ...boardFields } = board;
-    return { board: boardFields, lists: boardLists };
+    return {
+        board: boardFields,
+        lists: boardLists.map((list) => ({
+            ...list,
+            cards: list.cards.map(({ cardLabels: links, ...card }) => ({
+                ...card,
+                labelIds: links.map((l) => l.labelId),
+            })),
+        })),
+    };
 }
 
 // List order: like cards, `position` is a fractional-indexing key compared
@@ -319,7 +362,8 @@ async function renumberLists(boardId: string) {
 /**
  * Moves a list between two neighbors on the target board: its own board or
  * another one of the same owner. Cards point at the list only, so they move with
- * it untouched. Null on any refusal.
+ * it; on another board they lose their labels (labels belong to a board, #120).
+ * Null on any refusal.
  */
 export async function moveList(
     userId: string,
@@ -377,7 +421,23 @@ export async function moveList(
         .set({ boardId: toBoardId, position })
         .where(and(eq(lists.id, listId), isNull(lists.deletedAt)))
         .returning();
-    return rows.at(0) ?? null;
+    const row = rows.at(0) ?? null;
+    if (row && toBoardId !== list.boardId) {
+        // After the move, not before: a refused move keeps the labels. Deleted
+        // cards too, so their Undo doesn't bring back labels of the old board.
+        await db
+            .delete(cardLabels)
+            .where(
+                inArray(
+                    cardLabels.cardId,
+                    db
+                        .select({ id: cards.id })
+                        .from(cards)
+                        .where(eq(cards.listId, listId)),
+                ),
+            );
+    }
+    return row;
 }
 
 // Card order: `position` is a fractional-indexing key compared byte-wise (the column

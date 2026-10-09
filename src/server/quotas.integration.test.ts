@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
-import { boards, cards, lists } from '#/db/schema';
+import { boards, cardLabels, cards, labels, lists } from '#/db/schema';
 import {
     GUEST_QUOTAS,
     MAX_BOARDS_PER_USER,
@@ -23,7 +23,9 @@ import {
 } from '#/server/boards-repo';
 import {
     addCardAs,
+    addCardLabelAs,
     addListAs,
+    createLabelAs,
     createBoardAs,
     restoreCardAs,
     restoreListAs,
@@ -405,6 +407,47 @@ describe('guest quotas on every insert path', () => {
                 nextListId: null,
             }),
         ).rejects.toThrow(guestLimit(QuotaKind.Lists));
+    });
+
+    it('createLabel: refuses the 11th label on a board', async () => {
+        const guest = await seedGuest();
+        const [board] = await seedBoards(guest.id, 1);
+        await db.insert(labels).values(
+            range(GUEST_QUOTAS[QuotaKind.Labels]).map(() => ({
+                boardId: board.id,
+                title: null,
+                color: 'green',
+            })),
+        );
+
+        await expect(
+            createLabelAs(guest, board.id, { title: 'Typed', color: 'red' }),
+        ).rejects.toThrow(guestLimit(QuotaKind.Labels));
+    });
+
+    it('addCardLabel: refuses the 11th label on a card', async () => {
+        const guest = await seedGuest();
+        const [board] = await seedBoards(guest.id, 1);
+        const [list] = await seedLists(board.id, 1);
+        const [card] = await seedCards(list.id, 1);
+        const boardLabels = await db
+            .insert(labels)
+            .values(
+                range(GUEST_QUOTAS[QuotaKind.CardLabels] + 1).map(() => ({
+                    boardId: board.id,
+                    title: null,
+                    color: 'green',
+                })),
+            )
+            .returning();
+        const [extra, ...onCard] = boardLabels;
+        await db
+            .insert(cardLabels)
+            .values(onCard.map((l) => ({ cardId: card.id, labelId: l.id })));
+
+        await expect(addCardLabelAs(guest, card.id, extra.id)).rejects.toThrow(
+            guestLimit(QuotaKind.CardLabels),
+        );
     });
 
     it('restoreCard: refuses when the list is full again', async () => {
