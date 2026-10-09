@@ -8,6 +8,15 @@ import z from 'zod';
 
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().max(5000);
+// A whole day or an exact moment, never both; both null - no due date.
+const dueSchema = z
+    .object({
+        dueDate: z.iso.date().nullable(),
+        dueAt: z.iso.datetime({ offset: true }).nullable(),
+    })
+    .refine((due) => due.dueDate === null || due.dueAt === null, {
+        message: 'A due date is a whole day or a moment, not both',
+    });
 
 export const listBoardsServer = createServerFn({ method: 'GET' }).handler(
     async () => {
@@ -81,6 +90,8 @@ export const updateCardServer = createServerFn({ method: 'POST' })
             cardId: z.uuid(),
             title: titleSchema.optional(),
             description: descriptionSchema.nullable().optional(),
+            completed: z.boolean().optional(),
+            due: dueSchema.optional(),
         }),
     )
     .handler(async ({ data }) => {
@@ -88,6 +99,12 @@ export const updateCardServer = createServerFn({ method: 'POST' })
         await repo.updateCard(userId, data.cardId, {
             title: data.title,
             description: data.description,
+            completed: data.completed,
+            due: data.due && {
+                dueDate: data.due.dueDate,
+                dueAt:
+                    data.due.dueAt === null ? null : new Date(data.due.dueAt),
+            },
         });
     });
 

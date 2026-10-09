@@ -30,6 +30,27 @@ vi.mock('#/server/boards', () => ({
     restoreCardServer: vi.fn(),
 }));
 
+// The labels server fns import the db: the card renders no labels here.
+vi.mock('#/server/labels', () => ({
+    getLabelsServer: vi.fn(),
+    createLabelServer: vi.fn(),
+    updateLabelServer: vi.fn(),
+    deleteLabelServer: vi.fn(),
+    setCardLabelServer: vi.fn(),
+}));
+
+// The checklist server fns import the db: the card has no checklist here.
+vi.mock('#/server/checklists', () => ({
+    getChecklistServer: vi.fn(() => Promise.resolve(null)),
+    createChecklistServer: vi.fn(),
+    renameChecklistServer: vi.fn(),
+    deleteChecklistServer: vi.fn(),
+    addChecklistItemServer: vi.fn(),
+    updateChecklistItemServer: vi.fn(),
+    deleteChecklistItemServer: vi.fn(),
+    moveChecklistItemServer: vi.fn(),
+}));
+
 vi.mock('@tanstack/react-start', () => ({
     useServerFn: (fn: unknown) => fn,
 }));
@@ -44,6 +65,12 @@ function makeCard(id: string, listId: string): Card {
         listId,
         title: id,
         description: null,
+        completedAt: null,
+        dueDate: null,
+        dueAt: null,
+        labelIds: [],
+        checklistDone: 0,
+        checklistTotal: 0,
         position: 'a0',
         createdAt: new Date(0),
         updatedAt: new Date(0),

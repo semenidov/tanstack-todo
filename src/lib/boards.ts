@@ -127,7 +127,12 @@ export function addCardToList(
 export function updateCardInBoard(
     board: BoardData,
     cardId: string,
-    patch: Partial<Pick<Card, 'title' | 'description'>>,
+    patch: Partial<
+        Pick<
+            Card,
+            'title' | 'description' | 'completedAt' | 'dueDate' | 'dueAt'
+        >
+    >,
 ): BoardData {
     return {
         ...board,
@@ -288,4 +293,92 @@ export function removeBoardFromList(
     boardId: string,
 ): BoardSummary[] {
     return boards.filter((board) => board.id !== boardId);
+}
+
+// Labels on cards (#120): the board cache keeps only label ids per card.
+
+/** Puts the label on the card (`on`) or takes it off; the id order doesn't matter. */
+export function setCardLabelInBoard(
+    board: BoardData,
+    cardId: string,
+    labelId: string,
+    on: boolean,
+): BoardData {
+    return {
+        ...board,
+        lists: board.lists.map((list) => ({
+            ...list,
+            cards: list.cards.map((card) => {
+                if (card.id !== cardId) return card;
+                const labelIds = card.labelIds.filter((id) => id !== labelId);
+                return {
+                    ...card,
+                    labelIds: on ? [...labelIds, labelId] : labelIds,
+                };
+            }),
+        })),
+    };
+}
+
+/** A deleted label leaves every card of the board. */
+export function removeLabelFromBoard(
+    board: BoardData,
+    labelId: string,
+): BoardData {
+    return {
+        ...board,
+        lists: board.lists.map((list) => ({
+            ...list,
+            cards: list.cards.map((card) =>
+                card.labelIds.includes(labelId)
+                    ? {
+                          ...card,
+                          labelIds: card.labelIds.filter(
+                              (id) => id !== labelId,
+                          ),
+                      }
+                    : card,
+            ),
+        })),
+    };
+}
+
+/** Cards of the board with the label: for the delete confirmation. */
+export function labelCardCount(board: BoardData, labelId: string): number {
+    return board.lists.reduce(
+        (n, list) =>
+            n + list.cards.filter((c) => c.labelIds.includes(labelId)).length,
+        0,
+    );
+}
+
+/**
+ * Card-label links in the list: a move to another board takes them all off, so
+ * the Move form warns with this number (links, not distinct labels).
+ */
+export function listLabelLinkCount(list: ListWithCards): number {
+    return list.cards.reduce((n, card) => n + card.labelIds.length, 0);
+}
+
+/** Checklist progress of the card face (#120), after an edit in the card window. */
+export function setChecklistProgressInBoard(
+    board: BoardData,
+    cardId: string,
+    progress: { done: number; total: number },
+): BoardData {
+    return {
+        ...board,
+        lists: board.lists.map((list) => ({
+            ...list,
+            cards: list.cards.map((card) =>
+                card.id === cardId
+                    ? {
+                          ...card,
+                          checklistDone: progress.done,
+                          checklistTotal: progress.total,
+                      }
+                    : card,
+            ),
+        })),
+    };
 }

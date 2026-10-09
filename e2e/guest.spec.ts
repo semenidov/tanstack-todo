@@ -25,6 +25,23 @@ test('a guest gets the demo board with a hint and a banner, and a move is saved'
     await expect(page.getByRole('note')).toContainText(
         'Guest mode: boards are deleted after 7 days.',
     );
+    // The demo shows card enrichment (#120): one completed card.
+    await expect(
+        cardRow(page, 'Boards, lists and cards').getByRole('img', {
+            name: 'Completed',
+        }),
+    ).toBeVisible();
+    // Due dates: today by the time zone cookie, and an overdue one.
+    await expect(cardRow(page, 'Card due dates and labels')).toContainText(
+        'Due today: Today',
+    );
+    await expect(cardRow(page, 'Drag-and-drop lists')).toContainText('Overdue');
+    // Labels: color strips in creation order.
+    await expect(
+        cardRow(page, 'Drag-and-drop lists').getByRole('button', {
+            name: 'Labels: Feature, UX',
+        }),
+    ).toBeVisible();
 
     await moveCardTo(page, TRY_ME, 'Done', 1);
     await page.reload();

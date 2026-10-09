@@ -7,6 +7,7 @@ import {
 import type { QueryClient } from '@tanstack/react-query';
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools';
 import { TanStackDevtools } from '@tanstack/react-devtools';
+import { useEffect } from 'react';
 import { ThemeProvider } from 'next-themes';
 import { MessageScreen } from '#/components/message-screen';
 import { Button } from '#/components/ui/button';
@@ -16,6 +17,7 @@ import { pageMeta, siteLinks, siteMeta } from '#/lib/seo';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
 import { getSession } from '#/lib/auth-server';
+import { getCookieTimeZone, writeTimeZoneCookie } from '#/lib/time-zone';
 import { ArrowLeftIcon, MapPinOffIcon } from 'lucide-react';
 
 import appCss from '../styles.css?url';
@@ -24,7 +26,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     {
         beforeLoad: async () => {
             const session = await getSession();
-            return { session };
+            // Relative dates (due dates, "Created today") on the server: the
+            // zone from the cookie and the request time; see use-time-zone.ts.
+            return {
+                session,
+                timeZone: getCookieTimeZone(),
+                now: new Date(),
+            };
         },
         head: ({ match }) => ({
             meta: [
@@ -74,6 +82,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+    // The server renders relative dates by this cookie on the next request.
+    useEffect(() => writeTimeZoneCookie(), []);
+
     return (
         <html lang="en" suppressHydrationWarning>
             <head>

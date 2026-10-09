@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useId, useState } from 'react';
+import { TriangleAlertIcon } from 'lucide-react';
 import { ListSelect } from '#/components/board/list-select';
 import { Button } from '#/components/ui/button';
 import { Label } from '#/components/ui/label';
@@ -10,6 +11,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '#/components/ui/select';
+import { listLabelLinkCount } from '#/lib/boards';
 import { boardQueryOptions, boardsListQueryOptions } from '#/lib/boards-query';
 import type { ListWithCards } from '#/lib/boards-query';
 
@@ -62,6 +64,8 @@ export function MoveListForm({
         ? -1
         : lists.findIndex((l) => l.id === list.id);
     const isSameSpot = currentIndex !== -1 && currentIndex === position - 1;
+    // Labels belong to a board: a move to another one takes them off the cards.
+    const removedLabels = isOtherBoard ? listLabelLinkCount(list) : 0;
     const canMove =
         targetLists !== undefined &&
         !isSameSpot &&
@@ -112,6 +116,13 @@ export function MoveListForm({
                     </SelectContent>
                 </Select>
             </div>
+            {removedLabels > 0 && (
+                <p className="flex gap-2 text-sm text-amber-700 dark:text-amber-400">
+                    <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                    {removedLabels} {removedLabels === 1 ? 'label' : 'labels'}{' '}
+                    will be removed from cards.
+                </p>
+            )}
             <Button type="submit" disabled={!canMove}>
                 Move
             </Button>

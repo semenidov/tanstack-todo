@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '#/db';
 import { boards, cards, lists, session, user } from '#/db/schema';
 import { DEMO_BOARD } from '#/lib/demo-board';
+import { localDateKey } from '#/lib/due-date';
 import { GUEST_CAP_CODE } from '#/lib/guest';
 import { MAX_ACTIVE_GUESTS } from '#/lib/quotas';
 import { addCardAs, addListAs, createBoardAs } from '#/server/board-writes';
 import { getBoard } from '#/server/boards-repo';
+import { getChecklist } from '#/server/checklists-repo';
+import { listLabels } from '#/server/labels-repo';
 import { moveListOrThrow } from '#/server/move-list';
 import { seedUser } from '#/test/db';
 import { count, eq, inArray, sql } from 'drizzle-orm';
@@ -121,16 +124,55 @@ describe('guest sign-in', () => {
             .where(eq(boards.ownerId, guest.id));
         expect(owned).toHaveLength(1);
         const demo = await getBoard(guest.id, owned[0].id);
+        // No time zone cookie in the request: due dates count from today in UTC.
+        const today = Date.parse(localDateKey(new Date(), 'UTC'));
         expect(demo?.board.title).toBe('Todo app roadmap');
+        const demoLabels = await listLabels(guest.id, owned[0].id);
+        expect(
+            demoLabels.map((l) => ({ title: l.title, color: l.color })),
+        ).toEqual(DEMO_BOARD.labels);
+        const titleOf = new Map(demoLabels.map((l) => [l.id, l.title]));
+        // The board has only the counts; the checklists come by card.
+        const checklistOf = new Map(
+            await Promise.all(
+                (demo?.lists ?? [])
+                    .flatMap((l) => l.cards)
+                    .map(
+                        async (c) =>
+                            [c.id, await getChecklist(guest.id, c.id)] as const,
+                    ),
+            ),
+        );
         expect(
             demo?.lists.map((l) => ({
                 title: l.title,
                 cards: l.cards.map((c) => ({
                     title: c.title,
                     description: c.description,
+                    ...(c.completedAt && { completed: true }),
+                    ...(c.dueDate && {
+                        dueInDays: (Date.parse(c.dueDate) - today) / DAY_MS,
+                    }),
+                    ...(c.labelIds.length > 0 && {
+                        labels: c.labelIds.map((id) => titleOf.get(id)),
+                    }),
+                    ...(checklistOf.get(c.id) && {
+                        checklist: {
+                            title: checklistOf.get(c.id)?.title,
+                            items: checklistOf.get(c.id)?.items.map((i) => ({
+                                title: i.title,
+                                ...(i.done && { done: true }),
+                            })),
+                        },
+                    }),
                 })),
             })),
         ).toEqual(DEMO_BOARD.lists);
+        // The checklist shows 2/4 on the card face.
+        expect(demo?.lists[0].cards[1]).toMatchObject({
+            checklistDone: 2,
+            checklistTotal: 4,
+        });
         expect(demo?.lists[1].cards[0].title).toBe(
             '👋 Try me: drag this card to Done',
         );

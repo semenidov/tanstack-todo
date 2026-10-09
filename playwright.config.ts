@@ -20,12 +20,15 @@ export default defineConfig({
     use: {
         baseURL,
         trace: 'retain-on-failure',
+        // Due dates (#120) depend on the time zone; far from UTC, so a missing
+        // time zone cookie shows up. The page clock is set per test.
+        timezoneId: 'Pacific/Kiritimati',
     },
     projects: [
         { name: 'setup', testMatch: /auth\.setup\.ts/ },
         {
             name: 'crud',
-            testMatch: /boards?\.spec\.ts/,
+            testMatch: /(boards?|card-face|due-date|labels)\.spec\.ts/,
             dependencies: ['setup'],
             use: {
                 ...devices['Desktop Chrome'],

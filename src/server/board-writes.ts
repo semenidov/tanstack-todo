@@ -1,6 +1,9 @@
 import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
+import * as checklistsRepo from '#/server/checklists-repo';
+import * as labelsRepo from '#/server/labels-repo';
+import type { LabelInput } from '#/server/labels-repo';
 
 // Bodies of the server fns that add a live row (create, restore; move is in
 // move-card.ts). The repo functions default to the regular quotas, so the
@@ -44,4 +47,33 @@ export function addCardAs(user: SessionUser, listId: string, title: string) {
 
 export function restoreCardAs(user: SessionUser, cardId: string) {
     return repo.restoreCard(user.id, cardId, quotasFor(user));
+}
+
+export function createLabelAs(
+    user: SessionUser,
+    boardId: string,
+    input: LabelInput,
+) {
+    return labelsRepo.createLabel(user.id, boardId, input, quotasFor(user));
+}
+
+export function addCardLabelAs(
+    user: SessionUser,
+    cardId: string,
+    labelId: string,
+) {
+    return labelsRepo.addCardLabel(user.id, cardId, labelId, quotasFor(user));
+}
+
+export function addChecklistItemAs(
+    user: SessionUser,
+    checklistId: string,
+    title: string,
+) {
+    return checklistsRepo.addChecklistItem(
+        user.id,
+        checklistId,
+        title,
+        quotasFor(user),
+    );
 }
