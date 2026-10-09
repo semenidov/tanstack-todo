@@ -39,6 +39,18 @@ vi.mock('#/server/labels', () => ({
     setCardLabelServer: vi.fn(),
 }));
 
+// The checklist server fns import the db: the card has no checklist here.
+vi.mock('#/server/checklists', () => ({
+    getChecklistServer: vi.fn(() => Promise.resolve(null)),
+    createChecklistServer: vi.fn(),
+    renameChecklistServer: vi.fn(),
+    deleteChecklistServer: vi.fn(),
+    addChecklistItemServer: vi.fn(),
+    updateChecklistItemServer: vi.fn(),
+    deleteChecklistItemServer: vi.fn(),
+    moveChecklistItemServer: vi.fn(),
+}));
+
 vi.mock('@tanstack/react-start', () => ({
     useServerFn: (fn: unknown) => fn,
 }));

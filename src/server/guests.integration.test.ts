@@ -8,6 +8,7 @@ import { GUEST_CAP_CODE } from '#/lib/guest';
 import { MAX_ACTIVE_GUESTS } from '#/lib/quotas';
 import { addCardAs, addListAs, createBoardAs } from '#/server/board-writes';
 import { getBoard } from '#/server/boards-repo';
+import { getChecklist } from '#/server/checklists-repo';
 import { listLabels } from '#/server/labels-repo';
 import { moveListOrThrow } from '#/server/move-list';
 import { seedUser } from '#/test/db';
@@ -131,6 +132,17 @@ describe('guest sign-in', () => {
             demoLabels.map((l) => ({ title: l.title, color: l.color })),
         ).toEqual(DEMO_BOARD.labels);
         const titleOf = new Map(demoLabels.map((l) => [l.id, l.title]));
+        // The board has only the counts; the checklists come by card.
+        const checklistOf = new Map(
+            await Promise.all(
+                (demo?.lists ?? [])
+                    .flatMap((l) => l.cards)
+                    .map(
+                        async (c) =>
+                            [c.id, await getChecklist(guest.id, c.id)] as const,
+                    ),
+            ),
+        );
         expect(
             demo?.lists.map((l) => ({
                 title: l.title,
@@ -144,9 +156,23 @@ describe('guest sign-in', () => {
                     ...(c.labelIds.length > 0 && {
                         labels: c.labelIds.map((id) => titleOf.get(id)),
                     }),
+                    ...(checklistOf.get(c.id) && {
+                        checklist: {
+                            title: checklistOf.get(c.id)?.title,
+                            items: checklistOf.get(c.id)?.items.map((i) => ({
+                                title: i.title,
+                                ...(i.done && { done: true }),
+                            })),
+                        },
+                    }),
                 })),
             })),
         ).toEqual(DEMO_BOARD.lists);
+        // The checklist shows 2/4 on the card face.
+        expect(demo?.lists[0].cards[1]).toMatchObject({
+            checklistDone: 2,
+            checklistTotal: 4,
+        });
         expect(demo?.lists[1].cards[0].title).toBe(
             '👋 Try me: drag this card to Done',
         );

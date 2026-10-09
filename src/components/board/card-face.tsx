@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { DueBadge } from '#/components/board/due/due-badge';
 import { LabelStrip } from '#/components/board/labels/label-strip';
 import type { Card } from '#/lib/boards-query';
-import { CheckIcon, TextIcon } from 'lucide-react';
+import { cn } from 'cn';
+import { CheckIcon, SquareCheckBigIcon, TextIcon } from 'lucide-react';
 
 interface CardFaceProps {
     card: Card;
@@ -25,6 +26,22 @@ export function CardFace({ card, title }: CardFaceProps) {
                 due={card}
                 completed={card.completedAt !== null}
             />,
+        );
+    }
+    if (card.checklistTotal > 0) {
+        const complete = card.checklistDone === card.checklistTotal;
+        badges.push(
+            <span
+                key="checklist"
+                className={cn(
+                    'flex items-center gap-1 tabular-nums',
+                    complete && 'text-green-600 dark:text-green-500',
+                )}
+            >
+                <SquareCheckBigIcon className="size-3.5" />
+                <span className="sr-only">Checklist: </span>
+                {card.checklistDone}/{card.checklistTotal}
+            </span>,
         );
     }
     if (card.description) {

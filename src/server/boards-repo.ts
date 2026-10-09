@@ -142,11 +142,12 @@ export async function seedDemoBoard(
                     : addDays(today, card.dueInDays),
             position: keys[j],
             labels: card.labels ?? [],
+            checklist: card.checklist,
         }));
     });
     const insertedCards = await db
         .insert(cards)
-        .values(cardRows.map(({ labels: _, ...card }) => card))
+        .values(cardRows.map(({ labels: _, checklist: __, ...card }) => card))
         .returning();
 
     // Labels in creation order: one insert would give them one created_at and
@@ -175,6 +176,39 @@ export async function seedDemoBoard(
         }),
     );
     if (links.length > 0) await db.insert(cardLabels).values(links);
+
+    // Checklists: one insert of the checklists, one of all their items.
+    const withChecklist = cardRows.flatMap(({ checklist, ...card }) => {
+        if (!checklist) return [];
+        const cardId = cardIdBySpot.get(`${card.listId}:${card.position}`);
+        if (!cardId) throw new Error('Demo checklist not seeded');
+        return [{ cardId, checklist }];
+    });
+    if (withChecklist.length === 0) return board;
+    const checklistRows = await db
+        .insert(checklists)
+        .values(
+            withChecklist.map(({ cardId, checklist }) => ({
+                cardId,
+                title: checklist.title,
+            })),
+        )
+        .returning();
+    const checklistIdByCard = new Map(
+        checklistRows.map((c) => [c.cardId, c.id]),
+    );
+    const items = withChecklist.flatMap(({ cardId, checklist }) => {
+        const checklistId = checklistIdByCard.get(cardId);
+        if (!checklistId) throw new Error('Demo checklist not seeded');
+        const keys = generateNKeysBetween(null, null, checklist.items.length);
+        return checklist.items.map((item, i) => ({
+            checklistId,
+            title: item.title,
+            done: item.done ?? false,
+            position: keys[i],
+        }));
+    });
+    if (items.length > 0) await db.insert(checklistItems).values(items);
     return board;
 }
 

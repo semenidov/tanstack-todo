@@ -359,3 +359,26 @@ export function labelCardCount(board: BoardData, labelId: string): number {
 export function listLabelLinkCount(list: ListWithCards): number {
     return list.cards.reduce((n, card) => n + card.labelIds.length, 0);
 }
+
+/** Checklist progress of the card face (#120), after an edit in the card window. */
+export function setChecklistProgressInBoard(
+    board: BoardData,
+    cardId: string,
+    progress: { done: number; total: number },
+): BoardData {
+    return {
+        ...board,
+        lists: board.lists.map((list) => ({
+            ...list,
+            cards: list.cards.map((card) =>
+                card.id === cardId
+                    ? {
+                          ...card,
+                          checklistDone: progress.done,
+                          checklistTotal: progress.total,
+                      }
+                    : card,
+            ),
+        })),
+    };
+}

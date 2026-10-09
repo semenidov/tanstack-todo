@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { AddChecklistPopover } from '#/components/board/checklist/add-checklist-popover';
+import { OWN_ESCAPE_ATTRIBUTE } from '#/components/board/checklist/checklist-item';
+import { ChecklistSection } from '#/components/board/checklist/checklist-section';
 import {
     useDeleteCard,
     useMoveCard,
@@ -30,6 +34,7 @@ import {
     CardLabelsField,
 } from '#/components/board/labels/card-labels-field';
 import type { Card, ListWithCards } from '#/lib/boards-query';
+import { checklistQueryOptions } from '#/lib/checklist-query';
 import { formatCardDate } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
 import { useNow, useTimeZone } from '#/lib/use-time-zone';
@@ -101,7 +106,20 @@ export function CardDialog({
     if (!hasDue) {
         emptyBlocks.push(<AddDueDateButton key="due" {...dueProps} />);
     }
-    // Checklist button - goes last here (checklist slice).
+    // Prefetched by the card route; undefined only while it loads.
+    const { data: checklist } = useQuery(checklistQueryOptions(card.id));
+    // A checklist made just now opens with its "Add an item" field focused.
+    const [isChecklistNew, setIsChecklistNew] = useState(false);
+    if (checklist === null) {
+        emptyBlocks.push(
+            <AddChecklistPopover
+                key="checklist"
+                boardId={boardId}
+                cardId={card.id}
+                onCreated={() => setIsChecklistNew(true)}
+            />,
+        );
+    }
 
     function commitTitle(raw: string) {
         const trimmed = raw.trim();
@@ -140,6 +158,15 @@ export function CardDialog({
         >
             <DialogContent
                 showCloseButton={false}
+                // Inline checklist fields cancel their edit on Escape instead.
+                onEscapeKeyDown={(e) => {
+                    if (
+                        e.target instanceof Element &&
+                        e.target.closest(`[${OWN_ESCAPE_ATTRIBUTE}]`)
+                    ) {
+                        e.preventDefault();
+                    }
+                }}
                 // Mobile: full screen; from md (as useIsDesktop) a centered window.
                 className="max-md:inset-0 max-md:flex max-md:h-dvh max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-none max-md:p-4 md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto"
             >
@@ -317,7 +344,14 @@ export function CardDialog({
                         )}
                     </div>
 
-                    {/* Checklist block - goes here. */}
+                    {checklist && (
+                        <ChecklistSection
+                            boardId={boardId}
+                            cardId={card.id}
+                            checklist={checklist}
+                            startAdding={isChecklistNew}
+                        />
+                    )}
 
                     <CardDates card={card} />
                 </div>

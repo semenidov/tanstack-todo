@@ -15,6 +15,13 @@ export interface DemoCard {
     dueInDays?: number;
     /** Titles of the board's demo labels on the card (#120). */
     labels?: Array<string>;
+    /** The card's checklist (#120), items in order. */
+    checklist?: DemoChecklist;
+}
+
+export interface DemoChecklist {
+    title: string;
+    items: Array<{ title: string; done?: boolean }>;
 }
 
 export interface DemoLabel {
@@ -55,6 +62,15 @@ export const DEMO_BOARD: {
                     description: 'Deadlines and colored labels on cards.',
                     dueInDays: 0,
                     labels: ['Feature'],
+                    checklist: {
+                        title: 'Card details',
+                        items: [
+                            { title: 'Labels', done: true },
+                            { title: 'Due dates', done: true },
+                            { title: 'Checklists' },
+                            { title: 'Mark as done' },
+                        ],
+                    },
                 },
                 {
                     title: 'Shared boards with roles',
