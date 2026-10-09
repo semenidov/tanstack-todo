@@ -43,6 +43,11 @@ test('a guest gets the demo board with a hint and a banner, and a move is saved'
         }),
     ).toBeVisible();
 
+    // A checklist with 2 of 4 items done.
+    await expect(cardRow(page, 'Card due dates and labels')).toContainText(
+        'Checklist: 2/4',
+    );
+
     await moveCardTo(page, TRY_ME, 'Done', 1);
     await page.reload();
     await expect
