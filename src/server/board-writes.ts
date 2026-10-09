@@ -1,6 +1,7 @@
 import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
+import * as checklistsRepo from '#/server/checklists-repo';
 import * as labelsRepo from '#/server/labels-repo';
 import type { LabelInput } from '#/server/labels-repo';
 
@@ -62,4 +63,17 @@ export function addCardLabelAs(
     labelId: string,
 ) {
     return labelsRepo.addCardLabel(user.id, cardId, labelId, quotasFor(user));
+}
+
+export function addChecklistItemAs(
+    user: SessionUser,
+    checklistId: string,
+    title: string,
+) {
+    return checklistsRepo.addChecklistItem(
+        user.id,
+        checklistId,
+        title,
+        quotasFor(user),
+    );
 }

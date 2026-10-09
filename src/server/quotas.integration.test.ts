@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
-import { boards, cardLabels, cards, labels, lists } from '#/db/schema';
+import {
+    boards,
+    cardLabels,
+    cards,
+    checklistItems,
+    checklists,
+    labels,
+    lists,
+} from '#/db/schema';
 import {
     GUEST_QUOTAS,
     MAX_BOARDS_PER_USER,
@@ -24,6 +32,7 @@ import {
 import {
     addCardAs,
     addCardLabelAs,
+    addChecklistItemAs,
     addListAs,
     createLabelAs,
     createBoardAs,
@@ -448,6 +457,35 @@ describe('guest quotas on every insert path', () => {
         await expect(addCardLabelAs(guest, card.id, extra.id)).rejects.toThrow(
             guestLimit(QuotaKind.CardLabels),
         );
+    });
+
+    it('addChecklistItem: refuses the 21st item; the checklist keeps 20', async () => {
+        const guest = await seedGuest();
+        const [board] = await seedBoards(guest.id, 1);
+        const [list] = await seedLists(board.id, 1);
+        const [card] = await seedCards(list.id, 1);
+        const [checklist] = await db
+            .insert(checklists)
+            .values({ cardId: card.id, title: 'Steps' })
+            .returning();
+        const limit = GUEST_QUOTAS[QuotaKind.ChecklistItems];
+        const keys = generateNKeysBetween(null, null, limit);
+        await db.insert(checklistItems).values(
+            keys.map((position) => ({
+                checklistId: checklist.id,
+                title: 'Item',
+                position,
+            })),
+        );
+
+        await expect(
+            addChecklistItemAs(guest, checklist.id, 'Typed'),
+        ).rejects.toThrow(guestLimit(QuotaKind.ChecklistItems));
+        const [{ n }] = await db
+            .select({ n: count() })
+            .from(checklistItems)
+            .where(eq(checklistItems.checklistId, checklist.id));
+        expect(n).toBe(limit);
     });
 
     it('restoreCard: refuses when the list is full again', async () => {

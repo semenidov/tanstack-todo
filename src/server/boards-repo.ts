@@ -4,7 +4,15 @@ import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import { addDays, localDateKey } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
-import { boards, cardLabels, cards, labels, lists } from '#/db/schema';
+import {
+    boards,
+    cardLabels,
+    cards,
+    checklistItems,
+    checklists,
+    labels,
+    lists,
+} from '#/db/schema';
 import { ownedBoardIds, ownedListIds } from '#/server/access';
 import {
     and,
@@ -16,7 +24,9 @@ import {
     isNull,
     max,
     min,
+    sql,
 } from 'drizzle-orm';
+import type { AnyColumn } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 
 export function listBoards(userId: string) {
@@ -183,6 +193,25 @@ export function deleteBoard(userId: string, boardId: string) {
         .returning();
 }
 
+/**
+ * Items of the card's checklist (only done ones with `done`) as a scalar
+ * subquery. `sql` wraps the builder query: relational query extras take SQL,
+ * and a correlated subquery has no builder form there.
+ */
+function checklistItemCount(cardId: AnyColumn, done?: true) {
+    const items = db
+        .select({ n: count() })
+        .from(checklistItems)
+        .innerJoin(checklists, eq(checklistItems.checklistId, checklists.id))
+        .where(
+            and(
+                eq(checklists.cardId, cardId),
+                done ? eq(checklistItems.done, true) : undefined,
+            ),
+        );
+    return sql`(${items})`.mapWith(Number);
+}
+
 export async function getBoard(userId: string, boardId: string) {
     const board = await db.query.boards.findFirst({
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
@@ -200,6 +229,16 @@ export async function getBoard(userId: string, boardId: string) {
                         // Only the ids: colors and titles come from the board's
                         // labels cache (labels-query.ts).
                         with: { cardLabels: { columns: { labelId: true } } },
+                        // Checklist progress for the card face (#120): counted
+                        // in this query, items are not loaded with the board.
+                        extras: (card) => ({
+                            checklistDone: checklistItemCount(card.id, true).as(
+                                'checklist_done',
+                            ),
+                            checklistTotal: checklistItemCount(card.id).as(
+                                'checklist_total',
+                            ),
+                        }),
                     },
                 },
             },

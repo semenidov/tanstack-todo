@@ -33,6 +33,8 @@ function makeCard(id: string, title = id): Card {
         dueDate: null,
         dueAt: null,
         labelIds: [],
+        checklistDone: 0,
+        checklistTotal: 0,
         position: 'a0',
         createdAt: new Date(0),
         updatedAt: new Date(0),
