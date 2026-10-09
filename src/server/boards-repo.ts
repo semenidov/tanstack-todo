@@ -3,6 +3,7 @@ import { DEMO_BOARD } from '#/lib/demo-board';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import { boards, cards, lists } from '#/db/schema';
+import { ownedBoardIds, ownedListIds } from '#/server/access';
 import {
     and,
     asc,
@@ -15,21 +16,6 @@ import {
     min,
 } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
-
-function ownedBoardIds(userId: string) {
-    return db
-        .select({ id: boards.id })
-        .from(boards)
-        .where(eq(boards.ownerId, userId));
-}
-
-function ownedListIds(userId: string) {
-    return db
-        .select({ id: lists.id })
-        .from(lists)
-        .innerJoin(boards, eq(lists.boardId, boards.id))
-        .where(and(eq(boards.ownerId, userId), isNull(lists.deletedAt)));
-}
 
 export function listBoards(userId: string) {
     // Left joins keep boards without lists/cards; counting non-null ids gives 0 for them.
