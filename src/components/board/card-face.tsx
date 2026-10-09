@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { DueBadge } from '#/components/board/due/due-badge';
 import type { Card } from '#/lib/boards-query';
 import { CheckIcon, TextIcon } from 'lucide-react';
 
@@ -16,6 +17,15 @@ interface CardFaceProps {
 export function CardFace({ card, title }: CardFaceProps) {
     // Footer badges in a fixed order: due date → checklist → description.
     const badges: Array<ReactNode> = [];
+    if (card.dueDate || card.dueAt) {
+        badges.push(
+            <DueBadge
+                key="due"
+                due={card}
+                completed={card.completedAt !== null}
+            />,
+        );
+    }
     if (card.description) {
         badges.push(
             <span key="description" role="img" aria-label="Has description">

@@ -21,6 +21,7 @@ import {
 import { boardQueryOptions } from '#/lib/boards-query';
 import type { Card } from '#/lib/boards-query';
 import type { CardMoveNeighbors } from '#/lib/boards';
+import type { Due } from '#/lib/due-date';
 import {
     createErrorMessage,
     moveErrorMessage,
@@ -79,10 +80,13 @@ export interface UpdateCardVars {
     title?: string;
     description?: string | null;
     completed?: boolean;
+    /** Both null - removes the due date. */
+    due?: Due;
 }
 
 // Edits of one card's content go through the card queue (card-queue.ts): fast
-// toggles of "completed" reach the server in the order they were made.
+// toggles of "completed" and due date changes reach the server in the order
+// they were made.
 export function useUpdateCard(boardId: string, cardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
@@ -104,6 +108,10 @@ export function useUpdateCard(boardId: string, cardId: string) {
                           }),
                           ...(vars.completed !== undefined && {
                               completedAt: vars.completed ? new Date() : null,
+                          }),
+                          ...(vars.due && {
+                              dueDate: vars.due.dueDate,
+                              dueAt: vars.due.dueAt,
                           }),
                       })
                     : old,

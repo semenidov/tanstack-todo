@@ -127,7 +127,12 @@ export function addCardToList(
 export function updateCardInBoard(
     board: BoardData,
     cardId: string,
-    patch: Partial<Pick<Card, 'title' | 'description' | 'completedAt'>>,
+    patch: Partial<
+        Pick<
+            Card,
+            'title' | 'description' | 'completedAt' | 'dueDate' | 'dueAt'
+        >
+    >,
 ): BoardData {
     return {
         ...board,

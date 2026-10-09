@@ -6,6 +6,11 @@ export interface DemoCard {
     description: string;
     /** Marked done (#120): the demo shows one completed card. */
     completed?: boolean;
+    /**
+     * A whole-day due date, in days from the guest's today (by the time zone
+     * cookie): 0 - today, negative - overdue.
+     */
+    dueInDays?: number;
 }
 
 export interface DemoList {
@@ -22,10 +27,12 @@ export const DEMO_BOARD: { title: string; lists: Array<DemoList> } = {
                 {
                     title: 'Drag-and-drop lists',
                     description: 'Reorder lists the same way as cards.',
+                    dueInDays: -2,
                 },
                 {
                     title: 'Card due dates and labels',
                     description: 'Deadlines and colored labels on cards.',
+                    dueInDays: 0,
                 },
                 {
                     title: 'Shared boards with roles',

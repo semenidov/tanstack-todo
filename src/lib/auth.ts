@@ -8,6 +8,7 @@ import {
     SIGN_UP_LIMIT,
 } from '#/lib/auth-rate-limit';
 import { prepareGuestSignIn, seedGuest } from '#/server/guests';
+import { timeZoneFromCookies } from '#/lib/time-zone';
 
 const PROD_HOST = 'todo-semenidov.vercel.app';
 const PREVIEW_HOSTS = ['tanstack-todo-*-ssemenidov.vercel.app'];
@@ -68,8 +69,11 @@ export const auth = betterAuth({
                 before: async (user) => {
                     if (user.isAnonymous === true) await prepareGuestSignIn();
                 },
-                after: async (user) => {
-                    if (user.isAnonymous === true) await seedGuest(user.id);
+                after: async (user, context) => {
+                    if (user.isAnonymous !== true) return;
+                    // The demo board's "Today" is the guest's today (#120).
+                    const cookies = context?.headers?.get('cookie');
+                    await seedGuest(user.id, timeZoneFromCookies(cookies));
                 },
             },
         },

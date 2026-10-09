@@ -26,6 +26,12 @@ vi.mock('@tanstack/react-start', () => ({
     useServerFn: (fn: unknown) => fn,
 }));
 
+// The time zone and clock come from the root route context; no router here.
+vi.mock('#/lib/use-time-zone', () => ({
+    useTimeZone: () => 'UTC',
+    useNow: () => new Date(),
+}));
+
 vi.mock('sonner', () => ({
     toast: { warning: vi.fn(), error: vi.fn(), success: vi.fn() },
 }));

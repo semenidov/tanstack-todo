@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import {
     useDeleteCard,
     useMoveCard,
@@ -20,9 +21,16 @@ import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
 import { ListSelect } from '#/components/board/list-select';
 import { Textarea } from '#/components/ui/textarea';
-import type { Card, ListWithCards } from '#/lib/boards-query';
-import { useHydrated } from '#/lib/use-hydrated';
 import {
+    AddDueDateButton,
+    DueDateField,
+} from '#/components/board/due/due-date-field';
+import type { Card, ListWithCards } from '#/lib/boards-query';
+import { formatCardDate } from '#/lib/due-date';
+import type { Due } from '#/lib/due-date';
+import { useNow, useTimeZone } from '#/lib/use-time-zone';
+import {
+    ArrowLeftIcon,
     CircleCheckIcon,
     CircleIcon,
     EllipsisIcon,
@@ -52,6 +60,31 @@ export function CardDialog({
     const { moveCard } = useMoveCard(boardId);
     const { deleteWithUndo } = useDeleteCard(boardId);
     const isCompleted = card.completedAt !== null;
+    const hasDue = card.dueDate !== null || card.dueAt !== null;
+    const [isDueOpen, setIsDueOpen] = useState(false);
+    const dueProps = {
+        due: card,
+        onChange: (due: Due) => updateCard.mutate({ due }),
+        open: isDueOpen,
+        onOpenChange: setIsDueOpen,
+    };
+
+    // Blocks the card has, in one row: labels and due date.
+    const blocks: Array<ReactNode> = [];
+    // Labels block - goes first here (labels slice).
+    if (hasDue) {
+        blocks.push(
+            <DueDateField key="due" completed={isCompleted} {...dueProps} />,
+        );
+    }
+    // Buttons for the blocks the card doesn't have yet, in the order
+    // Labels / Due date / Checklist; a block takes its place once added.
+    const emptyBlocks: Array<ReactNode> = [];
+    // Labels button - goes first here (labels slice).
+    if (!hasDue) {
+        emptyBlocks.push(<AddDueDateButton key="due" {...dueProps} />);
+    }
+    // Checklist button - goes last here (checklist slice).
 
     function commitTitle(raw: string) {
         const trimmed = raw.trim();
@@ -90,10 +123,23 @@ export function CardDialog({
         >
             <DialogContent
                 showCloseButton={false}
-                className="max-h-[90dvh] overflow-y-auto sm:max-w-lg"
+                // Mobile: full screen; from md (as useIsDesktop) a centered window.
+                className="max-md:inset-0 max-md:flex max-md:h-dvh max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-none max-md:p-4 md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto"
             >
-                {/* Header: completed toggle → title and its list → menu and close. */}
-                <div className="flex min-w-0 items-start gap-2">
+                {/* Header. Desktop: completed toggle → title and its list below
+                    → menu and close. Mobile: ← list name ⋯, then toggle and title. */}
+                <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2 [grid-template-areas:'back_list_actions'_'check_title_title'] md:[grid-template-areas:'check_title_actions'_'._list_.']">
+                    <DialogClose asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Close"
+                            className="mt-0.5 [grid-area:back] md:hidden"
+                        >
+                            <ArrowLeftIcon />
+                        </Button>
+                    </DialogClose>
+
                     {/* The only place to mark the card completed. */}
                     <button
                         type="button"
@@ -103,7 +149,7 @@ export function CardDialog({
                         onClick={() =>
                             updateCard.mutate({ completed: !isCompleted })
                         }
-                        className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                        className="-ml-2 flex size-9 shrink-0 items-center justify-center rounded-full outline-none [grid-area:check] focus-visible:ring-[3px] focus-visible:ring-ring/50 max-md:ml-0"
                     >
                         {isCompleted ? (
                             <CircleCheckIcon className="size-5 text-green-600 dark:text-green-500" />
@@ -114,7 +160,7 @@ export function CardDialog({
 
                     {/* min-w-0: long titles and list names wrap or truncate
                         instead of widening the dialog. */}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 [grid-area:title]">
                         {isEditingTitle ? (
                             <>
                                 {/* Keeps the dialog named for screen readers while the title is an input. */}
@@ -154,24 +200,28 @@ export function CardDialog({
                                 </button>
                             </DialogTitle>
                         )}
-                        <div className="flex min-w-0 items-center text-sm text-muted-foreground">
-                            <label htmlFor="card-list" className="shrink-0">
-                                in list
-                            </label>
-                            <ListSelect
-                                id="card-list"
-                                lists={lists}
-                                value={list.id}
-                                // To the top of the chosen list; exact position - Move… on the card.
-                                onValueChange={(toListId) =>
-                                    moveCard(card.id, toListId, 0)
-                                }
-                                className="w-auto border-none bg-transparent px-1.5 font-medium text-foreground shadow-none data-[size=default]:h-7 dark:bg-transparent"
-                            />
-                        </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center">
+                    <div className="flex min-w-0 items-center text-sm text-muted-foreground [grid-area:list] max-md:min-h-9">
+                        <label
+                            htmlFor="card-list"
+                            className="shrink-0 max-md:sr-only"
+                        >
+                            in list
+                        </label>
+                        <ListSelect
+                            id="card-list"
+                            lists={lists}
+                            value={list.id}
+                            // To the top of the chosen list; exact position - Move… on the card.
+                            onValueChange={(toListId) =>
+                                moveCard(card.id, toListId, 0)
+                            }
+                            className="w-auto border-none bg-transparent px-1.5 font-medium text-foreground shadow-none data-[size=default]:h-7 dark:bg-transparent"
+                        />
+                    </div>
+
+                    <div className="flex shrink-0 items-center [grid-area:actions] max-md:mt-0.5">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
@@ -197,6 +247,7 @@ export function CardDialog({
                                 variant="ghost"
                                 size="icon-sm"
                                 aria-label="Close"
+                                className="max-md:hidden"
                             >
                                 <XIcon />
                             </Button>
@@ -206,8 +257,16 @@ export function CardDialog({
 
                 {/* min-w-0: a grid item of DialogContent. */}
                 <div className="min-w-0 space-y-6">
-                    {/* Labels and due date in one row, or the buttons of the
-                        empty blocks (Labels / Due date / Checklist) - go here. */}
+                    {blocks.length > 0 && (
+                        <div className="flex flex-wrap gap-x-6 gap-y-3">
+                            {blocks}
+                        </div>
+                    )}
+                    {emptyBlocks.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                            {emptyBlocks}
+                        </div>
+                    )}
 
                     <div>
                         <label
@@ -250,30 +309,16 @@ export function CardDialog({
     );
 }
 
-// "Created Oct 3 · Updated today". Relative to the device's date, so it is
-// rendered on the client only: the server doesn't know the device's time zone.
+// "Created Oct 3 · Updated today", by the render time zone like due dates.
 function CardDates({ card }: { card: Card }) {
-    const hydrated = useHydrated();
-    if (!hydrated) return null;
-
-    const now = new Date();
+    const timeZone = useTimeZone();
+    const now = useNow();
     const isUpdated = card.updatedAt.getTime() !== card.createdAt.getTime();
     return (
         <p className="text-xs text-muted-foreground">
-            Created {formatCardDate(card.createdAt, now)}
-            {isUpdated && ` · Updated ${formatCardDate(card.updatedAt, now)}`}
+            Created {formatCardDate(card.createdAt, now, timeZone)}
+            {isUpdated &&
+                ` · Updated ${formatCardDate(card.updatedAt, now, timeZone)}`}
         </p>
     );
-}
-
-function formatCardDate(date: Date, now: Date) {
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    if (date.toDateString() === now.toDateString()) return 'today';
-    if (date.toDateString() === yesterday.toDateString()) return 'yesterday';
-    return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        ...(date.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
-    });
 }

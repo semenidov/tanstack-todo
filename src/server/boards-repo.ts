@@ -2,6 +2,8 @@ import { db } from '#/db';
 import { DEMO_BOARD } from '#/lib/demo-board';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
+import { addDays, localDateKey } from '#/lib/due-date';
+import type { Due } from '#/lib/due-date';
 import { boards, cards, lists } from '#/db/schema';
 import { ownedBoardIds, ownedListIds } from '#/server/access';
 import {
@@ -88,8 +90,16 @@ export async function createBoard(
     return board;
 }
 
-/** The guest's demo board (#84): board, lists in order, cards in the given order. */
-export async function seedDemoBoard(userId: string) {
+/**
+ * The guest's demo board (#84): board, lists in order, cards in the given order.
+ * Due dates count from today in `timeZone` (the guest's cookie, #120).
+ */
+export async function seedDemoBoard(
+    userId: string,
+    timeZone: string,
+    now = new Date(),
+) {
+    const today = localDateKey(now, timeZone);
     const [board] = await db
         .insert(boards)
         .values({ ownerId: userId, title: DEMO_BOARD.title })
@@ -115,7 +125,11 @@ export async function seedDemoBoard(userId: string) {
             listId,
             title: card.title,
             description: card.description,
-            completedAt: card.completed ? new Date() : null,
+            completedAt: card.completed ? now : null,
+            dueDate:
+                card.dueInDays === undefined
+                    ? null
+                    : addDays(today, card.dueInDays),
             position: keys[j],
         }));
     });
@@ -406,9 +420,15 @@ export async function addCard(
 export function updateCard(
     userId: string,
     cardId: string,
-    data: { title?: string; description?: string | null; completed?: boolean },
+    data: {
+        title?: string;
+        description?: string | null;
+        completed?: boolean;
+        /** Both null - no due date (cards_due_check: never both set). */
+        due?: Due;
+    },
 ) {
-    const { completed, ...fields } = data;
+    const { completed, due, ...fields } = data;
     // updatedAt is bumped by the column's $onUpdate on every write.
     return db
         .update(cards)
@@ -417,6 +437,7 @@ export function updateCard(
             ...(completed !== undefined && {
                 completedAt: completed ? new Date() : null,
             }),
+            ...(due && { dueDate: due.dueDate, dueAt: due.dueAt }),
         })
         .where(
             and(

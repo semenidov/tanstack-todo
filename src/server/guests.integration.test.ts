@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '#/db';
 import { boards, cards, lists, session, user } from '#/db/schema';
 import { DEMO_BOARD } from '#/lib/demo-board';
+import { localDateKey } from '#/lib/due-date';
 import { GUEST_CAP_CODE } from '#/lib/guest';
 import { MAX_ACTIVE_GUESTS } from '#/lib/quotas';
 import { addCardAs, addListAs, createBoardAs } from '#/server/board-writes';
@@ -121,6 +122,8 @@ describe('guest sign-in', () => {
             .where(eq(boards.ownerId, guest.id));
         expect(owned).toHaveLength(1);
         const demo = await getBoard(guest.id, owned[0].id);
+        // No time zone cookie in the request: due dates count from today in UTC.
+        const today = Date.parse(localDateKey(new Date(), 'UTC'));
         expect(demo?.board.title).toBe('Todo app roadmap');
         expect(
             demo?.lists.map((l) => ({
@@ -129,6 +132,9 @@ describe('guest sign-in', () => {
                     title: c.title,
                     description: c.description,
                     ...(c.completedAt && { completed: true }),
+                    ...(c.dueDate && {
+                        dueInDays: (Date.parse(c.dueDate) - today) / DAY_MS,
+                    }),
                 })),
             })),
         ).toEqual(DEMO_BOARD.lists);
