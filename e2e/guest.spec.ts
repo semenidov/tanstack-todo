@@ -31,6 +31,11 @@ test('a guest gets the demo board with a hint and a banner, and a move is saved'
             name: 'Completed',
         }),
     ).toBeVisible();
+    // Due dates: today by the time zone cookie, and an overdue one.
+    await expect(cardRow(page, 'Card due dates and labels')).toContainText(
+        'Due today: Today',
+    );
+    await expect(cardRow(page, 'Drag-and-drop lists')).toContainText('Overdue');
 
     await moveCardTo(page, TRY_ME, 'Done', 1);
     await page.reload();
