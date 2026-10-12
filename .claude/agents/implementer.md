@@ -14,6 +14,7 @@ One of:
 
 - an issue number: read it (`mcp__github__issue_read`); its spec (acceptance criteria, edge cases, implementation plan) is your task;
 - a fix task from the main session: issue, PR, what is broken (failed CI log excerpt, verifier blocker/should, or owner's fixes). Check out the PR branch, fix only that, push, exit. Context comes from the task, the issue and the PR description.
+- a slice task from the main session (large task split into slices, `CONTRIBUTING.md`, «Цикл»): issue, PR, slice number and scope, what previous slices exported. Check out the PR branch (don't create one), implement only this slice, append «Слайс N» to the PR description, push, exit. Don't touch `src/db/schema.ts` / `drizzle/` unless you are slice 1 - if the schema lacks something, stop and report. Fix existing tests your slice broke: before push run the integration/e2e specs of the area you touched. In the report add what the next slice needs (exports, where to plug in).
 
 If the spec is ambiguous or contradicts the code, stop and report the question instead of guessing.
 
