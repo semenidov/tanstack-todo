@@ -128,7 +128,7 @@ export function ChecklistSection({
         const moved = moveItemInChecklist(checklist, itemId, toIndex);
         const neighbors = checklistItemNeighbors(moved.items, itemId);
         if (!neighbors) return;
-        moveItem.mutate({ itemId, toIndex, ...neighbors });
+        moveItem({ itemId, toIndex, ...neighbors });
     }
 
     return (

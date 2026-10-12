@@ -203,9 +203,19 @@ export interface MoveChecklistItemVars extends ChecklistItemNeighbors {
     toIndex: number;
 }
 
-/** Moves the item: the cache by index, the server by the neighbors (ADR 58). */
+/**
+ * Moves the item: the cache by index, the server by the neighbors (ADR 58).
+ * Returns a plain function, not the mutation: the cache is written synchronously
+ * in the drop handler, like `moveCard` (card-mutations.tsx). `onMutate` runs a few
+ * microtasks later, after dnd-kit has already dropped the transforms, and the items
+ * would jump back to the old order for a render and then animate to the new one.
+ */
 export function useMoveChecklistItem(boardId: string, cardId: string) {
-    return useOptimisticChecklistMutation(boardId, cardId, {
+    const cache = useChecklistCache(boardId, cardId);
+    const { queryClient, keys } = cache;
+
+    const { mutate } = useMutation({
+        ...cardMutationOptions(cardId),
         mutationFn: ({
             itemId,
             prevItemId,
@@ -214,8 +224,24 @@ export function useMoveChecklistItem(boardId: string, cardId: string) {
             moveChecklistItemServer({
                 data: { itemId, prevItemId, nextItemId },
             }),
-        apply: (checklist, { itemId, toIndex }) =>
-            moveItemInChecklist(checklist, itemId, toIndex),
-        errorText: "Couldn't move the item. Please try again.",
+        onError: () => {
+            toast.error("Couldn't move the item. Please try again.");
+            for (const queryKey of keys) {
+                void queryClient.invalidateQueries({ queryKey });
+            }
+        },
+        onSettled: () =>
+            invalidateAfterLastCardMutation(queryClient, cardId, keys),
     });
+
+    return (vars: MoveChecklistItemVars) => {
+        // Synchronous cancel: a refetch in flight must not overwrite the move.
+        for (const queryKey of keys) {
+            void queryClient.cancelQueries({ queryKey });
+        }
+        cache.set((old) =>
+            old ? moveItemInChecklist(old, vars.itemId, vars.toIndex) : old,
+        );
+        mutate(vars);
+    };
 }
