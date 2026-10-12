@@ -47,22 +47,25 @@ test('sets a due date with a time, clears the time and removes it; the status fo
     await expect(chip).toHaveText('Due: Mar 20');
 
     await saved(page, () =>
-        picker.getByRole('button', { name: 'Today', exact: true }).click(),
+        picker.getByRole('button', { name: /March 10th/ }).click(),
     );
     await expect(chip).toHaveText('Due today: Today');
 
+    // Enter in the time field saves the time and closes the popover.
     const time = picker.getByRole('textbox', { name: 'Time' });
     await time.fill('15:00');
     await saved(page, () => time.press('Enter'));
+    await expect(picker).toHaveCount(0);
     await expect(chip).toHaveText('Due today: Today 15:00');
 
     // Another day keeps the time.
+    await chip.click();
     await saved(page, () =>
-        picker.getByRole('button', { name: 'Tomorrow' }).click(),
+        picker.getByRole('button', { name: /March 11th/ }).click(),
     );
     await expect(chip).toHaveText('Due tomorrow: Tomorrow 15:00');
     await saved(page, () =>
-        picker.getByRole('button', { name: 'Today', exact: true }).click(),
+        picker.getByRole('button', { name: /March 10th/ }).click(),
     );
 
     await page.keyboard.press('Escape');

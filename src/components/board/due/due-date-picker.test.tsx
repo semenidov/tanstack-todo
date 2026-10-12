@@ -51,6 +51,15 @@ function dayButton(day: number) {
 }
 
 describe('DueDatePicker', () => {
+    it('has no Today / Tomorrow shortcuts: the calendar and the time only', () => {
+        renderPicker(OCT_15);
+
+        expect(
+            screen.queryByRole('button', { name: /^(Today|Tomorrow)$/ }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Time')).toBeInTheDocument();
+    });
+
     it('Enter on the day just clicked closes the picker', async () => {
         const user = userEvent.setup();
         const { onChange, onClose } = renderPicker({

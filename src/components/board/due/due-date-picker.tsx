@@ -3,7 +3,7 @@ import { XIcon } from 'lucide-react';
 import { Button } from '#/components/ui/button';
 import { Calendar } from '#/components/ui/calendar';
 import { Input } from '#/components/ui/input';
-import { addDays, buildDue, dueParts, localDateKey } from '#/lib/due-date';
+import { buildDue, dueParts, localDateKey } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
 import { useNow, useTimeZone } from '#/lib/use-time-zone';
 
@@ -31,7 +31,7 @@ interface DueDatePickerProps {
 }
 
 /**
- * Today / Tomorrow, a calendar and a 24-hour time field. Picking a day saves
+ * A calendar and a 24-hour time field. Picking a day saves
  * it and keeps the time already set; an empty time means the whole day.
  * Enter closes: the day is already saved by the click, so a native Enter on
  * the focused day button would only pick the same day again (#120).
@@ -74,24 +74,6 @@ export function DueDatePicker({ due, onChange, onClose }: DueDatePickerProps) {
 
     return (
         <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-2 gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => pickDate(todayKey)}
-                >
-                    Today
-                </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => pickDate(addDays(todayKey, 1))}
-                >
-                    Tomorrow
-                </Button>
-            </div>
             <Calendar
                 mode="single"
                 required
