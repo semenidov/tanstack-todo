@@ -53,7 +53,9 @@ test('creates a checklist, adds, checks, moves, renames and deletes items, delet
     await openCard(page);
 
     // Create: the popover with the default title, Enter = Add.
-    await cardWindow(page).getByRole('button', { name: 'Checklist' }).click();
+    await cardWindow(page)
+        .getByRole('button', { name: 'Checklist', exact: true })
+        .click();
     const popover = page.getByRole('dialog', { name: 'Add checklist' });
     const title = popover.getByLabel('Title');
     await expect(title).toHaveValue('Checklist');
@@ -61,7 +63,10 @@ test('creates a checklist, adds, checks, moves, renames and deletes items, delet
     await saved(page, () => title.press('Enter'));
     await expect(popover).toHaveCount(0);
     await expect(
-        cardWindow(page).getByRole('button', { name: 'Checklist' }),
+        cardWindow(page).getByRole('button', {
+            name: 'Checklist',
+            exact: true,
+        }),
     ).toHaveCount(0);
 
     // The "Add an item" field is focused; Enter keeps it open for the next one.
@@ -142,7 +147,10 @@ test('creates a checklist, adds, checks, moves, renames and deletes items, delet
         confirm.getByRole('button', { name: 'Delete' }).click(),
     );
     await expect(
-        cardWindow(page).getByRole('button', { name: 'Checklist' }),
+        cardWindow(page).getByRole('button', {
+            name: 'Checklist',
+            exact: true,
+        }),
     ).toBeVisible();
     await closeCard(page);
     await expect(cardRow(page, 'Release')).not.toContainText('Checklist:');
