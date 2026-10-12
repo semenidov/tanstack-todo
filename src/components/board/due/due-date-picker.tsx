@@ -26,13 +26,17 @@ function isSameDue(a: Due, b: Due) {
 interface DueDatePickerProps {
     due: Due;
     onChange: (due: Due) => void;
+    /** Closes the popover: Enter on a day or in a valid time field. */
+    onClose: () => void;
 }
 
 /**
  * Today / Tomorrow, a calendar and a 24-hour time field. Picking a day saves
  * it and keeps the time already set; an empty time means the whole day.
+ * Enter closes: the day is already saved by the click, so a native Enter on
+ * the focused day button would only pick the same day again (#120).
  */
-export function DueDatePicker({ due, onChange }: DueDatePickerProps) {
+export function DueDatePicker({ due, onChange, onClose }: DueDatePickerProps) {
     const timeZone = useTimeZone();
     const now = useNow();
     const timeId = useId();
@@ -51,13 +55,15 @@ export function DueDatePicker({ due, onChange }: DueDatePickerProps) {
         change(buildDue(dateKey, savedTime, timeZone));
     }
 
+    /** Saves the typed time; false if it is invalid. */
     function commitTime() {
-        if (!parts) return;
+        if (!parts) return false;
         const next = buildDue(parts.date, timeText, timeZone);
         setIsTimeInvalid(!next);
-        if (!next) return;
+        if (!next) return false;
         setTimeText(dueParts(next, timeZone)?.time ?? '');
         change(next);
+        return true;
     }
 
     function clearTime() {
@@ -93,6 +99,13 @@ export function DueDatePicker({ due, onChange }: DueDatePickerProps) {
                 defaultMonth={dateKeyToLocal(parts?.date ?? todayKey)}
                 today={dateKeyToLocal(todayKey)}
                 onSelect={(date) => pickDate(localToDateKey(date))}
+                onDayKeyDown={(date, modifiers, e) => {
+                    if (e.key !== 'Enter' || modifiers.disabled) return;
+                    // No native click: it would select the same day again.
+                    e.preventDefault();
+                    pickDate(localToDateKey(date));
+                    onClose();
+                }}
                 weekStartsOn={1}
                 className="mx-auto p-0"
             />
@@ -116,7 +129,7 @@ export function DueDatePicker({ due, onChange }: DueDatePickerProps) {
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 e.preventDefault();
-                                commitTime();
+                                if (commitTime()) onClose();
                             }
                         }}
                     />

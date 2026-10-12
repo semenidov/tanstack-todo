@@ -39,7 +39,11 @@ function DueDatePopover({
                 {children}
             </ResponsivePopoverTrigger>
             <ResponsivePopoverContent title="Due date">
-                <DueDatePicker due={due} onChange={onChange} />
+                <DueDatePicker
+                    due={due}
+                    onChange={onChange}
+                    onClose={() => onOpenChange(false)}
+                />
             </ResponsivePopoverContent>
         </ResponsivePopover>
     );
