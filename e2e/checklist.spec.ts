@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL } from './helpers/auth';
 import { resetBoards } from './helpers/db';
-import { addCard, cardRow, gotoBoard } from './helpers/board';
+import { addCard, cardRow, dndAnnouncement, gotoBoard } from './helpers/board';
 
 test.beforeEach(async () => {
     await resetBoards();
@@ -35,6 +35,13 @@ async function openCard(page: Page) {
 async function closeCard(page: Page) {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toHaveCount(0);
+}
+
+/** The card window has two drag contexts (board, checklist), each with its live region. */
+async function announced(page: Page, text: string) {
+    await expect(
+        dndAnnouncement(page).filter({ hasText: new RegExp(`^${text}$`) }),
+    ).toHaveCount(1);
 }
 
 async function itemNames(page: Page) {
@@ -91,9 +98,18 @@ test('creates a checklist, adds, checks, moves, renames and deletes items, delet
 
     // Move A one down with the keyboard: B, A, C, D, E.
     await openCard(page);
-    await cardWindow(page).getByRole('button', { name: 'Move item A' }).focus();
+    const handle = cardWindow(page).getByRole('button', {
+        name: 'Move item A',
+    });
+    await handle.focus();
+    // Each key waits for the drag state: the sensor listens for arrows only
+    // after the pick-up, a key pressed right away is lost and Space drops the
+    // item in place. "Picked up" is replaced at once by the first "is in".
     await page.keyboard.press('Space');
+    await expect(handle).toHaveAttribute('aria-pressed', 'true');
+    await announced(page, 'Item A is in position 1 of 5');
     await page.keyboard.press('ArrowDown');
+    await announced(page, 'Item A is in position 2 of 5');
     await saved(page, () => page.keyboard.press('Space'));
     await expect.poll(() => itemNames(page)).toEqual(['B', 'A', 'C', 'D', 'E']);
 
