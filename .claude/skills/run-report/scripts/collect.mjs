@@ -2,26 +2,60 @@
 // Draft of the run report (schema.md): implementer transcript(s) + gh + git -> draft JSON.
 // Read-only: publishes nothing. Fields marked "сессия" in schema.md are left for the main session.
 //
-//   node collect.mjs --pr 110 --transcript <subagents/agent-<id>.jsonl> [--transcript ...] [--approved <iso>] [--out draft.json]
+//   node collect.mjs --pr 110 --transcript <subagents/agent-<id>.jsonl> [--role <role>] [--transcript ... [--role ...]] [--approved <iso>] [--out draft.json]
+//
+// --role applies to the --transcript right before it (schema.md -> "Роли"). Without any --role
+// the draft is the same as before roles existed: first segment "impl", the rest "fix", round =
+// segment index, no intermediate CI.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 
-const { values: args } = parseArgs({
+const USAGE =
+    'usage: collect.mjs --pr <N> --transcript <path> [--role <role>] [--transcript <path> [--role <role>]] [--approved <iso>] [--out <file>]';
+const { values: args, tokens: argTokens } = parseArgs({
     options: {
         pr: { type: 'string' },
         transcript: { type: 'string', multiple: true },
+        role: { type: 'string', multiple: true },
         approved: { type: 'string' },
         out: { type: 'string' },
     },
+    tokens: true,
 });
 if (!args.pr || !args.transcript?.length) {
-    console.error(
-        'usage: collect.mjs --pr <N> --transcript <path> [--transcript <path>] [--approved <iso>] [--out <file>]',
-    );
+    console.error(USAGE);
     process.exit(2);
 }
+const ROLE_RE =
+    /^(impl|fix|slice:[1-9]\d*|fix:(ci|verifier|owner|spec)|tooling)$/;
+// Each --role belongs to the --transcript right before it.
+const entries = [];
+for (const t of argTokens) {
+    if (t.kind !== 'option') continue;
+    if (t.name === 'transcript') entries.push({ path: t.value, role: null });
+    else if (t.name === 'role') {
+        const e = entries.at(-1);
+        if (!e || e.role) {
+            console.error(
+                `collect: --role ${t.value} without its --transcript\n${USAGE}`,
+            );
+            process.exit(2);
+        }
+        if (!ROLE_RE.test(t.value)) {
+            console.error(
+                `collect: unknown role "${t.value}": impl | fix | slice:<N> | fix:ci | fix:verifier | fix:owner | fix:spec | tooling`,
+            );
+            process.exit(2);
+        }
+        e.role = t.value;
+    }
+}
+const legacy = entries.every((e) => !e.role);
+// Work before the main session first waits for CI: its CI runs on superseded SHAs are intermediate.
+const preCi = (role) =>
+    role === 'impl' || role === 'fix:spec' || role.startsWith('slice:');
 
 // gh through the local proxy sometimes fails the TLS handshake: retry network errors.
 function run(cmd, argv) {
@@ -78,7 +112,10 @@ function loadTranscript(path) {
                 return badTranscript(path, `line ${i + 1} is not JSON`);
             }
             if (rec === null || typeof rec !== 'object' || Array.isArray(rec))
-                return badTranscript(path, `line ${i + 1} is not a JSON object`);
+                return badTranscript(
+                    path,
+                    `line ${i + 1} is not a JSON object`,
+                );
             return rec;
         });
     if (recs.length === 0) badTranscript(path, 'empty file');
@@ -355,7 +392,7 @@ function costOf(usage) {
     };
 }
 
-function segmentStages(seg, round, usage) {
+function segmentStages(seg, round, usage, role) {
     const items = seg.calls.map((c) => ({ call: c, ...classify(c) }));
     // Reads take the kind of the work around them; reads before the first work call are "explore".
     let seenWork = false;
@@ -463,6 +500,7 @@ function segmentStages(seg, round, usage) {
     return list.map((st) => ({
         round: st.round,
         actor: 'impl',
+        role,
         kind: st.kind,
         name: '',
         draft_files: [...st.files].slice(0, 8),
@@ -556,19 +594,41 @@ const verifierComments = pr.comments
 
 // ---------- assemble ----------
 
-const transcripts = args.transcript.map(loadTranscript);
-const allUsage = transcripts.flatMap((t) => t.usage);
+const allTranscripts = entries.map((e, i) => ({
+    ...loadTranscript(e.path),
+    // Without --role: the first transcript is the first run, the rest are fixes (legacy).
+    role: e.role ?? (i === 0 ? 'impl' : 'fix'),
+}));
 {
-    const fin = allUsage.filter((m) => m.final && m.chars > 0);
+    const all = allTranscripts.flatMap((t) => t.usage);
+    const fin = all.filter((m) => m.final && m.chars > 0);
     const chars = fin.reduce((n, m) => n + m.chars, 0);
     if (chars > 0)
         TOKENS_PER_CHAR =
             fin.reduce((n, m) => n + (m.u.output_tokens ?? 0), 0) / chars;
 }
-const segments = transcripts.flatMap((t) =>
-    t.segments.map((s) => ({ ...s, usage: t.usage })),
+// "tooling" transcripts (work on the process tools) are a separate block, not part of the feature.
+const transcripts = allTranscripts.filter((t) => t.role !== 'tooling');
+if (transcripts.length === 0) {
+    console.error('collect: every transcript is "tooling": no feature run');
+    process.exit(2);
+}
+const allUsage = transcripts.flatMap((t) => t.usage);
+const segmentsOf = (list) =>
+    list.flatMap((t) =>
+        t.segments.map((s) => ({
+            ...s,
+            usage: t.usage,
+            role: t.role,
+            transcript: allTranscripts.indexOf(t),
+        })),
+    );
+const segments = segmentsOf(transcripts);
+// Legacy: the role is per segment (a resumed transcript holds the first run and a fix).
+if (legacy) segments.forEach((s, i) => (s.role = i === 0 ? 'impl' : 'fix'));
+const toolingSegments = segmentsOf(
+    allTranscripts.filter((t) => t.role === 'tooling'),
 );
-const implStages = segments.flatMap((s, i) => segmentStages(s, i + 1, s.usage));
 
 const started = segments[0].start;
 const approved = args.approved ?? new Date().toISOString();
@@ -583,6 +643,41 @@ const ciRuns = ghRuns.filter(
 const roundAt = (iso) =>
     1 + verifyRuns.filter((r) => ms(r.createdAt) <= ms(iso)).length;
 
+// Round of a segment: legacy - its index; with roles - by its start against the verify runs.
+const implStages = segments.flatMap((s, i) =>
+    segmentStages(s, legacy ? i + 1 : roundAt(s.start), s.usage, s.role),
+);
+const toolingStages = toolingSegments.flatMap((s) =>
+    segmentStages(s, roundAt(s.start), s.usage, s.role),
+);
+
+// Intermediate CI (only with roles): the main session first waits for CI after the last pre-CI
+// segment (impl, slice:N, fix:spec) ends, or at the first verify run if that is earlier. Runs
+// created up to that moment (+1 min for the push before the handback) on any SHA but the last
+// one pushed by then were not awaited.
+const intermediate = new Set();
+{
+    const pre = segments.filter((s) => preCi(s.role));
+    if (!legacy && pre.length) {
+        const cutoff =
+            Math.min(
+                Math.max(...pre.map((s) => ms(s.end))),
+                verifyRuns.length ? ms(verifyRuns[0].createdAt) : Infinity,
+            ) + 60e3;
+        const before = ciRuns
+            .filter((r) => ms(r.createdAt) <= cutoff)
+            .sort((a, b) => ms(a.createdAt) - ms(b.createdAt));
+        const lastSha = before.at(-1)?.headSha;
+        for (const r of before) if (r.headSha !== lastSha) intermediate.add(r);
+    }
+}
+const ciCount = (list) => ({
+    runs: list.length,
+    success: list.filter((r) => r.conclusion === 'success').length,
+    failure: list.filter((r) => r.conclusion === 'failure').length,
+    cancelled: list.filter((r) => r.conclusion === 'cancelled').length,
+});
+
 const ghStages = [
     ...ciRuns.map((r) => ({
         round: roundAt(r.createdAt),
@@ -594,6 +689,7 @@ const ghStages = [
         min: minutes(r.createdAt, r.updatedAt),
         ref: r.headSha.slice(0, 7),
         conclusion: r.conclusion,
+        ...(intermediate.has(r) ? { intermediate: true } : {}),
     })),
     ...verifyRuns.map((r, i) => {
         const c = verifierComments.find(
@@ -734,6 +830,45 @@ for (const miss of misses) {
 const allRuns = implStages.flatMap((s) => s.runs);
 const count = (pred) => allRuns.filter(pred).length;
 const sum = (xs) => Math.round(xs.reduce((a, b) => a + b, 0) * 10) / 10;
+const RESULTS = ['pass', 'fail', 'no_tests', 'crash', 'flaky', 'expected_red'];
+const localOf = (runs) =>
+    Object.fromEntries([
+        ['runs', runs.length],
+        ...RESULTS.map((k) => [k, runs.filter((r) => r.result === k).length]),
+    ]);
+
+// Per role: a message belongs to the segment of its transcript that started last before it.
+const allSegments = [...segments, ...toolingSegments];
+const roleOfMessage = new Map();
+allTranscripts.forEach((t, i) => {
+    const segs = allSegments.filter((s) => s.transcript === i);
+    for (const m of t.usage)
+        roleOfMessage.set(
+            m,
+            (segs.findLast((s) => ms(s.start) <= ms(m.at)) ?? segs[0]).role,
+        );
+});
+const roles = [...new Set(allSegments.map((s) => s.role))].map((role) => {
+    const segs = allSegments.filter((s) => s.role === role);
+    const st = [...implStages, ...toolingStages].filter((s) => s.role === role);
+    const msgs = [...roleOfMessage]
+        .filter(([, r]) => r === role)
+        .map(([m]) => m);
+    return {
+        role,
+        in_totals: role !== 'tooling',
+        transcripts: new Set(segs.map((s) => s.transcript)).size,
+        segments: segs.length,
+        rounds: [...new Set(st.map((s) => s.round))].sort((a, b) => a - b),
+        start: segs[0].start,
+        end: segs.at(-1).end,
+        work_min: sum(st.filter((s) => s.kind !== 'wait_ci').map((s) => s.min)),
+        wait_min: sum(st.filter((s) => s.kind === 'wait_ci').map((s) => s.min)),
+        local: localOf(st.flatMap((s) => s.runs)),
+        tokens: msgs.reduce(addMessage, emptyTokens()),
+        cost_usd: costOf(msgs),
+    };
+});
 
 let processSha = null;
 try {
@@ -766,17 +901,14 @@ const report = {
         impl_wait_min: sum(
             implStages.filter((s) => s.kind === 'wait_ci').map((s) => s.min),
         ),
-        rounds: Math.max(segments.length, verifyRuns.length),
+        rounds: legacy
+            ? Math.max(segments.length, verifyRuns.length)
+            : Math.max(verifyRuns.length, ...implStages.map((s) => s.round)),
         verdicts: ghStages
             .filter((s) => s.kind === 'verify')
             .map((s) => s.verdict),
-        ci: {
-            runs: ciRuns.length,
-            success: ciRuns.filter((r) => r.conclusion === 'success').length,
-            failure: ciRuns.filter((r) => r.conclusion === 'failure').length,
-            cancelled: ciRuns.filter((r) => r.conclusion === 'cancelled')
-                .length,
-        },
+        ci: ciCount(ciRuns.filter((r) => !intermediate.has(r))),
+        ci_intermediate: ciCount([...intermediate]),
         local: {
             runs: allRuns.length,
             pass: count((r) => r.result === 'pass'),
@@ -791,7 +923,9 @@ const report = {
         impl_cost_usd: costOf(allUsage),
         cache,
     },
+    roles,
     stages,
+    ...(toolingStages.length ? { tooling: { stages: toolingStages } } : {}),
     // A later report repeats earlier findings: keep the round where each id first appeared.
     findings: [
         ...new Map(

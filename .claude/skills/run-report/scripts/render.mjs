@@ -21,9 +21,43 @@ const SPEC_REF_RE = /^(criterion:\d+|edge:\d+|plan|coding|none)$/;
 
 // ---------- validation ----------
 
+const ROLE_RE =
+    /^(impl|fix|slice:[1-9]\d*|fix:(ci|verifier|owner|spec)|tooling)$/;
 const problems = [];
-r.stages.forEach((s, i) => {
-    const where = `stages[${i}] ${s.actor}/${s.kind}`;
+// Reports before roles have no "roles": nothing new to check.
+const toolingStages = r.tooling?.stages ?? [];
+if (r.roles) {
+    const known = new Set();
+    r.roles.forEach((x, i) => {
+        if (!ROLE_RE.test(x.role ?? ''))
+            problems.push(`roles[${i}]: role "${x.role}" не из словаря`);
+        else if (known.has(x.role))
+            problems.push(`roles[${i}]: role ${x.role} повторяется`);
+        known.add(x.role);
+    });
+    [...r.stages, ...toolingStages].forEach((s, i) => {
+        if (s.actor === 'impl' && !known.has(s.role))
+            problems.push(`impl-этап #${i}: role "${s.role}" нет в roles`);
+    });
+    r.stages.forEach((s, i) => {
+        if (s.role === 'tooling')
+            problems.push(`stages[${i}]: tooling - только в tooling.stages`);
+        if (
+            s.intermediate !== undefined &&
+            (s.actor !== 'ci' || s.intermediate !== true)
+        )
+            problems.push(
+                `stages[${i}]: intermediate только true и только у ci`,
+            );
+    });
+    if (!r.totals.ci_intermediate)
+        problems.push('totals.ci_intermediate: нет счётчика');
+}
+[
+    ...r.stages.map((s, i) => [s, `stages[${i}]`]),
+    ...toolingStages.map((s, i) => [s, `tooling.stages[${i}]`]),
+].forEach(([s, pos]) => {
+    const where = `${pos} ${s.actor}/${s.kind}`;
     if (s.actor === 'impl' && !s.name?.trim())
         problems.push(`${where}: пустое name`);
     (s.runs ?? []).forEach((run, j) => {
@@ -63,7 +97,17 @@ r.totals.local = Object.fromEntries([
     ['runs', runs.length],
     ...RESULTS.map((k) => [k, runs.filter((x) => x.result === k).length]),
 ]);
-for (const s of r.stages) {
+// Per role from the stages too: the session sets expected_red after collect.
+for (const x of r.roles ?? []) {
+    const list = (x.role === 'tooling' ? toolingStages : r.stages)
+        .filter((s) => s.role === x.role)
+        .flatMap((s) => s.runs ?? []);
+    x.local = Object.fromEntries([
+        ['runs', list.length],
+        ...RESULTS.map((k) => [k, list.filter((y) => y.result === k).length]),
+    ]);
+}
+for (const s of [...r.stages, ...toolingStages]) {
     delete s.draft_files;
     for (const run of s.runs ?? []) delete run.hint;
 }
@@ -114,13 +158,28 @@ function errorsCell(list) {
     );
 }
 
+// impl stages show their role unless it is the legacy impl/fix.
+const who = (s) =>
+    s.actor === 'impl' && s.role && !['impl', 'fix'].includes(s.role)
+        ? `impl ${s.role}`
+        : ACTOR[s.actor];
+const ciCell = (ci) => {
+    const by = (c) => ci.filter((s) => s.conclusion === c).length;
+    return [
+        `${by('success')} ок`,
+        by('failure') && `${by('failure')} упал`,
+        by('cancelled') && `${by('cancelled')} отм.`,
+    ]
+        .filter(Boolean)
+        .join(', ');
+};
 const rows = [];
 const rounds = [...new Set(r.stages.map((s) => s.round))].sort((a, b) => a - b);
 for (const round of rounds) {
     const inRound = r.stages.filter((s) => s.round === round);
     const runCell = (list) =>
         list.length ? `${list.length} / ${notOk(list).length}` : '-';
-    // Work stages one per row; docs, ship and wait_ci folded into one row each per round (the JSON keeps them all).
+    // Work stages one per row; docs, ship and wait_ci folded into one row each per round and role (the JSON keeps them all).
     const FOLD = {
         docs: 'Документация, описание PR',
         ship: 'Коммиты, push, PR, метки',
@@ -130,15 +189,19 @@ for (const round of rounds) {
     for (const s of inRound) {
         if (s.actor === 'ci') continue;
         if (s.actor === 'impl' && FOLD[s.kind]) {
-            if (folded.has(s.kind)) continue;
-            folded.add(s.kind);
+            const key = `${s.kind}|${s.role}`;
+            if (folded.has(key)) continue;
+            folded.add(key);
             const group = inRound.filter(
-                (x) => x.actor === 'impl' && x.kind === s.kind,
+                (x) =>
+                    x.actor === 'impl' &&
+                    x.kind === s.kind &&
+                    x.role === s.role,
             );
             const groupRuns = group.flatMap((x) => x.runs ?? []);
             rows.push([
                 round,
-                'impl',
+                who(s),
                 `${FOLD[s.kind]}${group.length > 1 ? ` ×${group.length}` : ''}`,
                 Math.round(group.reduce((a, x) => a + x.min, 0)),
                 runCell(groupRuns),
@@ -149,32 +212,30 @@ for (const round of rounds) {
         const name = s.kind === 'verify' ? 'Проверка' : s.name;
         rows.push([
             round,
-            ACTOR[s.actor],
+            who(s),
             name,
             Math.round(s.min),
             s.verdict ? VERDICT[s.verdict] : runCell(s.runs ?? []),
             s.runs?.length ? errorsCell(s.runs) : '-',
         ]);
     }
-    const ci = inRound.filter((s) => s.actor === 'ci');
-    if (ci.length) {
-        const by = (c) => ci.filter((s) => s.conclusion === c).length;
-        const parts = [
-            `${by('success')} ок`,
-            by('failure') && `${by('failure')} упал`,
-            by('cancelled') && `${by('cancelled')} отм.`,
-        ]
-            .filter(Boolean)
-            .join(', ');
-        rows.push([
-            round,
-            'CI',
-            `CI ×${ci.length}`,
-            Math.round(ci.reduce((a, s) => a + s.min, 0)),
-            parts,
-            '-',
-        ]);
-    }
+    // Intermediate CI (not awaited) - a separate row, outside the CI totals.
+    for (const [list, label] of [
+        [inRound.filter((s) => s.actor === 'ci' && !s.intermediate), 'CI'],
+        [
+            inRound.filter((s) => s.actor === 'ci' && s.intermediate),
+            'CI промежуточные',
+        ],
+    ])
+        if (list.length)
+            rows.push([
+                round,
+                'CI',
+                `${label} ×${list.length}`,
+                Math.round(list.reduce((a, s) => a + s.min, 0)),
+                ciCell(list),
+                '-',
+            ]);
 }
 
 const t = r.totals;
@@ -183,7 +244,10 @@ const summary = [
     `до апрува ${fmtMin(t.wall_min)}`,
     `impl: работа ${fmtMin(t.impl_work_min)}, ожидание CI ${fmtMin(t.impl_wait_min)}`,
     `раундов ${t.rounds} (${t.verdicts.map((v) => VERDICT[v]).join(' → ')})`,
-    `CI ${t.ci.runs} (${t.ci.success} ок${t.ci.failure ? `, ${t.ci.failure} упал` : ''}${t.ci.cancelled ? `, ${t.ci.cancelled} отм.` : ''})`,
+    `CI ${t.ci.runs} (${t.ci.success} ок${t.ci.failure ? `, ${t.ci.failure} упал` : ''}${t.ci.cancelled ? `, ${t.ci.cancelled} отм.` : ''})` +
+        (t.ci_intermediate?.runs
+            ? ` + промежуточных ${t.ci_intermediate.runs}`
+            : ''),
     `локальные запуски ${l.runs}, не ок ${l.runs - l.pass} (flaky ${l.flaky}, red ${l.expected_red})`,
     `токены impl: чтение кэша ${fmtTok(t.impl_tokens.cache_read)}, запись кэша ${fmtTok(t.impl_tokens.cache_write_5m + t.impl_tokens.cache_write_1h)}, output ≈${fmtTok(t.impl_tokens.output_est)}`,
     t.impl_cost_usd
@@ -223,6 +287,19 @@ const findings = r.findings
     )
     .join(' · ');
 
+// By role: only when roles were passed (legacy impl/fix adds nothing over the round table).
+const roleRows = (r.roles ?? []).some((x) => !['impl', 'fix'].includes(x.role))
+    ? [
+          '| Роль | Транскр. | Раунды | Работа, мин | Запуски / не ок (flaky) | Чтение / запись кэша, output ≈ | $ ≈ |',
+          '|---|---|---|---|---|---|---|',
+          ...r.roles.map(
+              (x) =>
+                  `| ${x.role}${x.in_totals ? '' : ' (вне итогов)'} | ${x.transcripts} | ${x.rounds.join(', ') || '-'} | ${Math.round(x.work_min)} | ${x.local.runs} / ${x.local.runs - x.local.pass} (${x.local.flaky}) | ${fmtTok(x.tokens.cache_read)} / ${fmtTok(x.tokens.cache_write_5m + x.tokens.cache_write_1h)}, ${fmtTok(x.tokens.output_est)} | ${x.cost_usd ? fmtUsd(x.cost_usd.total) : '-'} |`,
+          ),
+          '',
+      ]
+    : [];
+
 // JSON inside an HTML comment must not contain "-->".
 const json = JSON.stringify(r).replace(/-->/g, '--\\u003e');
 
@@ -233,6 +310,7 @@ console.log(
         summary,
         '',
         ...(cacheLine ? [cacheLine, ''] : []),
+        ...roleRows,
         '| Раунд | Кто | Этап | Мин | Запуски / не ок | Ошибки |',
         '|---|---|---|---|---|---|',
         ...rows.map(
