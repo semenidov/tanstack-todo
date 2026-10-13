@@ -27,6 +27,7 @@ import { cn } from 'cn';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { CardFace } from '#/components/board/card-face';
 import { useMoveCard } from '#/components/board/card-mutations';
 import { useMoveList } from '#/components/board/list-mutations';
 import {
@@ -37,7 +38,7 @@ import {
 } from '#/lib/boards';
 import { Badge } from '#/components/ui/badge';
 import { boardQueryOptions } from '#/lib/boards-query';
-import type { BoardData, ListWithCards } from '#/lib/boards-query';
+import type { BoardData, Card, ListWithCards } from '#/lib/boards-query';
 import type { CardDndAnnouncerState } from '#/lib/card-dnd';
 import {
     cardDndAnnouncements,
@@ -402,7 +403,7 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
                     >
                         {activeCard && (
                             <CardPreview
-                                title={activeCard.title}
+                                card={activeCard}
                                 tilted={!reducedMotion}
                             />
                         )}
@@ -419,8 +420,8 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     );
 }
 
-// The card under the pointer while dragging: a static copy without the link and menu.
-function CardPreview({ title, tilted }: { title: string; tilted: boolean }) {
+// The card under the pointer while dragging: its face without the link and menu.
+function CardPreview({ card, tilted }: { card: Card; tilted: boolean }) {
     return (
         <div
             className={cn(
@@ -428,7 +429,7 @@ function CardPreview({ title, tilted }: { title: string; tilted: boolean }) {
                 tilted && 'rotate-3',
             )}
         >
-            <div className="truncate px-3 py-2 pr-8 text-sm">{title}</div>
+            <CardFace card={card} />
         </div>
     );
 }
@@ -459,9 +460,9 @@ function ListPreview({
                 {list.cards.map((card) => (
                     <li
                         key={card.id}
-                        className="truncate rounded-md border bg-background px-3 py-2 text-sm shadow-xs"
+                        className="rounded-md border bg-background shadow-xs"
                     >
-                        {card.title}
+                        <CardFace card={card} />
                     </li>
                 ))}
             </ul>

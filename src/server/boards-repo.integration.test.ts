@@ -17,6 +17,13 @@ import {
     restoreList,
     updateCard,
 } from '#/server/boards-repo';
+import {
+    addChecklistItem,
+    createChecklist,
+    getChecklist,
+    updateChecklistItem,
+} from '#/server/checklists-repo';
+import { addCardLabel, createLabel } from '#/server/labels-repo';
 import { seedUser } from '#/test/db';
 import { asc, eq } from 'drizzle-orm';
 
@@ -616,6 +623,47 @@ describe('restoreCard', () => {
         const affected = await restoreCard(b.id, card!.id);
         expect(affected).toHaveLength(0);
         expect((await cardRow(card!.id)).deletedAt).toBeInstanceOf(Date);
+    });
+
+    it('Undo of a delete returns the label, due date, completion and checklist', async () => {
+        const a = await seedUser();
+        const board = await seedBoard(a.id, 'Board');
+        const [list] = await listsOf(board.id);
+        const card = await addCard(a.id, list.id, 'card');
+        const label = await createLabel(a.id, board.id, {
+            title: 'Urgent',
+            color: 'green',
+        });
+        expect(await addCardLabel(a.id, card!.id, label!.id)).toBe(true);
+        await updateCard(a.id, card!.id, {
+            completed: true,
+            due: { dueDate: '2030-01-15', dueAt: null },
+        });
+        const checklist = await createChecklist(a.id, card!.id, 'Steps');
+        const first = await addChecklistItem(a.id, checklist!.id, 'First');
+        await addChecklistItem(a.id, checklist!.id, 'Second');
+        await updateChecklistItem(a.id, first!.id, { done: true });
+
+        await deleteCard(a.id, card!.id);
+        expect((await getBoard(a.id, board.id))?.lists[0].cards).toEqual([]);
+        await restoreCard(a.id, card!.id);
+
+        const [restored] = (await getBoard(a.id, board.id))!.lists[0].cards;
+        expect(restored).toMatchObject({
+            id: card!.id,
+            labelIds: [label!.id],
+            dueDate: '2030-01-15',
+            dueAt: null,
+            checklistDone: 1,
+            checklistTotal: 2,
+        });
+        expect(restored.completedAt).toBeInstanceOf(Date);
+        const restoredChecklist = await getChecklist(a.id, card!.id);
+        expect(restoredChecklist?.title).toBe('Steps');
+        expect(restoredChecklist?.items.map((i) => [i.title, i.done])).toEqual([
+            ['First', true],
+            ['Second', false],
+        ]);
     });
 });
 

@@ -53,9 +53,9 @@ export async function prepareGuestSignIn(now = new Date()) {
  * After a guest is created: the demo board. A failure does not undo the sign-in
  * (the guest gets an empty /boards) but is reported, not swallowed.
  */
-export async function seedGuest(userId: string) {
+export async function seedGuest(userId: string, timeZone: string) {
     try {
-        await seedDemoBoard(userId);
+        await seedDemoBoard(userId, timeZone);
     } catch (error) {
         Sentry.captureException(error);
         console.error('Demo board seeding failed', error);

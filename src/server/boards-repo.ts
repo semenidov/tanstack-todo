@@ -2,7 +2,18 @@ import { db } from '#/db';
 import { DEMO_BOARD } from '#/lib/demo-board';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
-import { boards, cards, lists } from '#/db/schema';
+import { addDays, localDateKey } from '#/lib/due-date';
+import type { Due } from '#/lib/due-date';
+import {
+    boards,
+    cardLabels,
+    cards,
+    checklistItems,
+    checklists,
+    labels,
+    lists,
+} from '#/db/schema';
+import { ownedBoardIds, ownedListIds } from '#/server/access';
 import {
     and,
     asc,
@@ -13,23 +24,10 @@ import {
     isNull,
     max,
     min,
+    sql,
 } from 'drizzle-orm';
+import type { AnyColumn } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
-
-function ownedBoardIds(userId: string) {
-    return db
-        .select({ id: boards.id })
-        .from(boards)
-        .where(eq(boards.ownerId, userId));
-}
-
-function ownedListIds(userId: string) {
-    return db
-        .select({ id: lists.id })
-        .from(lists)
-        .innerJoin(boards, eq(lists.boardId, boards.id))
-        .where(and(eq(boards.ownerId, userId), isNull(lists.deletedAt)));
-}
 
 export function listBoards(userId: string) {
     // Left joins keep boards without lists/cards; counting non-null ids gives 0 for them.
@@ -102,8 +100,16 @@ export async function createBoard(
     return board;
 }
 
-/** The guest's demo board (#84): board, lists in order, cards in the given order. */
-export async function seedDemoBoard(userId: string) {
+/**
+ * The guest's demo board (#84): board, lists in order, cards in the given order.
+ * Due dates count from today in `timeZone` (the guest's cookie, #120).
+ */
+export async function seedDemoBoard(
+    userId: string,
+    timeZone: string,
+    now = new Date(),
+) {
+    const today = localDateKey(now, timeZone);
     const [board] = await db
         .insert(boards)
         .values({ ownerId: userId, title: DEMO_BOARD.title })
@@ -129,10 +135,80 @@ export async function seedDemoBoard(userId: string) {
             listId,
             title: card.title,
             description: card.description,
+            completedAt: card.completed ? now : null,
+            dueDate:
+                card.dueInDays === undefined
+                    ? null
+                    : addDays(today, card.dueInDays),
             position: keys[j],
+            labels: card.labels ?? [],
+            checklist: card.checklist,
         }));
     });
-    await db.insert(cards).values(cardRows);
+    const insertedCards = await db
+        .insert(cards)
+        .values(cardRows.map(({ labels: _, checklist: __, ...card }) => card))
+        .returning();
+
+    // Labels in creation order: one insert would give them one created_at and
+    // leave the order to random ids, so each gets its own millisecond.
+    const labelRows = await db
+        .insert(labels)
+        .values(
+            DEMO_BOARD.labels.map((label, i) => ({
+                boardId: board.id,
+                title: label.title,
+                color: label.color,
+                createdAt: new Date(now.getTime() + i),
+            })),
+        )
+        .returning();
+    const labelIdByTitle = new Map(labelRows.map((l) => [l.title, l.id]));
+    const cardIdBySpot = new Map(
+        insertedCards.map((c) => [`${c.listId}:${c.position}`, c.id]),
+    );
+    const links = cardRows.flatMap((card) =>
+        card.labels.map((title) => {
+            const cardId = cardIdBySpot.get(`${card.listId}:${card.position}`);
+            const labelId = labelIdByTitle.get(title);
+            if (!cardId || !labelId) throw new Error('Demo label not seeded');
+            return { cardId, labelId };
+        }),
+    );
+    if (links.length > 0) await db.insert(cardLabels).values(links);
+
+    // Checklists: one insert of the checklists, one of all their items.
+    const withChecklist = cardRows.flatMap(({ checklist, ...card }) => {
+        if (!checklist) return [];
+        const cardId = cardIdBySpot.get(`${card.listId}:${card.position}`);
+        if (!cardId) throw new Error('Demo checklist not seeded');
+        return [{ cardId, checklist }];
+    });
+    if (withChecklist.length === 0) return board;
+    const checklistRows = await db
+        .insert(checklists)
+        .values(
+            withChecklist.map(({ cardId, checklist }) => ({
+                cardId,
+                title: checklist.title,
+            })),
+        )
+        .returning();
+    const checklistIdByCard = new Map(
+        checklistRows.map((c) => [c.cardId, c.id]),
+    );
+    const items = withChecklist.flatMap(({ cardId, checklist }) => {
+        const checklistId = checklistIdByCard.get(cardId);
+        if (!checklistId) throw new Error('Demo checklist not seeded');
+        const keys = generateNKeysBetween(null, null, checklist.items.length);
+        return checklist.items.map((item, i) => ({
+            checklistId,
+            title: item.title,
+            done: item.done ?? false,
+            position: keys[i],
+        }));
+    });
+    if (items.length > 0) await db.insert(checklistItems).values(items);
     return board;
 }
 
@@ -151,6 +227,25 @@ export function deleteBoard(userId: string, boardId: string) {
         .returning();
 }
 
+/**
+ * Items of the card's checklist (only done ones with `done`) as a scalar
+ * subquery. `sql` wraps the builder query: relational query extras take SQL,
+ * and a correlated subquery has no builder form there.
+ */
+function checklistItemCount(cardId: AnyColumn, done?: true) {
+    const items = db
+        .select({ n: count() })
+        .from(checklistItems)
+        .innerJoin(checklists, eq(checklistItems.checklistId, checklists.id))
+        .where(
+            and(
+                eq(checklists.cardId, cardId),
+                done ? eq(checklistItems.done, true) : undefined,
+            ),
+        );
+    return sql`(${items})`.mapWith(Number);
+}
+
 export async function getBoard(userId: string, boardId: string) {
     const board = await db.query.boards.findFirst({
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
@@ -165,6 +260,19 @@ export async function getBoard(userId: string, boardId: string) {
                         columns: { deletedAt: false },
                         where: (c) => isNull(c.deletedAt),
                         orderBy: (c) => [asc(c.position), asc(c.id)],
+                        // Only the ids: colors and titles come from the board's
+                        // labels cache (labels-query.ts).
+                        with: { cardLabels: { columns: { labelId: true } } },
+                        // Checklist progress for the card face (#120): counted
+                        // in this query, items are not loaded with the board.
+                        extras: (card) => ({
+                            checklistDone: checklistItemCount(card.id, true).as(
+                                'checklist_done',
+                            ),
+                            checklistTotal: checklistItemCount(card.id).as(
+                                'checklist_total',
+                            ),
+                        }),
                     },
                 },
             },
@@ -173,7 +281,16 @@ export async function getBoard(userId: string, boardId: string) {
     if (!board) return null;
 
     const { lists: boardLists, ...boardFields } = board;
-    return { board: boardFields, lists: boardLists };
+    return {
+        board: boardFields,
+        lists: boardLists.map((list) => ({
+            ...list,
+            cards: list.cards.map(({ cardLabels: links, ...card }) => ({
+                ...card,
+                labelIds: links.map((l) => l.labelId),
+            })),
+        })),
+    };
 }
 
 // List order: like cards, `position` is a fractional-indexing key compared
@@ -318,7 +435,8 @@ async function renumberLists(boardId: string) {
 /**
  * Moves a list between two neighbors on the target board: its own board or
  * another one of the same owner. Cards point at the list only, so they move with
- * it untouched. Null on any refusal.
+ * it; on another board they lose their labels (labels belong to a board, #120).
+ * Null on any refusal.
  */
 export async function moveList(
     userId: string,
@@ -376,7 +494,23 @@ export async function moveList(
         .set({ boardId: toBoardId, position })
         .where(and(eq(lists.id, listId), isNull(lists.deletedAt)))
         .returning();
-    return rows.at(0) ?? null;
+    const row = rows.at(0) ?? null;
+    if (row && toBoardId !== list.boardId) {
+        // After the move, not before: a refused move keeps the labels. Deleted
+        // cards too, so their Undo doesn't bring back labels of the old board.
+        await db
+            .delete(cardLabels)
+            .where(
+                inArray(
+                    cardLabels.cardId,
+                    db
+                        .select({ id: cards.id })
+                        .from(cards)
+                        .where(eq(cards.listId, listId)),
+                ),
+            );
+    }
+    return row;
 }
 
 // Card order: `position` is a fractional-indexing key compared byte-wise (the column
@@ -419,11 +553,25 @@ export async function addCard(
 export function updateCard(
     userId: string,
     cardId: string,
-    data: { title?: string; description?: string | null },
+    data: {
+        title?: string;
+        description?: string | null;
+        completed?: boolean;
+        /** Both null - no due date (cards_due_check: never both set). */
+        due?: Due;
+    },
 ) {
+    const { completed, due, ...fields } = data;
+    // updatedAt is bumped by the column's $onUpdate on every write.
     return db
         .update(cards)
-        .set(data)
+        .set({
+            ...fields,
+            ...(completed !== undefined && {
+                completedAt: completed ? new Date() : null,
+            }),
+            ...(due && { dueDate: due.dueDate, dueAt: due.dueAt }),
+        })
         .where(
             and(
                 eq(cards.id, cardId),

@@ -4,6 +4,7 @@ import * as React from 'react';
 import { cn } from 'cn';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
 import { Select as SelectPrimitive } from 'radix-ui';
+import { POPUP_COLLISION_PADDING } from '#/components/ui/popup-position';
 
 function Select({
     ...props
@@ -54,6 +55,7 @@ function SelectContent({
     children,
     position = 'item-aligned',
     align = 'center',
+    collisionPadding = POPUP_COLLISION_PADDING,
     ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
     return (
@@ -68,6 +70,7 @@ function SelectContent({
                 )}
                 position={position}
                 align={align}
+                collisionPadding={collisionPadding}
                 {...props}
             >
                 <SelectScrollUpButton />

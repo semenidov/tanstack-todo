@@ -16,21 +16,27 @@ function overTheWire(error: Error) {
 }
 
 describe('USER_QUOTAS', () => {
-    it('limits boards, lists and cards', () => {
+    it('limits boards, lists, cards, labels and checklist items', () => {
         expect(USER_QUOTAS).toEqual({
             [QuotaKind.Boards]: 20,
             [QuotaKind.Lists]: 30,
             [QuotaKind.Cards]: 200,
+            [QuotaKind.Labels]: 50,
+            [QuotaKind.CardLabels]: 10,
+            [QuotaKind.ChecklistItems]: 100,
         });
     });
 });
 
 describe('GUEST_QUOTAS', () => {
-    it('limits a guest to 3 boards, 10 lists per board and 50 cards per list', () => {
+    it('limits a guest to 3 boards, 10 lists, 50 cards, 10 labels and 20 checklist items', () => {
         expect(GUEST_QUOTAS).toEqual({
             [QuotaKind.Boards]: 3,
             [QuotaKind.Lists]: 10,
             [QuotaKind.Cards]: 50,
+            [QuotaKind.Labels]: 10,
+            [QuotaKind.CardLabels]: 10,
+            [QuotaKind.ChecklistItems]: 20,
         });
     });
 
@@ -94,6 +100,21 @@ describe('createErrorMessage', () => {
             QuotaKind.Cards,
             200,
             "You've reached the limit of 200 cards in this list.",
+        ],
+        [
+            QuotaKind.Labels,
+            50,
+            "You've reached the limit of 50 labels on this board.",
+        ],
+        [
+            QuotaKind.CardLabels,
+            10,
+            "You've reached the limit of 10 labels on this card.",
+        ],
+        [
+            QuotaKind.ChecklistItems,
+            100,
+            "You've reached the limit of 100 items in this checklist.",
         ],
     ])('names the %s quota from the server error', (kind, limit, text) => {
         const error = overTheWire(new QuotaExceededError(kind, limit));

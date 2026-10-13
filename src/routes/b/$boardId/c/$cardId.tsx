@@ -1,16 +1,24 @@
 import { CardDialog } from '#/components/board/card-dialog';
 import { cardLinkId, findCardInBoard } from '#/lib/boards';
 import { boardQueryOptions } from '#/lib/boards-query';
+import { checklistQueryOptions } from '#/lib/checklist-query';
 import { pageMeta } from '#/lib/seo';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
 import { toast } from 'sonner';
+import z from 'zod';
 
 export const Route = createFileRoute('/b/$boardId/c/$cardId')({
     component: CardRoute,
-    // No separate fetch: the card lives in the parent board query's cache.
-    loader: ({ context, params }) => {
+    // The card lives in the parent board query's cache; only its checklist is
+    // fetched (#120): items are not loaded with the board.
+    loader: async ({ context, params }) => {
+        if (z.uuid().safeParse(params.cardId).success) {
+            await context.queryClient.ensureQueryData(
+                checklistQueryOptions(params.cardId),
+            );
+        }
         const board = context.queryClient.getQueryData(
             boardQueryOptions(params.boardId).queryKey,
         );

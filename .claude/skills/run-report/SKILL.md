@@ -14,23 +14,26 @@ description: Отчёт о прогоне фичи (implementer → CI → verif
 
 ## Шаги
 
-1. **Транскрипты implementer.** Путь - `~/.claude/projects/<проект>/<сессия>/subagents/agent-<agentId>.jsonl` (`output_file` из результата запуска на Windows пустой). Каждый запуск implementer на этот PR (первый и каждая починка) - свой файл и свой `--transcript`, в порядке запусков. Пустой, не-JSONL или файл без вызовов инструментов collect отклоняет с кодом 2.
-2. **Черновик** (только чтение: транскрипт, `gh`, `git`):
+1. **Транскрипты implementer.** Путь - `~/.claude/projects/<проект>/<сессия>/subagents/agent-<agentId>.jsonl` (`output_file` из результата запуска на Windows пустой). Каждый запуск implementer на этот PR (первый, каждый слайс, каждая починка) - свой файл и свой `--transcript`, в порядке запусков. Пустой, не-JSONL или файл без вызовов инструментов collect отклоняет с кодом 2.
+2. **Роли.** После каждого `--transcript` - `--role <role>` (словарь - `schema.md` → «Роли»): `slice:<N>`, `fix:spec`, `fix:ci`, `fix:verifier`, `fix:owner`, `tooling` (работа над инструментами процесса - вне итогов фичи). Роли обязательны, если фича шла слайсами или CI ждала основная сессия: без них слайсы станут раундами, а CI на промежуточные push попадёт в итоги. Без `--role` - прежний отчёт (первый `impl`, дальше `fix`).
+3. **Черновик** (только чтение: транскрипт, `gh`, `git`):
     ```bash
-    node .claude/skills/run-report/scripts/collect.mjs --pr <N> --transcript <path> --out <scratchpad>/draft.json
+    node .claude/skills/run-report/scripts/collect.mjs --pr <N> \
+      --transcript <path1> --role slice:1 --transcript <path2> --role fix:ci \
+      --out <scratchpad>/draft.json
     ```
     `--approved <iso>` - если апрув был не только что (по умолчанию - текущее время).
-3. **Поля сессии** - в копии `<scratchpad>/final.json`; цифры, время и `kind` не трогаем:
-    - `name` у этапов `impl`: что делалось, до ~40 символов («Ядро: вход, демо-доска», «e2e гостя»). Для ship/docs/wait_ci - коротко («Коммит, push», «Ожидание CI»).
+4. **Поля сессии** - в копии `<scratchpad>/final.json`; цифры, время и `kind` не трогаем:
+    - `name` у этапов `impl` (и `tooling.stages`): что делалось, до ~40 символов («Ядро: вход, демо-доска», «e2e гостя»). Для ship/docs/wait_ci - коротко («Коммит, push», «Ожидание CI»).
     - Каждый запуск с `result` ≠ `pass`: `error.class` из словаря и `error.text` ≤ 80 символов по `hint` (и транскрипту, если `hint` неясен). Red-фаза red-green (тест до кода, намеренная поломка для проверки теста) → `result: "expected_red"`, `class: "expected"`. `flaky` проставляет collect - не меняем.
     - Находки verifier: `outcome`, `spec_ref`, `spec_check` - по спеке issue и таблице исходов `[claude summary]`.
     - Этапы можно склеить или разделить, если эвристика ошиблась явно (время берётся из соседних границ, сумма не меняется).
-4. **Рендер:**
+5. **Рендер:**
     ```bash
     node .claude/skills/run-report/scripts/render.mjs <scratchpad>/final.json > <scratchpad>/run-report.md
     ```
     Код 1 - список незаполненных полей: дописать и повторить.
-5. **Публикация:** `gh pr comment <N> --body-file <scratchpad>/run-report.md`. Владельцу - ссылка и строка итогов.
+6. **Публикация:** `gh pr comment <N> --body-file <scratchpad>/run-report.md`. Владельцу - ссылка и строка итогов.
 
 ## Что не собираем и почему
 

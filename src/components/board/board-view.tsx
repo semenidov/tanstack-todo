@@ -1,6 +1,7 @@
 import { AddList } from '#/components/board/add-list';
 import { BoardDnd } from '#/components/board/board-dnd';
 import { ListColumn } from '#/components/board/list-column';
+import { LabelsExpandedProvider } from '#/components/board/labels/labels-expanded';
 import { EditableTitle } from '#/components/editable-title';
 import { useRenameBoard } from '#/components/boards/board-mutations';
 import { GuestBanner } from '#/components/guest-banner';
@@ -118,30 +119,33 @@ export function BoardView({ board, lists }: BoardData) {
                     </Empty>
                 </div>
             ) : (
-                <BoardDnd board={board} lists={lists}>
-                    {({ lists: shownLists, isDragging }) => (
-                        <div
-                            ref={setContainerRef}
-                            className={cn(
-                                'flex flex-1 items-start gap-4 overflow-x-auto px-[7.5vw] py-4 sm:scroll-px-4 sm:p-4 md:cursor-grab md:*:cursor-auto',
-                                // No snapping while a card is dragged: it would fight auto-scroll.
-                                isDragging
-                                    ? 'snap-none'
-                                    : 'snap-x snap-mandatory',
-                            )}
-                        >
-                            {shownLists.map((list) => (
-                                <ListColumn
-                                    key={list.id}
-                                    board={board}
-                                    list={list}
-                                    allLists={shownLists}
-                                />
-                            ))}
-                            <AddList boardId={board.id} />
-                        </div>
-                    )}
-                </BoardDnd>
+                // Labels expanded on one card are expanded on all cards of the board.
+                <LabelsExpandedProvider boardId={board.id}>
+                    <BoardDnd board={board} lists={lists}>
+                        {({ lists: shownLists, isDragging }) => (
+                            <div
+                                ref={setContainerRef}
+                                className={cn(
+                                    'flex flex-1 items-start gap-4 overflow-x-auto px-[7.5vw] py-4 sm:scroll-px-4 sm:p-4 md:cursor-grab md:*:cursor-auto',
+                                    // No snapping while a card is dragged: it would fight auto-scroll.
+                                    isDragging
+                                        ? 'snap-none'
+                                        : 'snap-x snap-mandatory',
+                                )}
+                            >
+                                {shownLists.map((list) => (
+                                    <ListColumn
+                                        key={list.id}
+                                        board={board}
+                                        list={list}
+                                        allLists={shownLists}
+                                    />
+                                ))}
+                                <AddList boardId={board.id} />
+                            </div>
+                        )}
+                    </BoardDnd>
+                </LabelsExpandedProvider>
             )}
         </div>
     );

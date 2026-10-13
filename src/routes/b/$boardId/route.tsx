@@ -5,6 +5,7 @@ import { RouteError } from '#/components/route-error';
 import { Button } from '#/components/ui/button';
 import { pageMeta } from '#/lib/seo';
 import { boardQueryOptions } from '#/lib/boards-query';
+import { labelsQueryOptions } from '#/lib/labels-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import {
     createFileRoute,
@@ -30,10 +31,16 @@ export const Route = createFileRoute('/b/$boardId')({
         if (!z.uuid().safeParse(params.boardId).success) {
             throw notFound();
         }
-        const board = await context.queryClient.query({
-            ...boardQueryOptions(params.boardId),
-            staleTime: 'static',
-        });
+        // Labels in parallel with the board: the card faces need their colors.
+        const [board] = await Promise.all([
+            context.queryClient.query({
+                ...boardQueryOptions(params.boardId),
+                staleTime: 'static',
+            }),
+            context.queryClient.ensureQueryData(
+                labelsQueryOptions(params.boardId),
+            ),
+        ]);
         if (!board) throw notFound();
         return board;
     },

@@ -7,6 +7,7 @@ import {
     useIsCardSyncing,
     useMoveCard,
 } from '#/components/board/card-mutations';
+import { CardFace } from '#/components/board/card-face';
 import { MoveCardForm } from '#/components/board/move-card-form';
 import { Button } from '#/components/ui/button';
 import {
@@ -77,20 +78,29 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
                             'border-dashed bg-muted shadow-none *:invisible',
                     )}
                 >
-                    {/* The link is the drag handle: Space picks the card up, Enter opens it.
-                        No native link drag, no iOS link preview or text selection on long press. */}
-                    <Link
-                        to="/b/$boardId/c/$cardId"
-                        params={{ boardId, cardId: card.id }}
-                        id={cardLinkId(card.id)}
-                        ref={setActivatorNodeRef}
-                        {...listeners}
-                        aria-describedby={attributes['aria-describedby']}
-                        draggable={false}
-                        className="block truncate px-3 py-2 pr-8 text-sm select-none [-webkit-touch-callout:none]"
-                    >
-                        {card.title}
-                    </Link>
+                    <CardFace
+                        card={card}
+                        title={
+                            // The link is the drag handle: Space picks the card up, Enter opens it.
+                            // Its ::after covers the whole card, so a press anywhere drags or opens it;
+                            // the menu (and later the labels) sit above it. No native link drag,
+                            // no iOS link preview or text selection on long press.
+                            <Link
+                                to="/b/$boardId/c/$cardId"
+                                params={{ boardId, cardId: card.id }}
+                                id={cardLinkId(card.id)}
+                                ref={setActivatorNodeRef}
+                                {...listeners}
+                                aria-describedby={
+                                    attributes['aria-describedby']
+                                }
+                                draggable={false}
+                                className="outline-none [-webkit-touch-callout:none] after:absolute after:inset-0 after:rounded-md focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+                            >
+                                {card.title}
+                            </Link>
+                        }
+                    />
                     {showSpinner && (
                         <span
                             role="status"
@@ -106,7 +116,7 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
                                 variant="ghost"
                                 size="icon-sm"
                                 aria-label="Card actions"
-                                className="absolute right-1 top-1/2 -translate-y-1/2 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
+                                className="absolute top-0.5 right-1 opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100"
                             >
                                 <EllipsisIcon />
                             </Button>
