@@ -11,7 +11,7 @@ import { prepareGuestSignIn, seedGuest } from '#/server/guests';
 
 const PROD_HOST = 'todo-semenidov.vercel.app';
 const PREVIEW_HOSTS = ['tanstack-todo-*-ssemenidov.vercel.app'];
-const LOCAL_HOSTS = ['localhost:3000', '127.0.0.1:3100'];
+const LOCAL_HOSTS = ['localhost:3000', '127.0.0.1:3000', '127.0.0.1:3100'];
 
 const onVercel = !!process.env.VERCEL;
 const isPreview = process.env.VERCEL_ENV === 'preview';

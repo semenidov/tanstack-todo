@@ -18,12 +18,13 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 
 ## Команды
 
-- `npm run dev` - vite dev на :3000 (ходит в Neon по `.env`)
+- `npm run dev` - vite dev на `127.0.0.1:3000` (ходит в Neon по `.env`)
 - `npm test` - все проекты; `test:unit` (jsdom, офлайн) / `test:integration` (Neon-ветка `test`, по сети) - по отдельности; `test:watch`
 - `npm run db:push:test` - синхронизировать схему на тест-ветку (`.env.test`), если она отстала от main (обычно ветка наследует схему при создании)
 - `npm run build`, `npm run generate-routes` (tsr)
 - Миграции: `db:generate` (сгенерить SQL-диф в `drizzle/`, коммитим) → `db:migrate` (накат на Neon; **direct**-строкой, не pooled). Прод - шагом в CI. `db:push` - только быстрая синхронизация схемы, без истории.
 - Сеть локально: VPN в режиме туннеля. Без него запросы к Neon больше ~16 КБ и TCP на порт 5432 (`drizzle-kit migrate`) зависают без ошибки.
+  С VPN `::1` недоступен, поэтому dev и e2e слушают `127.0.0.1`, не `localhost` (№77).
 - `npm run format` - prettier + eslint (прогонять после `shadcn add`)
 - `npm run typecheck` - `tsc --noEmit`
 - Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
@@ -49,7 +50,7 @@ TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · 
 - `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
 - `src/components/ui/*` - shadcn (генерятся CLI; после `add` прогонять `npm run format`).
 - `src/lib/seo.ts` - метаданные: `pageMeta(screen)` (title + `og:title` в формате `<Экран> · Todo List`), `siteMeta` (description, OG, twitter card), `siteLinks` (favicon, apple-touch-icon, manifest).
-- `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет из env). `baseURL` динамический: `allowedHosts` - прод-домен всегда, маска `tanstack-todo-*-ssemenidov.vercel.app` только при `VERCEL_ENV=preview`, `localhost:3000`/`127.0.0.1:3100` только вне Vercel; `protocol` https на Vercel, http локально. Хост запроса из списка становится baseURL и доверенным origin - превью логинятся без "Invalid origin". `BETTER_AUTH_URL` больше не используется.
+- `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет из env). `baseURL` динамический: `allowedHosts` - прод-домен всегда, маска `tanstack-todo-*-ssemenidov.vercel.app` только при `VERCEL_ENV=preview`, `localhost:3000`/`127.0.0.1:3000`/`127.0.0.1:3100` только вне Vercel; `protocol` https на Vercel, http локально. Хост запроса из списка становится baseURL и доверенным origin - превью логинятся без "Invalid origin". `BETTER_AUTH_URL` больше не используется.
 - `src/lib/auth-rate-limit.ts` - правила лимитера входа/регистрации/гостевого входа (`SIGN_IN_LIMIT`, `SIGN_UP_LIMIT`, `GUEST_SIGN_IN_LIMIT`, общие для `auth.ts` и форм) и `authErrorMessage` (текст тоста: на 429 - «Too many attempts…» с фактическим окном).
 - `src/lib/quotas.ts` - квоты на содержимое (`USER_QUOTAS`, `GUEST_QUOTAS`, `quotasFor(user)`; `GUEST_TTL_DAYS`, `MAX_ACTIVE_GUESTS`), `QuotaExceededError` (код квоты в `message`), `createErrorMessage`/`restoreErrorMessage`/`moveErrorMessage` - тексты тостов при отказе по квоте (создание, Undo, перенос карточки или колонки).
 - `src/lib/auth-client.ts` - клиентский `createAuthClient` с `anonymousClient` (`signIn/signUp/signOut`, `signIn.anonymous`, `deleteAnonymousUser`).
