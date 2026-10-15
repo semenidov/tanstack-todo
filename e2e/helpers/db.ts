@@ -1,15 +1,7 @@
-import { neon } from '@neondatabase/serverless';
 import { eq, sql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { user } from '../../src/db/auth-schema';
+import { db } from '../../src/db';
 import { boards, lists } from '../../src/db/schema';
-
-const url = process.env.DATABASE_URL;
-if (!url) {
-    throw new Error('E2E: DATABASE_URL is not set (missing .env.e2e?)');
-}
-
-const db = drizzle(neon(url));
 
 // `sql` only for truncate: the query builder has no truncate.
 export async function resetDb() {

@@ -29,9 +29,11 @@ export default defineConfig({
                     // One shared DB and a global truncate in beforeEach: files must not run in parallel.
                     fileParallelism: false,
                     include: ['src/**/*.integration.{test,spec}.{ts,tsx}'],
-                    hookTimeout: 30000,
-                    testTimeout: 30000,
-                    retry: 2,
+                    // Neon over the network in CI: transient resets and cold starts.
+                    // Local Docker Postgres needs neither, so failures surface at once.
+                    ...(process.env.CI
+                        ? { hookTimeout: 30000, testTimeout: 30000, retry: 2 }
+                        : {}),
                 },
             },
         ],
