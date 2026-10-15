@@ -65,9 +65,15 @@
 - `verifier` тесты не перезапускает; ручной QA - одноразовым Playwright-spec в `e2e/_verify/` (в git не попадает) через `playwright.verify.config.ts` против превью, по 2 новых юзера на прогон, только по критериям и краевым случаям спеки.
 - Вывод тестов - компактный репортер (`--reporter=line`), в контекст - только упавшее. Замеры вместо скриншотов.
 
-### Neon локально
+### База локально
 
-Миграции на локальные ветки `e2e`/`test` катить можно, на `main` - никогда. Если предыдущая фича с миграцией не смержена или миграцию перегенерировали, перед новой фичей ветку `e2e` (и `test`, если трогали) сбрасывают от родителя (Neon Console → Reset from parent; локально API-ключа Neon нет - делает владелец по просьбе основной сессии).
+Локально Neon не используется: Postgres 18 в Docker (`compose.yaml`), CI, превью и прод - на Neon (DECISIONS №77). Базы: `main` - `npm run dev` (`.env`), `test` - integration и e2e (`.env.test`, `.env.e2e`; тесты её чистят).
+
+- Старт: `docker compose up -d`. На новом volume - миграции на обе базы: `npm run db:migrate` (`main`) и `npx drizzle-kit migrate --config=drizzle.config.test.ts` (`test`).
+- Пароль Postgres берётся из `DB_PASSWORD` в `.env` и должен совпадать с паролем в `DATABASE_URL` всех трёх env-файлов. Он применяется только при первой инициализации volume: смена `DB_PASSWORD` позже ничего не меняет (нужен `ALTER USER` в базе или новый volume).
+- Init-скрипт `docker/postgres-init.sql` создаёт базу `test` только на пустом volume. Volume уже был - создать вручную: `docker compose exec db createdb -U postgres test`, затем миграции на `test`.
+- Контейнер остановлен - integration и e2e падают сразу с подсказкой `docker compose up -d`.
+- Миграции на локальные `main` и `test` катить можно; на Neon `main` с этой машины - никогда (прод мигрирует CI). Схема разъехалась после перегенерации миграции: пересоздать базу `test` (`docker compose exec db dropdb -U postgres test`, `createdb`, миграции). `docker compose down -v` удаляет volume с обеими базами.
 
 ## Правила кода
 
