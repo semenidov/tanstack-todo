@@ -29,12 +29,24 @@ Work in the main repo `D:/sandbox/claude/programming/tanstack-todo`. New feature
 - Tests: cover every acceptance criterion and every edge case marked «тест». For new logic - red-green: write the test, see it fail, then implement. Small bug fixes and styling: no red-green. For styling/refactoring/config write in the PR why no test is needed.
 - Never open or check the Vercel preview. A manual check, if needed, is a small local e2e test in your workspace.
 - Run only the tests you wrote or changed, with a compact reporter (`npx playwright test <files> --reporter=line`, `npx vitest run <files>`). Never the full e2e suite - CI does that. Typecheck/lint/unit run in git hooks; if a hook fails, fix only what it reports.
-- Migrations may be applied to the local `e2e`/`test` Neon branches, never to `main`.
 - Commit after each logical step and push early (draft PR right after the first push), so an interrupted run loses nothing.
 - In context keep only failures: trim logs, no screenshots unless the spec is visual.
 - Don't merge, don't force-push, don't touch `.env*` or `.github/**` unless the spec says so, never print secrets. Don't install dependencies or generate binary assets unless the spec says so.
 - Update `DOCUMENTATION.md` / `DECISIONS.md` only as the spec says, briefly.
 - Honesty: "verified" only if a test or CI proves it; everything else is "not verified".
+
+## Local database
+
+- Docker Postgres from `compose.yaml`: `main` is the owner's dev data, `test` is for tests (they wipe it).
+- Allowed: `docker compose up -d` if the container is stopped. Nothing else in Docker: no own projects/containers/volumes, no `down`, no compose edits unless the spec says so.
+- Don't override `DATABASE_URL` or other env in the shell. Don't write data to `main`.
+- DB unreachable or auth fails after `up -d`: stop and report.
+
+## Migrations
+
+- `schema.ts` → `npm run db:generate` → separate commit of `drizzle/` → `migrate` on `test` (`--config=drizzle.config.test.ts`) and on `main` (`npm run db:migrate`).
+- No `db:push`. Never Neon.
+- Changing a migration already applied: prefer a new migration on top. If you regenerated it: recreate `test` (`CONTRIBUTING.md`, «База локально»), report `main` to the owner.
 
 ## After push
 
@@ -42,7 +54,7 @@ Don't wait for CI and don't add the `verify` label: exit with the final report. 
 
 ## Fix runs
 
-Fix each item of the task, nothing else; problems noticed outside it go to the report, not the code. A CI excerpt with Neon network errors (`fetch failed`, `ConnectTimeoutError`) or a flaky test is the environment: don't fix it, report. If you disagree with an item, don't change it silently and don't argue in a loop: write "не согласен: <reason>" in the report, the main session decides.
+Fix each item of the task, nothing else; problems noticed outside it go to the report, not the code. A CI excerpt with Neon network errors (`fetch failed`, `ConnectTimeoutError`) or a flaky test is the environment: don't fix it, report. Locally a failing test is a real failure, except `ECONNREFUSED` / «Local Postgres is unreachable». If you disagree with an item, don't change it silently and don't argue in a loop: write "не согласен: <reason>" in the report, the main session decides.
 
 ## PR description
 
