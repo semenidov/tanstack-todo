@@ -70,7 +70,7 @@
 Локально Neon не используется: Postgres 18 в Docker (`compose.yaml`), CI, превью и прод - на Neon (DECISIONS №77). Базы: `main` - `npm run dev` (`.env`), `test` - integration и e2e (`.env.test`, `.env.e2e`; тесты её чистят).
 
 - Старт: `docker compose up -d`. На новом volume - миграции на обе базы: `npm run db:migrate` (`main`) и `npx drizzle-kit migrate --config=drizzle.config.test.ts` (`test`).
-- Пароль Postgres берётся из `DB_PASSWORD` в `.env` и должен совпадать с паролем в `DATABASE_URL` всех трёх env-файлов. Он применяется только при первой инициализации volume: смена `DB_PASSWORD` позже ничего не меняет (нужен `ALTER USER` в базе или новый volume).
+- Пользователь и пароль - `postgres`/`postgres`, зашиты в `compose.yaml` (порт только на 127.0.0.1). `DATABASE_URL` во всех трёх env-файлах: `postgresql://postgres:postgres@localhost:5432/<main|test>`. Пароль применяется только при первой инициализации volume: если volume создан с другим, `docker compose exec db psql -U postgres -c "ALTER USER postgres PASSWORD 'postgres'"`.
 - Init-скрипт `docker/postgres-init.sql` создаёт базу `test` только на пустом volume. Volume уже был - создать вручную: `docker compose exec db createdb -U postgres test`, затем миграции на `test`.
 - Контейнер остановлен - integration и e2e падают сразу с подсказкой `docker compose up -d`.
 - Миграции на локальные `main` и `test` катить можно; на Neon `main` с этой машины - никогда (прод мигрирует CI). Схема разъехалась после перегенерации миграции: пересоздать базу `test` (`docker compose exec db dropdb -U postgres test`, `createdb`, миграции). `docker compose down -v` удаляет volume с обеими базами.

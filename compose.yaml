@@ -8,8 +8,9 @@ services:
         ports:
             - '127.0.0.1:5432:5432'
         environment:
-            POSTGRES_USER: ${DB_USER:-postgres}
-            POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+            # Local dev only (port bound to 127.0.0.1); matches DATABASE_URL in .env*.
+            POSTGRES_USER: postgres
+            POSTGRES_PASSWORD: postgres
             POSTGRES_DB: main
         volumes:
             # postgres 18 keeps data in /var/lib/postgresql/<major>/docker.
