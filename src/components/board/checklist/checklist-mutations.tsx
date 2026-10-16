@@ -206,9 +206,10 @@ export interface MoveChecklistItemVars extends ChecklistItemNeighbors {
 /**
  * Moves the item: the cache by index, the server by the neighbors (ADR 58).
  * Returns a plain function, not the mutation: the cache is written synchronously
- * in the drop handler, like `moveCard` (card-mutations.tsx). `onMutate` runs a few
- * microtasks later, after dnd-kit has already dropped the transforms, and the items
- * would jump back to the old order for a render and then animate to the new one.
+ * in the drop handler, like `moveCard` (card-mutations.tsx): `onMutate` would run
+ * a few microtasks later. Not enough by itself: the cache reaches React a tick
+ * later (TanStack Query notifies in a setTimeout), after dnd-kit has dropped the
+ * transforms, so `ChecklistSection` also shows the drop from local state.
  */
 export function useMoveChecklistItem(boardId: string, cardId: string) {
     const cache = useChecklistCache(boardId, cardId);

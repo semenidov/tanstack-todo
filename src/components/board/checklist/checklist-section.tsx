@@ -74,6 +74,17 @@ export function ChecklistSection({
     const updateItem = useUpdateChecklistItem(boardId, cardId);
     const deleteItem = useDeleteChecklistItem(boardId, cardId);
     const moveItem = useMoveChecklistItem(boardId, cardId);
+    const [dropped, setDropped] = useState<{
+        base: Checklist['items'];
+        items: Checklist['items'];
+    } | null>(null);
+
+    // The drop is in the cache already, but the new `checklist` prop comes a tick
+    // later: keep showing the drop so the items don't flash back (as on the board).
+    const shownItems =
+        dropped && dropped.base === checklist.items
+            ? dropped.items
+            : checklist.items;
 
     const progress = checklistProgress(checklist.items);
     const percent =
@@ -128,6 +139,7 @@ export function ChecklistSection({
         const moved = moveItemInChecklist(checklist, itemId, toIndex);
         const neighbors = checklistItemNeighbors(moved.items, itemId);
         if (!neighbors) return;
+        setDropped({ base: checklist.items, items: moved.items });
         moveItem({ itemId, toIndex, ...neighbors });
     }
 
@@ -228,11 +240,11 @@ export function ChecklistSection({
                 onDragEnd={handleDragEnd}
             >
                 <SortableContext
-                    items={checklist.items}
+                    items={shownItems}
                     strategy={verticalListSortingStrategy}
                 >
                     <ul aria-label="Checklist items" className="grid gap-0.5">
-                        {checklist.items.map((item) => (
+                        {shownItems.map((item) => (
                             <ChecklistItem
                                 key={item.id}
                                 item={item}
