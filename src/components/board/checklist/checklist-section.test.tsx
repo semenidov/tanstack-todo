@@ -1,4 +1,11 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+    act,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+    within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
     QueryClient,
@@ -8,6 +15,10 @@ import {
 import { ChecklistSection } from '#/components/board/checklist/checklist-section';
 import type { Checklist } from '#/lib/checklist';
 import { checklistQueryOptions } from '#/lib/checklist-query';
+import {
+    getChecklistServer,
+    moveChecklistItemServer,
+} from '#/server/checklists';
 
 vi.mock('#/server/boards', () => ({
     getBoardServer: vi.fn(),
@@ -69,7 +80,7 @@ afterEach(() => {
 function FromCache() {
     const { data } = useQuery({
         ...checklistQueryOptions('card-1'),
-        enabled: false,
+        staleTime: Infinity,
     });
     return data ? (
         <ChecklistSection
@@ -94,7 +105,8 @@ const press = async (target: Element, code: string) => {
     });
 };
 
-it('shows the new order right at the drop, before the cache reaches React', async () => {
+/** Renders the section from the cache and moves A one down, up to the drop. */
+async function pickUpAndMoveA() {
     const queryClient = new QueryClient();
     queryClient.setQueryData(
         checklistQueryOptions('card-1').queryKey,
@@ -105,11 +117,15 @@ it('shows the new order right at the drop, before the cache reaches React', asyn
             <FromCache />
         </QueryClientProvider>,
     );
-
     const handle = screen.getByRole('button', { name: 'Move item A' });
     handle.focus();
     await press(handle, 'Space');
     await press(handle, 'ArrowDown');
+    return handle;
+}
+
+it('shows the new order right at the drop, before the cache reaches React', async () => {
+    const handle = await pickUpAndMoveA();
 
     // TanStack Query notifies subscribers in a setTimeout(0): frozen here.
     vi.useFakeTimers();
@@ -117,4 +133,14 @@ it('shows the new order right at the drop, before the cache reaches React', asyn
         fireEvent.keyDown(handle, { code: 'Space' });
     });
     expect(itemNames()).toEqual(['B', 'A', 'C']);
+});
+
+it('falls back to the server order when the move fails', async () => {
+    vi.mocked(moveChecklistItemServer).mockRejectedValueOnce(new Error('500'));
+    vi.mocked(getChecklistServer).mockResolvedValue(checklist);
+    const handle = await pickUpAndMoveA();
+
+    await press(handle, 'Space');
+    await waitFor(() => expect(getChecklistServer).toHaveBeenCalled());
+    await waitFor(() => expect(itemNames()).toEqual(['A', 'B', 'C']));
 });
