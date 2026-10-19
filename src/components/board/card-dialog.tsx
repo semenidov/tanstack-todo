@@ -28,11 +28,14 @@ import { Textarea } from '#/components/ui/textarea';
 import {
     AddDueDateButton,
     DueDateField,
+    DueDatePopover,
 } from '#/components/board/due/due-date-field';
 import {
     AddLabelsButton,
     CardLabelsField,
 } from '#/components/board/labels/card-labels-field';
+import { LabelsPopover } from '#/components/board/labels/labels-popover';
+import { useAnchoredPopover } from '#/components/responsive-popover';
 import type { Card, ListWithCards } from '#/lib/boards-query';
 import { checklistQueryOptions } from '#/lib/checklist-query';
 import { formatCardDate } from '#/lib/due-date';
@@ -70,41 +73,50 @@ export function CardDialog({
     const { deleteWithUndo } = useDeleteCard(boardId);
     const isCompleted = card.completedAt !== null;
     const hasDue = card.dueDate !== null || card.dueAt !== null;
-    const [isDueOpen, setIsDueOpen] = useState(false);
-    const dueProps = {
-        due: card,
-        onChange: (due: Due) => updateCard.mutate({ due }),
-        open: isDueOpen,
-        onOpenChange: setIsDueOpen,
-    };
-
+    // The Labels and Due date popovers are rendered apart from their buttons,
+    // which move between the rows below once a block appears or goes (#133).
+    const duePopover = useAnchoredPopover();
+    const labelsPopover = useAnchoredPopover();
     const hasLabels = card.labelIds.length > 0;
-    const [isLabelsOpen, setIsLabelsOpen] = useState(false);
-    const labelsProps = {
-        boardId,
-        card,
-        open: isLabelsOpen,
-        onOpenChange: setIsLabelsOpen,
-    };
 
     // Blocks the card has, in one row: labels and due date.
     const blocks: Array<ReactNode> = [];
     if (hasLabels) {
-        blocks.push(<CardLabelsField key="labels" {...labelsProps} />);
+        blocks.push(
+            <CardLabelsField
+                key="labels"
+                boardId={boardId}
+                card={card}
+                buttonProps={labelsPopover.buttonProps}
+            />,
+        );
     }
     if (hasDue) {
         blocks.push(
-            <DueDateField key="due" completed={isCompleted} {...dueProps} />,
+            <DueDateField
+                key="due"
+                due={card}
+                onChange={changeDue}
+                completed={isCompleted}
+                buttonProps={duePopover.buttonProps}
+            />,
         );
     }
     // Buttons for the blocks the card doesn't have yet, in the order
     // Labels / Due date / Checklist; a block takes its place once added.
     const emptyBlocks: Array<ReactNode> = [];
     if (!hasLabels) {
-        emptyBlocks.push(<AddLabelsButton key="labels" {...labelsProps} />);
+        emptyBlocks.push(
+            <AddLabelsButton
+                key="labels"
+                buttonProps={labelsPopover.buttonProps}
+            />,
+        );
     }
     if (!hasDue) {
-        emptyBlocks.push(<AddDueDateButton key="due" {...dueProps} />);
+        emptyBlocks.push(
+            <AddDueDateButton key="due" buttonProps={duePopover.buttonProps} />,
+        );
     }
     // Prefetched by the card route; undefined only while it loads.
     const { data: checklist } = useQuery(checklistQueryOptions(card.id));
@@ -140,6 +152,10 @@ export function CardDialog({
 
     function cancelDescription() {
         setDescription(card.description ?? '');
+    }
+
+    function changeDue(due: Due) {
+        updateCard.mutate({ due });
     }
 
     async function handleDelete() {
@@ -311,6 +327,17 @@ export function CardDialog({
                             {emptyBlocks}
                         </div>
                     )}
+                    {/* No DOM of their own: the content is portaled. */}
+                    <LabelsPopover
+                        boardId={boardId}
+                        card={card}
+                        {...labelsPopover.popoverProps}
+                    />
+                    <DueDatePopover
+                        due={card}
+                        onChange={changeDue}
+                        {...duePopover.popoverProps}
+                    />
 
                     <div>
                         <label

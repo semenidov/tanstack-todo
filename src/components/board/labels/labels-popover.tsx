@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
     CheckIcon,
@@ -18,7 +18,6 @@ import { LabelChip } from '#/components/board/labels/label-strip';
 import {
     ResponsivePopover,
     ResponsivePopoverContent,
-    ResponsivePopoverTrigger,
 } from '#/components/responsive-popover';
 import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
@@ -60,39 +59,26 @@ function previousScreen(state: ScreenState): ScreenState | undefined {
     return LIST;
 }
 
-export interface LabelsPopoverProps {
+export interface LabelsPopoverProps extends Omit<
+    ComponentProps<typeof ResponsivePopover>,
+    'children'
+> {
     boardId: string;
     card: Card;
-    // Controlled by the card window: the trigger switches from the "Labels"
-    // button to the labels block once a label is on, and the popover stays open.
     open: boolean;
-    onOpenChange: (open: boolean) => void;
 }
 
 // The labels of the board for one card (#120): screens list → create / edit →
 // delete inside one popover (a bottom sheet on mobile), with a back arrow.
-export function LabelsPopover({
-    boardId,
-    card,
-    open,
-    onOpenChange,
-    children,
-}: LabelsPopoverProps & { children: ReactNode }) {
+// The card window renders it apart from its "Labels" / «+» buttons (#133).
+export function LabelsPopover({ boardId, card, ...props }: LabelsPopoverProps) {
     const [state, setState] = useState<ScreenState>(LIST);
+    // Every opening starts from the list: reset on any way of closing.
+    if (!props.open && state.screen !== Screen.List) setState(LIST);
     const previous = previousScreen(state);
 
     return (
-        <ResponsivePopover
-            open={open}
-            onOpenChange={(next) => {
-                // Every opening starts from the list.
-                if (!next) setState(LIST);
-                onOpenChange(next);
-            }}
-        >
-            <ResponsivePopoverTrigger asChild>
-                {children}
-            </ResponsivePopoverTrigger>
+        <ResponsivePopover {...props}>
             <ResponsivePopoverContent
                 title={SCREEN_TITLES[state.screen]}
                 onBack={previous && (() => setState(previous))}
