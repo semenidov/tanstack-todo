@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL, gotoHydrated } from './helpers/auth';
 import { resetBoards } from './helpers/db';
-import { addCard, cardRow, gotoBoard } from './helpers/board';
+import { addCard, cardRow, gotoBoard, popoverPosition } from './helpers/board';
 
 // The page clock is fixed in the time zone of playwright.config.ts
 // (`timezoneId`, UTC+14); the server keeps the real clock.
@@ -39,12 +39,15 @@ test('sets a due date with a time, clears the time and removes it; the status fo
 
     await cardRow(page, 'Ship it').getByRole('link').click();
     await window.getByRole('button', { name: 'Due date' }).click();
+    const opened = await popoverPosition(picker);
 
-    // A day in the calendar is saved right away; the popover stays open.
+    // A day in the calendar is saved right away; the popover stays open and
+    // in place while the "Due date" button gives way to the chip.
     await saved(page, () =>
         picker.getByRole('button', { name: /March 20th/ }).click(),
     );
     await expect(chip).toHaveText('Due: Mar 20');
+    expect(await popoverPosition(picker)).toEqual(opened);
 
     await saved(page, () =>
         picker.getByRole('button', { name: /March 10th/ }).click(),
@@ -86,7 +89,8 @@ test('sets a due date with a time, clears the time and removes it; the status fo
         picker.getByRole('button', { name: 'Clear time' }).click(),
     );
     await expect(chip).toHaveText('Due today: Today');
-    await page.keyboard.press('Escape');
+    // The chip closes the popover it opened.
+    await chip.click();
     await expect(picker).toHaveCount(0);
 
     await saved(page, () =>

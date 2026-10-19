@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentProps } from 'react';
 import { cn } from 'cn';
 import { PlusIcon, XIcon } from 'lucide-react';
 import {
@@ -10,39 +10,37 @@ import { DueDatePicker } from '#/components/board/due/due-date-picker';
 import {
     ResponsivePopover,
     ResponsivePopoverContent,
-    ResponsivePopoverTrigger,
 } from '#/components/responsive-popover';
+import type { PopoverButtonProps } from '#/components/responsive-popover';
 import { Button } from '#/components/ui/button';
 import type { Due } from '#/lib/due-date';
 
 const NO_DUE: Due = { dueDate: null, dueAt: null };
 
-interface DuePopoverProps {
+interface DueDatePopoverProps extends Omit<
+    ComponentProps<typeof ResponsivePopover>,
+    'children'
+> {
     due: Due;
     onChange: (due: Due) => void;
-    // Controlled by the card window: the trigger switches from the "Due date"
-    // button to the chip once a day is picked, and the popover stays open.
-    open: boolean;
     onOpenChange: (open: boolean) => void;
 }
 
-function DueDatePopover({
+// Rendered by the card window apart from the "Due date" button and the chip,
+// which only toggle it: picking the first day swaps them, the popover stays
+// open and in place (#133).
+export function DueDatePopover({
     due,
     onChange,
-    open,
-    onOpenChange,
-    children,
-}: DuePopoverProps & { children: ReactNode }) {
+    ...props
+}: DueDatePopoverProps) {
     return (
-        <ResponsivePopover open={open} onOpenChange={onOpenChange}>
-            <ResponsivePopoverTrigger asChild>
-                {children}
-            </ResponsivePopoverTrigger>
+        <ResponsivePopover {...props}>
             <ResponsivePopoverContent title="Due date">
                 <DueDatePicker
                     due={due}
                     onChange={onChange}
-                    onClose={() => onOpenChange(false)}
+                    onClose={() => props.onOpenChange(false)}
                 />
             </ResponsivePopoverContent>
         </ResponsivePopover>
@@ -50,23 +48,32 @@ function DueDatePopover({
 }
 
 /** The "Due date" button in the row of empty blocks of the card window. */
-export function AddDueDateButton(props: DuePopoverProps) {
+export function AddDueDateButton({
+    buttonProps,
+}: {
+    buttonProps: PopoverButtonProps;
+}) {
     return (
-        <DueDatePopover {...props}>
-            <Button type="button" variant="secondary" size="sm">
-                <PlusIcon />
-                Due date
-            </Button>
-        </DueDatePopover>
+        <Button type="button" variant="secondary" size="sm" {...buttonProps}>
+            <PlusIcon />
+            Due date
+        </Button>
     );
 }
 
 /** The due date block of the card window: a chip opening the picker and ✕. */
 export function DueDateField({
+    due,
+    onChange,
     completed,
-    ...props
-}: DuePopoverProps & { completed: boolean }) {
-    const description = useDueDescription(props.due, completed);
+    buttonProps,
+}: {
+    due: Due;
+    onChange: (due: Due) => void;
+    completed: boolean;
+    buttonProps: PopoverButtonProps;
+}) {
+    const description = useDueDescription(due, completed);
     if (!description) return null;
     return (
         <div className="min-w-0">
@@ -79,18 +86,17 @@ export function DueDateField({
                     DUE_STATUS_CLASSES[description.status],
                 )}
             >
-                <DueDatePopover {...props}>
-                    <button
-                        type="button"
-                        className="flex h-full items-center gap-1.5 rounded-l-md pl-2.5 pr-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    >
-                        <DueText description={description} />
-                    </button>
-                </DueDatePopover>
+                <button
+                    type="button"
+                    className="flex h-full items-center gap-1.5 rounded-l-md pl-2.5 pr-1 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    {...buttonProps}
+                >
+                    <DueText description={description} />
+                </button>
                 <button
                     type="button"
                     aria-label="Remove due date"
-                    onClick={() => props.onChange(NO_DUE)}
+                    onClick={() => onChange(NO_DUE)}
                     className="flex h-full items-center rounded-r-md px-1.5 opacity-70 outline-none hover:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
                     <XIcon className="size-3.5" />
