@@ -1,40 +1,46 @@
 # tanstack-todo - карта проекта
 
-Учебный/портфолио todo-app. Этот файл - **карта, а не копия кода**: где какая логика и какие сквозные паттерны. Детали (конкретные классы, тексты) не дублируем - для них есть код.
-
-Последняя сверка: 2026-10-12.
+Домены, слои и границы проекта: где что искать.
 
 ## Как поддерживать
 
-- Обновлять после значимых изменений (новый роут/компонент/паттерн, смена подхода).
-- Держать коротким, чтобы обновление было дешёвым.
-- Claude не может обновлять файл между сессиями; если код меняли мимо Claude - при старте большой задачи попросить сверить карту с кодом.
+- Пишем то, что остаётся верным при рефакторинге внутри домена.
+- Уровень - домены и папки, неглубоко. Без имён функций, кода и номеров задач.
+- Обновляем, когда появляется или меняется домен, слой, граница или общий подход.
+- Обновляя, переписываем раздел целиком под новую картину.
+- Строки короткие, файл читается за один присест.
 
 ## Стек
 
-TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод: Vercel (serverless) + Neon (managed Postgres) - https://todo-semenidov.vercel.app.
+- Фреймворк: TanStack Start (SSR) + Router, React.
+- Данные: TanStack Query (серверное состояние), Drizzle ORM + Postgres.
+- Auth: Better Auth.
+- UI: Tailwind, shadcn/ui (Radix), TanStack Form + Zod, dnd-kit, sonner.
+- Наблюдаемость: Sentry (ошибки), Vercel Analytics + Speed Insights.
+- Тесты: Vitest + Testing Library, Playwright.
 
-Окружения Vercel: **Production** (merge в `master`) - статичный `DATABASE_URL` на Neon `main`; **Preview** (любая другая ветка/PR) - статичные `DATABASE_URL` (pooled) и `DATABASE_URL_UNPOOLED` (direct) на Neon-ветку `staging`, общую для всех превью; интеграции и отдельных веток на превью нет. Правила: один PR с миграцией за раз; если PR с миграцией закрыт без мержа или миграцию перегенерировали внутри PR (сборка превью падает с `already exists`) - в Neon Reset from parent для `staging`, затем redeploy превью (после reset в `staging` копия прод-данных). Development в Vercel не используем (локально `.env`). Секреты окружений раздельные (`BETTER_AUTH_SECRET` у Preview свой). Сборка идёт через `npm run vercel-build` (`scripts/vercel-build.mjs`): на Preview перед `vite build` катит `drizzle-kit migrate` на `staging`, на Production - только `vite build`.
+Окружения:
+
+- Локально: Postgres в Docker, две базы. `main` для разработки, `test` для integration и e2e (тесты её чистят).
+- CI: на каждый прогон integration и e2e создаётся временная Neon-ветка, после прогона удаляется.
+- Превью: Vercel на каждый PR, все превью делят одну Neon-ветку `staging`.
+- Прод: Vercel (serverless) + Neon `main`, деплой при merge в `master`. https://todo-semenidov.vercel.app
+- Драйвер БД по окружению: локально node-postgres, на Neon - neon-http. Код опирается только на общее у обоих (без транзакций и batch).
+- Миграции: схема описана в Drizzle, SQL-миграции генерируются и коммитятся в `drizzle/`. Одни и те же файлы накатываются везде: локально вручную, в CI на временную ветку перед тестами, на превью при сборке, на прод отдельным шагом CI после мержа.
+- Работа с базами по окружениям - `CONTRIBUTING.md`.
 
 ## Команды
 
-- Локальная база - Postgres 18 в Docker (`compose.yaml`, контейнер `db`, `127.0.0.1:5432`): база `main` для `npm run dev` (`.env`), база `test` для integration и e2e (`.env.test`, `.env.e2e`). `docker compose up -d`, на новом volume - миграции на обе базы: `npm run db:migrate` и `npx drizzle-kit migrate --config=drizzle.config.test.ts`. CI, превью и прод - на Neon. Подробности и gotcha - `CONTRIBUTING.md`, «База локально».
-- `npm run dev` - vite dev на :3000 (Docker Postgres, база `main` по `.env`)
-- `npm test` - все проекты; `test:unit` (jsdom, офлайн) / `test:integration` (локальная база `test`; в CI - Neon) - по отдельности; `test:watch`
-- `npm run db:push:test` - синхронизировать схему на базу `test` (`.env.test`) без истории миграций
-- `npm run build`, `npm run generate-routes` (tsr)
-- Миграции: `db:generate` (сгенерить SQL-диф в `drizzle/`, коммитим) → `db:migrate` (накат на Neon; **direct**-строкой, не pooled). Прод - шагом в CI. `db:push` - только быстрая синхронизация схемы, без истории.
-- Сеть: локальная разработка и тесты Neon не трогают. VPN в режиме туннеля нужен только при прямой работе с Neon с этой машины: без него запросы больше ~16 КБ и TCP на порт 5432 (`drizzle-kit migrate`) зависают без ошибки.
-- `npm run format` - prettier + eslint (прогонять после `shadcn add`)
-- `npm run typecheck` - `tsc --noEmit`
-- Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
-- CI (`.github/workflows/ci.yml`): на PR и push в `master`. `quality` (lint+typecheck), `unit`, `integration` (эфемерная Neon-ветка `ci-<run_id>`). `e2e` - `needs` все чеки, ставит Chromium (`playwright install --with-deps`), эфемерная ветка `e2e-<run_id>`, `npm run test:e2e`, при падении - артефакт `playwright-report`. `migrate` - только push в `master`, `needs` все чеки, `db:migrate` на Neon main (direct). Секреты: `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_MAIN_DATABASE_URL` (direct), `BETTER_AUTH_SECRET`. `create-branch-action@v5` требует вход `username` (роль Neon, у нас `neondb_owner`). Vercel деплоит из гита сам, параллельно.
-- Verifier (`.github/workflows/verify.yml`): на `pull_request: labeled`, только метка `verify` и PR не из форка; очередь `verify-<pr>` без отмены, таймаут 30 мин. Снимает метку → требует зелёные `quality`/`unit`/`integration`/`e2e` на head SHA (иначе комментарий «CI не зелёный») → ждёт Deployment Vercel `Preview` этого SHA ≤10 мин (иначе «превью не готово») → checkout без сохранённого токена, `npm ci`, Chromium, Claude Code CLI фиксированной версии → кладёт в `$RUNNER_TEMP/verify` доверенный ввод (`meta.txt`, issue из `Closes #N`, описание PR, diff, `rules-changed.json` - какие из `verify.yml`/`verifier.md`/`CODING.md`/`DECISIONS.md` меняет PR; в лёгком режиме - прошлый отчёт `[verifier]` бота, его JSON `last-verdict.json` и комментарии владельца после него) → `claude -p` (opus, `--permission-mode dontAsk`, без `GH_TOKEN`; правила - `.claude/agents/verifier.md` из checkout PR; вывод CLI - в файлы `$RUNNER_TEMP`, в лог только код выхода и статус) пишет `out/report.md` и `out/verdict.json` → `jq`-валидация (схема, `id`, `finding_id`, основания blocker/should, лёгкий режим), до 2 автоповторов «исправь только формат» через `--resume` → шаг «Publish report» дописывает `run`/`rules_changed`/`verdict` и публикует комментарий (текст + `<!-- verifier:json -->`; не влезает в 65 536 символов - JSON только в артефакте `verifier-report`). Красный прогон: `changes`, некорректный JSON после автоповторов, нет `report.md`. `GH_TOKEN` - только у шагов, которые ходят в GitHub. Секреты: `CLAUDE_CODE_OAUTH_TOKEN` (подписка), `VERCEL_AUTOMATION_BYPASS_SECRET` - только шагу агента; `GITHUB_TOKEN` (комментарии от `github-actions[bot]`).
-- `scripts/wait-ci.sh <PR> <HEAD_SHA>` - ждёт завершения последнего прогона `ci.yml` (`pull_request`) по SHA (опрос `gh` раз в 60 с, ошибки `gh` пропускает, таймаут 40 мин; env `WAIT_CI_INTERVAL`/`WAIT_CI_TIMEOUT` в секундах): код 0 - success, 1 - failure (печатает id прогона и упавшие джобы, логи - нет), 2 - аргументы, 3 - timeout, 4 - cancelled. Основная сессия запускает его фоном после отчёта implementer (`CONTRIBUTING.md`, «Цикл»).
-- `scripts/wait-verify.sh <PR> <HEAD_SHA>` - ждёт завершения прогона `verify.yml` по SHA (последний по `createdAt`, без `skipped`; опрос `gh` раз в 60 с, таймаут 35 мин; env `WAIT_VERIFY_INTERVAL`/`WAIT_VERIFY_TIMEOUT` в секундах): JSON прогона и код 0, `timeout` и код 1, ошибка аргументов - код 2. Основная сессия запускает его фоном, поставив метку `verify` после зелёного CI (`CONTRIBUTING.md`, «Цикл»).
-- Skill `task-design` (`.claude/skills/task-design/`): поэтапная проработка задачи с владельцем до спеки в issue (брейншторм → product design → system design → code design → слайсы), блоки issue - по шаблону Task.
-- Skill `run-report` (`.claude/skills/run-report/`): отчёт о прогоне фичи комментарием `[run report]` после апрува владельца. `scripts/collect.mjs` - только чтение (транскрипт implementer + `gh` + `git`) → черновик JSON: этапы по эвристике вызовов, запуски тестов и их итог (`flaky` - авто), CI/verify, токены и стоимость implementer по ценам API (output - оценка), промахи кэша с причиной и этапом. Ручной шаг сессии - названия этапов, класс и текст ошибок, red-фазы, исходы находок verifier. `scripts/render.mjs` - валидация полей сессии → таблица + `<!-- run-stats:json -->`. Схема, словари, цены моделей - `schema.md` (цены продублированы в `PRICES` collect.mjs).
-- `playwright.verify.config.ts` - ручной QA verifier против превью: `testDir` `e2e/_verify`, `baseURL` = `PREVIEW_URL`, без `webServer`, 1 воркер, trace всегда. `e2e/verify.global-setup.ts` одним запросом к хосту превью шлёт `x-vercel-protection-bypass` + `x-vercel-set-bypass-cookie` и сохраняет в `e2e/.auth/vercel-bypass.json` только bypass-cookie хоста превью - браузер секрета не видит, сторонние хосты (Sentry, Analytics) его не получают. Юзеры - новые на каждый прогон (`uniqueEmail` + `signup`).
+- Все команды в `package.json`. Основные: `dev` (локальный сервер на базе `main`), `test` (unit + integration, e2e отдельно - `test:e2e`), `typecheck`, `format`.
+- Миграции: `db:generate` создаёт SQL-миграцию из схемы, `db:migrate` накатывает её. `db:push` синхронизирует схему без истории, только для быстрых локальных правок.
+- `format` прогонять после `shadcn add`.
+- Сеть: локальная разработка и тесты в Neon не ходят. VPN в режиме туннеля нужен только для прямой работы с Neon с этой машины, без него большие запросы и `drizzle-kit migrate` зависают без ошибки.
+
+## Проверки по пути кода
+
+- Коммит: prettier + eslint по изменённым файлам. Пуш: typecheck + unit. Хуки ставятся сами при `npm install`.
+- CI на PR и push в `master`: линт и типы, unit, integration, затем e2e. Integration и e2e идут на временных Neon-ветках.
+- После мержа в `master` CI накатывает миграции на прод, Vercel деплоит сам.
 
 ## Структура (файл → ответственность)
 
@@ -127,6 +133,8 @@ Auth (Better Auth): `user` (идентичность; `is_anonymous` - гост�
 
 `/` редиректит на `/boards` · `/boards` список досок · `/b/$boardId` доска · `/b/$boardId/c/$cardId` окно карточки (дочерний роут доски) · неизвестный URL → root `notFoundComponent`.
 
+- Маршруты: `/` -> редирект на `/boards` (для неавторизованных - `/login`); `/boards` (`src/routes/boards/index.tsx`) - страница досок (`BoardsView`, скелетон, `head: pageMeta('Boards')`). Доска по умолчанию и ленивое создание убраны: новый пользователь видит пустой список.
+
 ## Сквозные паттерны
 
 - **Данные = серверное состояние в кэше Query.** Лоадеры префетчат через `context.queryClient.query({ ...opts, staleTime: 'static' })` (замена deprecated `ensureQueryData`); компоненты читают `useSuspenseQuery`.
@@ -163,17 +171,26 @@ Auth (Better Auth): `user` (идентичность; `is_anonymous` - гост�
 
 ## Тесты
 
-Vitest + React Testing Library + jsdom. Слои по «трофею»:
+Vitest (unit, integration) + Playwright (e2e).
 
-- **Unit** - чистые функции над доской (`src/lib/boards.ts`): добавление/переименование/удаление списка и карточки, поиск карточки, возврат удалённого на место (restore).
-- **Component** - `add-card.test.tsx`, `card-dialog.test.tsx`, `delete-list-dialog.test.tsx`, `list-title.test.tsx`: рендер, инлайн-редактирование (Enter/blur/Esc), диалоги подтверждения, `auth-form.test.tsx` (см. ниже). Границы мокаются: `@tanstack/react-start` (`useServerFn`), `@tanstack/react-router`, `sonner`. БД не участвует.
-- **Component (формы)** - `auth-form.test.tsx`: презентационная, моков нет. Валидация не с первого символа, ошибка по `onBlur`, `onSubmit(value)` при валидных данных, пустой сабмит - ошибки у обоих полей (#57), очистка ошибки только у поля в фокусе. Ошибку ассертим по `role="alert"` / тексту (`FieldError`).
-- **Integration** - `src/server/boards-repo.integration.test.ts` (проект `integration`, node + **база `test`**: локально Docker, в CI эфемерная Neon-ветка): скоуп/IDOR на настоящем SQL для всех функций `boards-repo` (включая попытку переноса карточки на чужую доску того же владельца); `src/db/backfill-boards.integration.test.ts` - перенос todo → доски, идемпотентность. Требует `.env.test` на ветку `test` (не main - `truncate` в `beforeEach` сотрёт!) + маркер `TEST_DB=1` (предохранитель: без него сетап бросает и тесты не идут). Только при `CI` (Neon по сети, транзиентные `ECONNRESET`) - `retry: 2` и таймауты 30 с; локально падение видно сразу.
-- **Не покрыто на этом уровне (→ E2E):** валидация и auth-гейты обёрток `boards.ts` (zod-отказ, `requireUserId`) - живут в `createServerFn`, в vitest напрямую не дёрнуть; проверяются в Playwright через реальный HTTP+сессию.
-- **E2E** - Playwright (`e2e/`, только Chromium, `workers: 1`). `webServer` поднимает app на `127.0.0.1:3100` против **базы `test`** (`.env.e2e`, `DATABASE_URL` через `webServer.env`, не main; в CI - эфемерная Neon-ветка). `e2e/global-setup.ts` - `assertDbReachable` до запуска. `auth.spec`: регистрация → пустой `/boards`, вход/выход, редирект неавторизованного. `isolation.spec`: чужая доска по прямой ссылке → `Board not found`. `boards.spec`: создать доску (открывается новая), переименовать, удалить последнюю (пустое состояние). `board.spec`: карточка - добавить (сверху, порядок после reload), переименовать (через окно карточки), переместить окном Move (в другой список на позицию, вниз в своём списке, «Move» неактивна для текущего места), перетащить (клавиатура в списке и между списками двумя ходами подряд, мышь между списками, бросок вне списков и `Esc` - без изменений), удалить с Undo и без (удаление сразу на сервере: переживает reload и перезапрос доски в окне Undo); список - добавить, переименовать, удалить (пустой, с Undo); окно карточки по прямой ссылке (`/b/$boardId/c/$cardId`). Хелперы `e2e/helpers/*`: `auth.ts` (`gotoHydrated` ждёт `networkidle` перед действиями - иначе клик до гидрации = нативный сабмит формы), `board.ts` (`gotoBoard`, локаторы по доступным именам компонентов доски: «List actions», «Card actions», «List title», «New card title» и т.п.), `db.ts` (общий клиент `src/db`; `resetDb` - полный сброс для `auth.setup.ts`, `resetBoards` - только доски, для `beforeEach` в `board.spec`, доска создаётся хелпером `seedBoard(email)` через базу; `gotoBoard(page, email)` сидит доску и открывает `/b/<id>`). Запуск `npm run test:e2e` (UI-дебаг `test:e2e:ui`). Gotcha: `localhost` на Windows резолвится в `::1` → готовность webServer не ловится, поэтому `127.0.0.1`. `timeout: CI ? 60с : 30с` - холодный старт webServer+Neon в CI.
-- **Обогащение карточки (#120):** unit - `due-date.test.ts` (табличная проверка статуса и текста при фиксированных часах и таймзоне), `labels.test.ts`, `checklist.test.ts`; integration - `card-enrichment.integration.test.ts` (ограничения БД), `labels-repo`/`checklists-repo.integration.test.ts` (изоляция, метка другой доски, каскады, перенос колонки, порядок пунктов), квоты в `quotas.integration.test.ts`; e2e (проект `crud`) - `card-face`, `due-date` (часы страницы подменяются `page.clock`), `labels`, `checklist`.spec; демо-данные - в `guest.spec`. `timezoneId: 'Pacific/Kiritimati'` (UTC+14) в общем `use` Playwright - отсутствие cookie таймзоны заметно. Component-тесты, импортирующие окно карточки, мокают `#/server/labels`, `#/server/checklists` и `use-time-zone`.
-- **Ещё не сделано:** P2 E2E (валидация/notFound за пределами изоляции).
+- Unit - чистая логика и компоненты. Границы (роутер, серверные функции, тосты) замоканы, базы нет.
+- Integration - data-слой на настоящем Postgres.
+- E2E - приложение в браузере. Здесь же гейты и валидация серверных функций, которые в vitest не вызвать.
 
-Gotcha: vitest иногда падает с `Timeout waiting for worker to respond` (флап пула на старте) - это не падение тестов, повторный прогон проходит.
+Где лежат: unit и integration рядом с кодом, integration отличаются суффиксом `.integration.test.ts`. E2E - в `e2e/`, файл на область, общие хелперы в `e2e/helpers/`.
 
-- Маршруты: `/` -> редирект на `/boards` (для неавторизованных - `/login`); `/boards` (`src/routes/boards/index.tsx`) - страница досок (`BoardsView`, скелетон, `head: pageMeta('Boards')`). Доска по умолчанию и ленивое создание убраны: новый пользователь видит пустой список.
+Что проверяется сквозь все домены:
+
+- Изоляция: чужие данные недоступны ни через интерфейс, ни напрямую через серверные функции.
+- Сервер отказывает без сессии и на некорректный ввод.
+- Изменения сохраняются на сервере и переживают перезагрузку.
+- Целостность базы: ограничения, каскады, квоты.
+- Даты корректны в любой таймзоне (e2e идут в UTC+14).
+
+Предохранитель: integration и e2e работают только с базой `test` и чистят её. Integration без маркера `TEST_DB=1` не стартуют.
+
+Ретраи только в CI: integration и e2e ходят в Neon по сети и ловят транзиентные обрывы, поэтому там 2 повтора и увеличенные таймауты (e2e ещё и на холодный старт сервера). Локально ретраев нет, падение видно сразу.
+
+Флап: vitest иногда падает на старте с `Timeout waiting for worker to respond`, повторный прогон проходит.
+
+E2E поднимают сервер на `127.0.0.1`, не `localhost`: на Windows `localhost` резолвится в `::1`, и готовность сервера не ловится.

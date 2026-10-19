@@ -73,6 +73,13 @@
 - Контейнер остановлен - integration и e2e падают сразу с подсказкой `docker compose up -d`.
 - Миграции на локальные `main` и `test` катить можно; на Neon `main` с этой машины - никогда (прод мигрирует CI). Схема разъехалась после перегенерации миграции: пересоздать базу `test` (`docker compose exec db dropdb -U postgres test`, `createdb`, миграции). `docker compose down -v` удаляет volume с обеими базами.
 
+### База на превью и проде
+
+- **Production** (merge в `master`) - статичный `DATABASE_URL` на Neon `main`. **Preview** (любая другая ветка/PR) - статичные `DATABASE_URL` (pooled) и `DATABASE_URL_UNPOOLED` (direct) на Neon-ветку `staging`, общую для всех превью; интеграции и отдельных веток на превью нет. Development в Vercel не используем (локально `.env`).
+- Секреты окружений раздельные (`BETTER_AUTH_SECRET` у Preview свой).
+- Сборка - `npm run vercel-build` (`scripts/vercel-build.mjs`): на Preview перед `vite build` катит `drizzle-kit migrate` на `staging`, на Production - только `vite build`.
+- Один PR с миграцией за раз. Если PR с миграцией закрыт без мержа или миграцию перегенерировали внутри PR (сборка превью падает с `already exists`) - в Neon Reset from parent для `staging`, затем redeploy превью. После reset в `staging` копия прод-данных.
+
 ## Правила кода
 
 - `CODING.md` - уроки из код-ревью и антипаттерны. Замечание из ревью, которое может повториться, добавляется туда правилом в том же PR, где оно исправлено. Общие практики не добавляем.
