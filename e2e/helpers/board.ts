@@ -1,5 +1,5 @@
 import { expect } from '@playwright/test';
-import type { Page, Response } from '@playwright/test';
+import type { Locator, Page, Response } from '@playwright/test';
 import { gotoHydrated } from './auth';
 import { seedBoard } from './db';
 
@@ -147,4 +147,24 @@ export function listTitleButton(page: Page, title: string) {
     return page.locator('button:not(h1 button)', {
         has: page.locator(`span[title="${title}"]`),
     });
+}
+
+/**
+ * Where a popover stands once its opening animation has finished: its side of
+ * the anchor and the corner next to it (top-left below the anchor, bottom-left
+ * above it), so a change of its height alone doesn't count as a move.
+ */
+export async function popoverPosition(popover: Locator) {
+    await expect(popover).toBeVisible();
+    await popover.evaluate((el) =>
+        Promise.all(el.getAnimations().map((a) => a.finished)),
+    );
+    const side = await popover.getAttribute('data-side');
+    const box = await popover.boundingBox();
+    if (!box) return null;
+    return {
+        side,
+        x: box.x,
+        y: side === 'top' ? box.y + box.height : box.y,
+    };
 }

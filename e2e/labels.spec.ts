@@ -2,7 +2,13 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL, gotoHydrated } from './helpers/auth';
 import { resetBoards, seedBoard } from './helpers/db';
-import { addCard, cardRow, gotoBoard, listColumn } from './helpers/board';
+import {
+    addCard,
+    cardRow,
+    gotoBoard,
+    listColumn,
+    popoverPosition,
+} from './helpers/board';
 
 test.beforeEach(async () => {
     await resetBoards();
@@ -118,6 +124,58 @@ test('creates a label, puts it on cards, expands titles on the board and deletes
     await page.reload();
     await expect(cardRow(page, 'Ship it')).toBeVisible();
     await expect(anyLabels).toHaveCount(0);
+});
+
+test('the labels popover stays open and in place while labels go on and off the card', async ({
+    page,
+}) => {
+    test.slow();
+    await gotoBoard(page, CRUD_EMAIL);
+    await addCard(page, 'To do', 'Ship it');
+
+    await cardRow(page, 'Ship it').getByRole('link').click();
+    const window = page.getByRole('dialog', { name: 'Ship it' });
+    const labelsButton = window.getByRole('button', {
+        name: 'Labels',
+        exact: true,
+    });
+    const editLabels = window.getByRole('button', { name: 'Edit labels' });
+    await labelsButton.click();
+    await expect(labelsButton).toHaveAttribute('aria-expanded', 'true');
+    await createLabel(page, 'Frontend');
+    await createLabel(page, 'Backend');
+    const opened = await popoverPosition(labelsPopover(page));
+
+    /** Toggles the label; the button row and the labels block swap or grow. */
+    async function toggle(label: string, on: boolean) {
+        const checkbox = labelsPopover(page).getByRole('checkbox', {
+            name: label,
+        });
+        await saved(page, () => checkbox.click());
+        await expect(checkbox).toBeChecked({ checked: on });
+        await expect(window.getByText(label, { exact: true })).toHaveCount(
+            on ? 1 : 0,
+        );
+        expect(await popoverPosition(labelsPopover(page))).toEqual(opened);
+    }
+
+    // The first label swaps the "Labels" button for the labels block.
+    await toggle('Frontend', true);
+    await expect(editLabels).toBeVisible();
+    // The second one widens the block and moves «+».
+    await toggle('Backend', true);
+    await toggle('Frontend', false);
+    // The last one off brings the "Labels" button back.
+    await toggle('Backend', false);
+    await expect(labelsButton).toBeVisible();
+
+    // Its own button closes the popover; Esc - the popover, then the window.
+    await labelsButton.click();
+    await expect(labelsPopover(page)).toHaveCount(0);
+    await expect(labelsButton).toHaveAttribute('aria-expanded', 'false');
+    await labelsButton.click();
+    await expect(labelsPopover(page)).toBeVisible();
+    await closePopoverAndWindow(page);
 });
 
 test('moving a list to another board warns about its labels and takes them off; completion stays', async ({
