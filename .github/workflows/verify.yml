@@ -1,13 +1,16 @@
 name: Verify
 
 # CI verifier: code review + manual QA of a PR on its Vercel preview.
-# Started by the `verify` label (the implementer sets it after green CI).
+# Started by the `verify` label (the main session sets it after green CI).
 # Process: CONTRIBUTING.md «Процесс фичи», decisions №61, №62.
 #
 # The agent (Claude Code CLI) gets no GitHub token: it writes report.md and
 # verdict.json to $RUNNER_TEMP/verify/out, the workflow validates them and
 # publishes the comment. GH_TOKEN is set only on the steps that call GitHub.
 
+# `pull_request`, not `pull_request_target`: while this file changes often, its
+# edits are checked in their own PR. Before making `verify` a required check,
+# switch to `pull_request_target` - a PR can rewrite the rules of its reviewer.
 on:
     pull_request:
         types: [labeled]

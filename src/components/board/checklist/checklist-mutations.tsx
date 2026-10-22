@@ -28,7 +28,7 @@ import {
 
 // Checklist of a card (#120). All its mutations run in the card's queue
 // (card-queue.ts). Creating the checklist and an item waits for the server
-// (ADR 56); edits, checks, moves and deletes are optimistic (ADR 3). The board
+// (ADR 56); edits, checks, moves and deletes are optimistic (ADR 56). The board
 // keeps only the done/total counts: every cache edit updates them too.
 
 /** Writes the checklist cache and the card's counts on the board. */
