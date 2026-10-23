@@ -202,7 +202,7 @@ async function readNeighbors(checklistId: string, neighborIds: string[]) {
 
 /**
  * Gives every item a fresh key in the current order. Sequential updates without
- * a transaction (ADR 22): a rare path, the next renumbering fixes a partial failure.
+ * a transaction (ADR 77): a rare path, the next renumbering fixes a partial failure.
  */
 async function renumberChecklist(checklistId: string) {
     const rows = await db

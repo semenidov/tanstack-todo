@@ -118,7 +118,7 @@ export interface ToggleCardLabelVars {
     on: boolean;
 }
 
-// A checkbox in the labels popover: optimistic (ADR 3), in the card's queue
+// A checkbox in the labels popover: optimistic (ADR 56), in the card's queue
 // (card-queue.ts), so fast clicks reach the server in order.
 export function useToggleCardLabel(boardId: string, cardId: string) {
     const queryClient = useQueryClient();

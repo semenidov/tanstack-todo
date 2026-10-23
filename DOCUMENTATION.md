@@ -1,179 +1,223 @@
 # tanstack-todo - карта проекта
 
-Учебный/портфолио todo-app. Этот файл - **карта, а не копия кода**: где какая логика и какие сквозные паттерны. Детали (конкретные классы, тексты) не дублируем - для них есть код.
-
-Последняя сверка: 2026-10-12.
+Верхнеуровневая документация проекта.
+Домены, слои и границы проекта: где что искать.
+Работа с репозиторием и сквозные практики.
 
 ## Как поддерживать
 
-- Обновлять после значимых изменений (новый роут/компонент/паттерн, смена подхода).
-- Держать коротким, чтобы обновление было дешёвым.
-- Claude не может обновлять файл между сессиями; если код меняли мимо Claude - при старте большой задачи попросить сверить карту с кодом.
+- Пишем то, что остаётся верным при рефакторинге внутри домена.
+- Уровень - домены и папки, верхние абстракции. Без имён функций, кода и номеров задач.
+- Тонкие места, которые легко сломать, - коротко, в своём разделе.
+- Куда: где лежит и что умеет - «Структура»; как работает - «Сквозные паттерны».
+- Обновляем, когда появляется или меняется домен, слой, граница или общий подход.
+- Правим затронутые пункты как написанные сейчас, устаревшее удаляем. Новый пункт - только для новой мысли.
+- Меняется домен, слой или граница - пересобираем подраздел или раздел.
+- Пункт - одна мысль, без вложенных скобок.
 
 ## Стек
 
-TanStack Start (SSR) + Router + Query · Drizzle ORM + Postgres · shadcn/ui · TanStack Form · sonner (тосты). Windows, npm. Прод: Vercel (serverless) + Neon (managed Postgres) - https://todo-semenidov.vercel.app.
+- Фреймворк: TanStack Start (SSR) + Router, React.
+- Данные: TanStack Query (серверное состояние), Drizzle ORM + Postgres.
+- Auth: Better Auth.
+- UI: Tailwind, shadcn/ui (Radix), TanStack Form + Zod, dnd-kit, sonner.
+- Наблюдаемость: Sentry (ошибки), Vercel Analytics + Speed Insights.
+- Тесты: Vitest + Testing Library, Playwright.
 
-Окружения Vercel: **Production** (merge в `master`) - статичный `DATABASE_URL` на Neon `main`; **Preview** (любая другая ветка/PR) - статичные `DATABASE_URL` (pooled) и `DATABASE_URL_UNPOOLED` (direct) на Neon-ветку `staging`, общую для всех превью; интеграции и отдельных веток на превью нет. Правила: один PR с миграцией за раз; если PR с миграцией закрыт без мержа или миграцию перегенерировали внутри PR (сборка превью падает с `already exists`) - в Neon Reset from parent для `staging`, затем redeploy превью (после reset в `staging` копия прод-данных). Development в Vercel не используем (локально `.env`). Секреты окружений раздельные (`BETTER_AUTH_SECRET` у Preview свой). Сборка идёт через `npm run vercel-build` (`scripts/vercel-build.mjs`): на Preview перед `vite build` катит `drizzle-kit migrate` на `staging`, на Production - только `vite build`.
+Окружения:
+
+- Локально: Postgres в Docker, две базы. `main` для разработки, `test` для integration и e2e (тесты её чистят).
+- CI: на каждый прогон integration и e2e создаётся временная Neon-ветка, после прогона удаляется.
+- Превью: Vercel на каждый PR, все превью делят одну Neon-ветку `staging`.
+- Прод: Vercel (serverless) + Neon `main`, деплой при merge в `master`. https://todo-semenidov.vercel.app
+- Драйвер БД по окружению: локально node-postgres, на Neon - neon-http. Код опирается только на общее у обоих (без транзакций и batch).
+- Миграции: схема описана в Drizzle, SQL-миграции генерируются и коммитятся в `drizzle/`. Одни и те же файлы накатываются везде: локально вручную, в CI на временную ветку перед тестами, на превью при сборке, на прод отдельным шагом CI после мержа.
+- Работа с базами по окружениям - `CONTRIBUTING.md`.
 
 ## Команды
 
-- Локальная база - Postgres 18 в Docker (`compose.yaml`, контейнер `db`, `127.0.0.1:5432`): база `main` для `npm run dev` (`.env`), база `test` для integration и e2e (`.env.test`, `.env.e2e`). `docker compose up -d`, на новом volume - миграции на обе базы: `npm run db:migrate` и `npx drizzle-kit migrate --config=drizzle.config.test.ts`. CI, превью и прод - на Neon. Подробности и gotcha - `CONTRIBUTING.md`, «База локально».
-- `npm run dev` - vite dev на :3000 (Docker Postgres, база `main` по `.env`)
-- `npm test` - все проекты; `test:unit` (jsdom, офлайн) / `test:integration` (локальная база `test`; в CI - Neon) - по отдельности; `test:watch`
-- `npm run db:push:test` - синхронизировать схему на базу `test` (`.env.test`) без истории миграций
-- `npm run build`, `npm run generate-routes` (tsr)
-- Миграции: `db:generate` (сгенерить SQL-диф в `drizzle/`, коммитим) → `db:migrate` (накат на Neon; **direct**-строкой, не pooled). Прод - шагом в CI. `db:push` - только быстрая синхронизация схемы, без истории.
-- Сеть: локальная разработка и тесты Neon не трогают. VPN в режиме туннеля нужен только при прямой работе с Neon с этой машины: без него запросы больше ~16 КБ и TCP на порт 5432 (`drizzle-kit migrate`) зависают без ошибки.
-- `npm run format` - prettier + eslint (прогонять после `shadcn add`)
-- `npm run typecheck` - `tsc --noEmit`
-- Git-хуки (husky): `pre-commit` → lint-staged (prettier+eslint по staged), `pre-push` → typecheck + `test:unit`. Ставятся сами через `prepare` на `npm install`.
-- CI (`.github/workflows/ci.yml`): на PR и push в `master`. `quality` (lint+typecheck), `unit`, `integration` (эфемерная Neon-ветка `ci-<run_id>`). `e2e` - `needs` все чеки, ставит Chromium (`playwright install --with-deps`), эфемерная ветка `e2e-<run_id>`, `npm run test:e2e`, при падении - артефакт `playwright-report`. `migrate` - только push в `master`, `needs` все чеки, `db:migrate` на Neon main (direct). Секреты: `NEON_API_KEY`, `NEON_PROJECT_ID`, `NEON_MAIN_DATABASE_URL` (direct), `BETTER_AUTH_SECRET`. `create-branch-action@v5` требует вход `username` (роль Neon, у нас `neondb_owner`). Vercel деплоит из гита сам, параллельно.
-- Verifier (`.github/workflows/verify.yml`): на `pull_request: labeled`, только метка `verify` и PR не из форка; очередь `verify-<pr>` без отмены, таймаут 30 мин. Снимает метку → требует зелёные `quality`/`unit`/`integration`/`e2e` на head SHA (иначе комментарий «CI не зелёный») → ждёт Deployment Vercel `Preview` этого SHA ≤10 мин (иначе «превью не готово») → checkout без сохранённого токена, `npm ci`, Chromium, Claude Code CLI фиксированной версии → кладёт в `$RUNNER_TEMP/verify` доверенный ввод (`meta.txt`, issue из `Closes #N`, описание PR, diff, `rules-changed.json` - какие из `verify.yml`/`verifier.md`/`CODING.md`/`DECISIONS.md` меняет PR; в лёгком режиме - прошлый отчёт `[verifier]` бота, его JSON `last-verdict.json` и комментарии владельца после него) → `claude -p` (opus, `--permission-mode dontAsk`, без `GH_TOKEN`; правила - `.claude/agents/verifier.md` из checkout PR; вывод CLI - в файлы `$RUNNER_TEMP`, в лог только код выхода и статус) пишет `out/report.md` и `out/verdict.json` → `jq`-валидация (схема, `id`, `finding_id`, основания blocker/should, лёгкий режим), до 2 автоповторов «исправь только формат» через `--resume` → шаг «Publish report» дописывает `run`/`rules_changed`/`verdict` и публикует комментарий (текст + `<!-- verifier:json -->`; не влезает в 65 536 символов - JSON только в артефакте `verifier-report`). Красный прогон: `changes`, некорректный JSON после автоповторов, нет `report.md`. `GH_TOKEN` - только у шагов, которые ходят в GitHub. Секреты: `CLAUDE_CODE_OAUTH_TOKEN` (подписка), `VERCEL_AUTOMATION_BYPASS_SECRET` - только шагу агента; `GITHUB_TOKEN` (комментарии от `github-actions[bot]`).
-- `scripts/wait-ci.sh <PR> <HEAD_SHA>` - ждёт завершения последнего прогона `ci.yml` (`pull_request`) по SHA (опрос `gh` раз в 60 с, ошибки `gh` пропускает, таймаут 40 мин; env `WAIT_CI_INTERVAL`/`WAIT_CI_TIMEOUT` в секундах): код 0 - success, 1 - failure (печатает id прогона и упавшие джобы, логи - нет), 2 - аргументы, 3 - timeout, 4 - cancelled. Основная сессия запускает его фоном после отчёта implementer (`CONTRIBUTING.md`, «Цикл»).
-- `scripts/wait-verify.sh <PR> <HEAD_SHA>` - ждёт завершения прогона `verify.yml` по SHA (последний по `createdAt`, без `skipped`; опрос `gh` раз в 60 с, таймаут 35 мин; env `WAIT_VERIFY_INTERVAL`/`WAIT_VERIFY_TIMEOUT` в секундах): JSON прогона и код 0, `timeout` и код 1, ошибка аргументов - код 2. Основная сессия запускает его фоном, поставив метку `verify` после зелёного CI (`CONTRIBUTING.md`, «Цикл»).
-- Skill `task-design` (`.claude/skills/task-design/`): поэтапная проработка задачи с владельцем до спеки в issue (брейншторм → product design → system design → code design → слайсы), блоки issue - по шаблону Task.
-- Skill `run-report` (`.claude/skills/run-report/`): отчёт о прогоне фичи комментарием `[run report]` после апрува владельца. `scripts/collect.mjs` - только чтение (транскрипт implementer + `gh` + `git`) → черновик JSON: этапы по эвристике вызовов, запуски тестов и их итог (`flaky` - авто), CI/verify, токены и стоимость implementer по ценам API (output - оценка), промахи кэша с причиной и этапом. Ручной шаг сессии - названия этапов, класс и текст ошибок, red-фазы, исходы находок verifier. `scripts/render.mjs` - валидация полей сессии → таблица + `<!-- run-stats:json -->`. Схема, словари, цены моделей - `schema.md` (цены продублированы в `PRICES` collect.mjs).
-- `playwright.verify.config.ts` - ручной QA verifier против превью: `testDir` `e2e/_verify`, `baseURL` = `PREVIEW_URL`, без `webServer`, 1 воркер, trace всегда. `e2e/verify.global-setup.ts` одним запросом к хосту превью шлёт `x-vercel-protection-bypass` + `x-vercel-set-bypass-cookie` и сохраняет в `e2e/.auth/vercel-bypass.json` только bypass-cookie хоста превью - браузер секрета не видит, сторонние хосты (Sentry, Analytics) его не получают. Юзеры - новые на каждый прогон (`uniqueEmail` + `signup`).
+- Все команды в `package.json`. Основные: `dev` (локальный сервер на базе `main`), `test` (unit + integration, e2e отдельно - `test:e2e`), `typecheck`, `format`.
+- Миграции: `db:generate` создаёт SQL-миграцию из схемы, `db:migrate` накатывает её. `db:push` синхронизирует схему без истории, только для быстрых локальных правок.
+- `format` прогонять после `shadcn add`.
+- Сеть: локальная разработка и тесты в Neon не ходят. VPN в режиме туннеля нужен только для прямой работы с Neon с этой машины, без него большие запросы и `drizzle-kit migrate` зависают без ошибки.
 
-## Структура (файл → ответственность)
+## Проверки по пути кода
 
-- `src/router.tsx` - `getRouter()`: создаёт `QueryClient`, кладёт в context роутера, `setupRouterSsrQueryIntegration`.
-- `src/client.tsx` - кастомная клиентская точка входа: первым импортом `instrument.client` (Sentry), затем гидрация `StartClient`.
-- `src/server.ts` - кастомная серверная точка входа: первым импортом `instrument.server`, `fetch` обёрнут `wrapFetchWithSentry`.
-- `src/start.ts` - `createStart`: глобальные Sentry-middleware (request + function) - ловят ошибки server fns; `createCsrfMiddleware` на все server fns (отбивает cross-site вызовы).
-- `src/instrument.client.ts` / `src/instrument.server.ts` - `Sentry.init` (DSN из env, без DSN - no-op; только ошибки). `src/lib/sentry.ts` - общий строгий `dataCollection` (без тел/кук/заголовков/данных БД/переменных стека).
-- `src/routes/__root.tsx` - корневой роут: html-shell, head, `<Toaster>`, `notFoundComponent` (404 через MessageScreen), тип контекста `{ queryClient }`; `beforeLoad` кладёт в контекст `session`, `timeZone` (из cookie) и `now` (время запроса), эффект пишет cookie таймзоны (см. «Таймзона и SSR»).
-- `src/routes/index.tsx` - `/`: `redirect` на `/boards`; компонент не рендерится.
-- `src/server/debug.ts` - `crashServerFn` (тестовая серверная ошибка для Sentry); на production (`VERCEL_ENV`) отвечает 404 без броска.
-- `src/components/message-screen.tsx` - общий центрированный экран (`icon/title/description/action`) для 404 / notFound / error.
-- `src/components/route-error.tsx` - `errorComponent`: MessageScreen + кнопка Retry (`router.invalidate`).
-- `src/components/ui/*` - shadcn (генерятся CLI; после `add` прогонять `npm run format`).
-- `src/lib/seo.ts` - метаданные: `pageMeta(screen)` (title + `og:title` в формате `<Экран> · Todo List`), `siteMeta` (description, OG, twitter card), `siteLinks` (favicon, apple-touch-icon, manifest).
-- `src/lib/auth.ts` - инстанс Better Auth (`drizzleAdapter` pg, `emailAndPassword`; секрет из env). `baseURL` динамический: `allowedHosts` - прод-домен всегда, маска `tanstack-todo-*-ssemenidov.vercel.app` только при `VERCEL_ENV=preview`, `localhost:3000`/`127.0.0.1:3100` только вне Vercel; `protocol` https на Vercel, http локально. Хост запроса из списка становится baseURL и доверенным origin - превью логинятся без "Invalid origin". `BETTER_AUTH_URL` больше не используется.
-- `src/lib/auth-rate-limit.ts` - правила лимитера входа/регистрации/гостевого входа (`SIGN_IN_LIMIT`, `SIGN_UP_LIMIT`, `GUEST_SIGN_IN_LIMIT`, общие для `auth.ts` и форм) и `authErrorMessage` (текст тоста: на 429 - «Too many attempts…» с фактическим окном).
-- `src/lib/quotas.ts` - квоты на содержимое (`USER_QUOTAS`, `GUEST_QUOTAS`, `quotasFor(user)`; `GUEST_TTL_DAYS`, `MAX_ACTIVE_GUESTS`), `QuotaExceededError` (код квоты в `message`), `createErrorMessage`/`restoreErrorMessage`/`moveErrorMessage` - тексты тостов при отказе по квоте (создание, Undo, перенос карточки или колонки). С #120 - ещё меток на доске (50/10 у гостя), меток на карточке (10/10), пунктов чек-листа (100/20).
-- `src/lib/auth-client.ts` - клиентский `createAuthClient` с `anonymousClient` (`signIn/signUp/signOut`, `signIn.anonymous`, `deleteAnonymousUser`).
-- `src/lib/auth-server.ts` - `getSession`, `requireUser` (`{ id, isAnonymous }`, для server fns досок) и `requireUserId` (server fns над `auth.api.getSession`; кидают при отсутствии сессии).
-- `src/lib/guest.ts` - код и текст отказа по потолку гостей, `guestSignInErrorMessage` (тост кнопки гостя). `src/lib/demo-board.ts` - содержимое демо-доски (чистые данные). `src/lib/use-is-guest.ts` - `useIsGuest()` из сессии в контексте root.
-- `src/server/guests.ts` - жизненный цикл гостя для хуков Better Auth: `deleteExpiredGuests` (строго `is_anonymous AND created_at < now - 7 дней`), `prepareGuestSignIn` (очистка + потолок), `seedGuest` (демо-доска, ошибка - в Sentry).
-- `src/server/board-writes.ts` - тела server fns, добавляющих живую строку (`createBoardAs/addListAs/restoreListAs/addCardAs/restoreCardAs`, `createLabelAs/addCardLabelAs/addChecklistItemAs`): передают в репо `quotasFor(user)`; `moveCardOrThrow(user, data)` в `move-card.ts` - так же. Отдельно ради integration-теста на каждый путь.
-- `src/components/guest-sign-in-button.tsx` («Try as guest» на `/login`), `guest-banner.tsx` (баннер гостя на `/boards` и доске: одна строка, ✕ закрывает навсегда в этом браузере - `localStorage` `guest-banner-dismissed:<userId>`, рендер после гидрации), `sign-out-button.tsx` (выход в шапках: гость - `deleteAnonymousUser`, иначе `signOut`; затем `/login` и `queryClient.clear()`).
-- `src/components/auth-form.tsx` - презентационная форма email+password (login/signup).
-- `src/routes/login.tsx`, `src/routes/signup.tsx` - экраны входа/регистрации.
-- `src/routes/api/auth/$.ts` - catch-all серверный роут, проксирует GET/POST в `auth.handler`.
-- `src/db/auth-schema.ts` - таблицы Better Auth (`user/session/account/verification/rate_limit`), сгенерены CLI; ре-экспортятся из `schema.ts`.
-- `src/db/schema.ts` - таблицы `boards`, `lists`, `cards`, `labels`, `card_labels`, `checklists`, `checklist_items` + `relations` (нужны для relational `getBoard`) + `export * from './auth-schema'`. Поля - «Модель данных».
-- `src/server/access.ts` - общие подзапросы владения для репо: `ownedBoardIds`/`ownedListIds`/`ownedCardIds`/`ownedChecklistIds` (`inArray`-подзапрос до `boards.owner_id`) и `findOwnedCard` (карточка с её доской - для проверки «метка той же доски»).
-- `src/server/labels-repo.ts` + `labels.ts` (server fns) - метки доски (`listLabels`, порядок `created_at, id`; create/update/delete; повесить/снять на карточке - `addCardLabel`/`removeCardLabel`, только метку той же доски, обновляет `cards.updated_at`). Пустое название хранится `null`; нарушение индекса уникальности → ошибка `Label already exists`.
-- `src/server/checklists-repo.ts` + `checklists.ts` (server fns) - чек-лист карточки (один, `getChecklist` с пунктами по `position`), пункты (add/update/delete, `moveChecklistItem` по соседям с перенумерацией при `prev >= next`, как у карточек). Любая правка обновляет `cards.updated_at`.
-- `src/server/boards-repo.ts` - чистый data-слой досок: `seedDemoBoard` (демо-доска гостя), `listBoards/createBoard/renameBoard/deleteBoard/getBoard/addList/renameList/deleteList/moveList/addCard/updateCard/moveCard/deleteCard`, все с явным `userId`. `getBoard` отдаёт у карточки ещё `completedAt`, `dueDate`/`dueAt`, `labelIds` и `checklistDone`/`checklistTotal` (агрегат подзапросом, пункты не грузятся); `updateCard` принимает `completed` и `due`; `moveList` на другую доску удаляет `card_labels` всех карточек колонки (включая удалённые); `seedDemoBoard(userId, timeZone)` сидит метки, сроки («сегодня» по таймзоне), чек-лист и выполненную карточку. Доступ проверяется самим запросом (join/`inArray`-подзапрос до `boards.owner_id = userId`, подзапросы - в `access.ts`); для инсертов (`addList/addCard`) - предварительный `findFirst` с проверкой владельца перед `insert`. `createBoard/addList/addCard`, `restoreList/restoreCard`, `moveCard` в другую колонку и `moveList` на другую доску проверяют квоту (последний необязательный параметр `quotas`, по умолчанию `USER_QUOTAS`) и бросают `QuotaExceededError`. `moveCard(userId, cardId, toListId, prevCardId, nextCardId)` - перенос между соседями: соседи в целевой колонке, не удалены, не сама карточка, колонка на той же доске и не удалена; ключ `position` считает сервер (см. «Порядок карточек и DnD»). `moveCardServer` бросает ошибку при отказе (тело - `src/server/move-card.ts`, отдельно ради unit-теста). `moveList(userId, listId, toBoardId, prevListId, nextListId)` - то же для колонки: колонка и целевая доска свои и живые, соседи на целевой доске; на другую доску - UPDATE одной строки `lists` (карточки ссылаются только на `listId`); `prev >= next` - `renumberLists(boardId)` и повтор. `moveListServer` - тело в `src/server/move-list.ts` (`moveListOrThrow`, `quotasFor(user)`). Мутации над чужим/несуществующим id не меняют данные и возвращают `[]`/`null`.
-- `src/server/boards-repo.integration.test.ts` - ownership-скоуп для всех репо-функций досок, включая попытку `moveCard` на чужую доску того же владельца.
-- `src/server/boards.ts` - server fns над досками (`listBoardsServer/createBoardServer/renameBoardServer/deleteBoardServer/getBoardServer/addListServer/renameListServer/deleteListServer/moveListServer/addCardServer/updateCardServer/moveCardServer/deleteCardServer`). Тонкие обёртки: `requireUserId` → вызов `boards-repo`, валидация zod (`z.uuid()`, название/описание с лимитами).
-- `src/lib/boards-query.ts` - `boardQueryOptions(boardId)` (ключ `['boards', boardId]`), `boardsListQueryOptions` (ключ `['boards']`) (импортируют read-fns из `#/server/boards`); экспортит типы `BoardData`/`ListWithCards`/`Card`, выведенные из возврата `getBoardServer`.
-- `src/lib/labels-query.ts` - `labelsQueryOptions(boardId)` (ключ `['labels', boardId]`, метки доски; карточка хранит только id). `src/lib/labels.ts` - нормализация названия, проверка дубля без учёта регистра, порядок, правки кэша меток, `labelsOfCard`. `src/lib/label-colors.ts` - 10 ключей палитры (`LabelColor`) → классы полоски и чипа.
-- `src/lib/checklist-query.ts` - `checklistQueryOptions(cardId)` (ключ `['checklist', cardId]`, `null` - нет чек-листа). `src/lib/checklist.ts` - прогресс, правки кэша пунктов, перестановка и соседи для сервера.
-- `src/lib/due-date.ts` - чистые функции срока: `describeDue(due, { now, timeZone, completed })` → статус (`Overdue`/`Soon`/`Neutral`), текст бейджа и текст для скринридера; `buildDue` (день + текст поля времени → `dueDate` или `dueAt` по стенным часам таймзоны); `formatCardDate` (`Created · Updated`).
-- `src/lib/time-zone.ts` - cookie `tz`: `writeTimeZoneCookie` (клиент), `getCookieTimeZone` (isomorphic), `timeZoneFromCookies` (хук Better Auth); без cookie - UTC. `src/lib/use-time-zone.ts` - `useTimeZone()`/`useNow()`: до гидрации - значения из контекста корня, после - устройства (`useSyncExternalStore`, часы тикают раз в минуту).
-- `src/lib/use-media-query.ts` - `useMediaQuery`, `useIsDesktop` (`md`, 768px; на сервере и до гидрации - false).
-- `src/lib/use-drag-scroll.ts` - `useDragScroll()`: callback ref, горизонтальный pan мышью по фону контейнера (только `pointerType === 'mouse'`, `target === currentTarget`, pointer capture; на время drag `select-none cursor-grabbing!` и inline `scroll-snap-type: none` - доска идёт за мышью 1:1; при отпускании плавный `scrollTo` к ближайшей колонке по `scroll-snap-align` детей с учётом `scroll-padding` контейнера, затем snap возвращается CSS по `scrollend`); расчёт - чистые `getDragScrollLeft`/`getNearestSnapLeft`.
-- `src/lib/boards.ts` - чистые функции над `BoardData`: списки (`addListToBoard`/`renameListInBoard`/`removeListFromBoard`) и карточки (`addCardToList`/`updateCardInBoard`/`moveCardInBoard(board, cardId, toListId, index)`/`removeCardFromBoard`/`findCardInBoard`), метки и чек-лист на доске (`setCardLabelInBoard`/`removeLabelFromBoard`/`labelCardCount`/`listLabelLinkCount`/`setChecklistProgressInBoard`) для оптимистичных правок кэша `['boards', boardId]`; порядок - `cardMoveNeighbors` (соседи по индексу в списке без карточки), `isSameCardSpot`, `compareCardOrder`.
-- `src/lib/card-dnd.ts` - чистая логика DnD карточек: `cardDropTarget` (куда ляжет карточка над карточкой/колонкой), `pickCardDropId` (цель под точкой: над заголовком/AddCard - первая карточка, ниже последней или пустая колонка - колонка), `cardKeyboardPoint` (стрелки), `cardDndAnnouncements` (тексты для скринридера).
-- `src/lib/list-dnd.ts` - то же для колонок: `isListId`, `listDropIndex` (место над колонкой), `pickListDropId` (ближайшая колонка по x), `listKeyboardPoint` (←/→), `listDndAnnouncements` («List X, position 2 of 4»).
-- `src/lib/use-hydrated.ts` - флаг «отрендерено на клиенте» (`useSyncExternalStore`).
-- `src/lib/use-delayed-flag.ts` - флаг, включающийся с задержкой (спиннер синхронизации через 300 мс); `src/lib/use-prefers-reduced-motion.ts` - `prefers-reduced-motion` через `useSyncExternalStore`.
-- `src/routes/b/$boardId/route.tsx` - `/b/$boardId`: доска-layout (папочная конвенция роутера), рендерит `BoardView` + `<Outlet />` для окна карточки. Лоадер - uuid-guard + `boardQueryOptions` (иначе `notFound`) параллельно с `labelsQueryOptions`, `pendingComponent: BoardSkeleton`, `notFoundComponent: BoardNotFound`, `errorComponent: RouteError`. `head` берёт название доски из `loaderData`.
-- `src/routes/b/$boardId/c/$cardId.tsx` - `/b/$boardId/c/$cardId`: дочерний роут, окно карточки. Карточка ищется в кэше `boardQueryOptions` (`findCardInBoard`, без отдельного запроса), лоадер префетчит только чек-лист (`checklistQueryOptions`); не найдена - тост «Card not found» + `navigate` на доску. `head` берёт название карточки из лоадера (читает тот же кэш).
-- `src/components/boards/` - страница `/boards`: `boards-view.tsx` (шапка «Boards» + сетка `grid-cols-2 sm:3 lg:4` + пустое состояние `Empty`), `board-tile.tsx` (плитка-`Link` на `/b/$boardId`, название + «N lists», меню `⋯` Rename/Delete…; в режиме rename вместо ссылки неуправляемое поле, Enter/blur - сохранить, Esc - отмена), `create-board-tile.tsx` (плитка с пунктирной рамкой; создание не оптимистичное, ожидание как у `AddList`, после успеха `navigate` на `/b/<новый id>`), `delete-board-dialog.tsx` (`AlertDialog` со счётчиками, фокус на Cancel), `board-mutations.tsx` (`useRenameBoard` (оптимистично над кэшами `['boards']` и `['boards', id]`)/`useDeleteBoard` - оптимистично над кэшем `['boards']`, откат+тост; чистые функции правки - `renameBoardInList`/`removeBoardFromList` в `src/lib/boards.ts`), `boards-skeleton.tsx` (3 плитки).
-- `src/components/board/board-view.tsx` - `BoardView`: шапка (`Link` `← Boards` на `/boards` - на мобильном только иконка, `aria-label="Back to boards"`; название через `EditableTitle`, переименование оптимистично через `useRenameBoard` + `router.invalidate()`, чтобы обновился заголовок вкладки; `ThemeToggle`, выход) + горизонтальный ряд `ListColumn` + `AddList` (на sm+ `scroll-px-4`, чтобы snap сохранял отступ 16px); пустая доска - `Empty` + `AddList`. Ряд колонок листается перетаскиванием фона мышью (`useDragScroll`); колонки обёрнуты в `BoardDnd`, на время перетаскивания карточки - `snap-none`. Вокруг доски - `LabelsExpandedProvider` (метки доски + флаг «названия меток развёрнуты», не запоминается).
-- `src/components/board/board-dnd.tsx` - `BoardDnd`: один `DndContext` на карточки и колонки (сенсоры мышь 5px / touch 250мс / клавиатура `Space`; collision detection, стрелки и announcements ветвятся по типу активного: `lib/card-dnd.ts` / `lib/list-dnd.ts`), горизонтальный `SortableContext` колонок, `DragOverlay` в портале - статичная копия карточки (`CardFace`) или колонки со всеми карточками. Пока тянут - локальная копия списков (серверные данные применяются после броска); бросок - через `useMoveCard` / `useMoveList`.
-- `src/components/board/list-column.tsx` - `ListColumn`: колонка (`w-[85vw] sm:w-72`, `snap-start`, внутренний скролл), заголовок через `ListTitle`, меню `⋯` (Rename/Move…/Delete) через shadcn `DropdownMenu`; «Move…» - popover с `MoveListForm`; Delete неактивен, пока `useIsListSyncing`; тело - `AddCard` (вверху) + список `CardItem` в `SortableContext`. Колонка - один `useSortable` (`data.type: 'list'`): он же droppable для карточек; listeners на шапке (тянуть мышью/тачем), activator и `aria-describedby` - на кнопке названия (`Space` поднимает, `Enter` переименовывает; Space-клик подавлен в `EditableTitle` `spaceStartsDrag`); на время переименования listeners сняты. Мутации: `useRenameList` (оптимистичная, откат+тост, invalidate), `useDeleteList` - `deleteConfirmed` (после `DeleteListDialog`, для непустых колонок) и `deleteEmptyWithUndo` (пустая колонка: soft delete + тост Undo 5с с restore).
-- `src/components/editable-title.tsx` - `EditableTitle`: общий компонент «кнопка ↔ неуправляемое поле» для колонки, плитки доски и шапки доски (Enter/blur - сохранить непустое и изменённое, Esc - отмена, `disabled`; `children` - доп. содержимое кнопки; классы кнопки и поля - `className`/`inputClassName`, одной высоты).
-- `src/components/board/list-title.tsx` - `ListTitle`: `EditableTitle` + счётчик карточек, контролируется родителем (`isEditing` снаружи, чтобы пункт меню Rename тоже мог войти в режим правки).
-- `src/components/board/add-list.tsx` - `AddList`: кнопка → поле; Enter сохраняет и оставляет поле открытым (рефокус), Esc/blur закрывают. Создание не оптимистичное (#59): пока запрос идёт - поле `readOnly` + `aria-busy`, спиннер, повторный Enter игнорируется; `addListServer` возвращает запись, `onSuccess` кладёт её в кэш (`addListToBoard`), затем invalidate. Поле очищается только после успеха; ошибка или `null` (доски нет) - тост, текст остаётся.
-- `src/components/board/delete-list-dialog.tsx` - `DeleteListDialog`: shadcn `AlertDialog`, текст с числом карточек (ед./мн. число), фокус на Cancel (`autoFocus`, он первый в DOM).
-- `src/components/board/board-skeleton.tsx` - `BoardSkeleton`: шапка + 3 колонки-скелетона на `ui/skeleton`.
-- `src/components/board/add-card.tsx` - `AddCard`: как `AddList` (то же ожидание и обработка ошибки, `useAddCard` + `addCardToList`), но в начале колонки.
-- `src/components/board/card-face.tsx` - `CardFace`: лицо карточки, общее для `CardItem` и `DragOverlay`. Зоны сверху вниз: метки (`LabelStrip`) → [галочка «выполнено»] название (`line-clamp-2`) → футер бейджей в фиксированном порядке срок (`DueBadge`) → чек-лист `done/total` → описание; пустая зона не рендерится.
-- `src/components/board/card-item.tsx` - `CardItem`: `CardFace`; ссылка на `/b/$boardId/c/$cardId` растянута на всю карточку через `::after` (stretched link), чтобы кнопка меток на лице не была внутри `<a>`; меню `⋯` вверху справа (hover на десктопе через `group-hover`, всегда видно на мобильном) - «Move…» (popover `MoveCardForm`: колонка + позиция) и «Delete» с Undo (неактивен, пока карточка в очереди перемещений). `useSortable`: ручка перетаскивания - сама ссылка (`Space` поднимает, `Enter` открывает); на месте перетаскиваемой - пунктирная заглушка. Спиннер `aria-busy` в углу, если перемещение не подтверждено дольше 300 мс.
-- `src/components/board/move-card-form.tsx` - `MoveCardForm`: селекты колонки (по умолчанию текущая) и позиции (1..N, в другой колонке 1..N+1, сброс на 1 при смене колонки), «Move» неактивна для текущего места.
-- `src/components/board/list-select.tsx` - `ListSelect`: селект колонки для `MoveCardForm` и `CardDialog`; длинное название обрезается многоточием (полное - в `title`), пункты не шире триггера.
-- `src/components/board/move-list-form.tsx` - `MoveListForm`: селекты доски (`boardsListQueryOptions`, по умолчанию текущая, через `ListSelect`) и позиции (в текущей 1..N, в другой 1..N+1 по `boardQueryOptions` выбранной доски; пока грузится - позиция и Move неактивны; сброс на 1 при смене доски); Move неактивна на текущем месте и для другой доски, пока колонка синхронизируется. Для другой доски - предупреждение «N labels will be removed from cards.» (N - связи карточка-метка колонки, `listLabelLinkCount`), только при N > 0.
-- `src/components/board/list-mutations.tsx` - `useMoveList` (`moveList(listId, index)` внутри доски - сразу в кэш; `moveListToBoard(listId, toBoard, index)` - соседи из кэша целевой доски, колонка уходит из кэша текущей, после успеха тост «Moved to <board>» и invalidate целевой доски и `['boards']` (exact)), `useIsListSyncing` (в очереди перенос колонки или перемещение её карточек).
-- `src/components/board/board-order.ts` - очередь мутаций порядка доски (`boardOrderMutationOptions`, scope `board-order-<boardId>`, `invalidateAfterLastBoardOrder`), общая для карточек и колонок.
-- `src/components/board/card-queue.ts` - очередь мутаций одной карточки (`cardMutationOptions`, scope `card-<cardId>`, `invalidateAfterLastCardMutation`) по образцу `board-order.ts`: выполнено, срок, метки на карточке, чек-лист.
-- `src/components/board/card-mutations.tsx` - хуки мутаций карточек: `useAddCard`, `useUpdateCard` (название, описание, выполнено, срок; в очереди карточки, оптимистично, при ошибке тост + перечитывание без отката снимка), `useMoveCard` (`moveCard(cardId, toListId, index)`: сразу в кэш, запрос с соседями в очередь; `moveCardNextTo` - то же по соседям из снимка DnD; `useIsCardSyncing`), `useDeleteCard` (soft delete + Undo 5с с restore, по образцу `useDeleteList`). Общие для `add-card.tsx`, `card-item.tsx`, `card-dialog.tsx`.
-- `src/components/board/card-dialog.tsx` - `CardDialog`: shadcn `Dialog` (до `md` - на весь экран, шапка `← <колонка ▾> ⋯`). Шапка: кружок «выполнено» → инлайн-название (Enter/blur - сохранить, Esc - отмена, как `ListTitle`) и `in list <колонка> ▾` (`ListSelect`, выбор сразу вызывает `useMoveCard`) → `⋯` («Delete card» с Undo) и ✕. Блоки: ряд меток и срока (`blocks`) или ряд кнопок пустых блоков `Labels`/`Due date`/`Checklist` (`emptyBlocks`); всплывашки Labels и Due date рисуются рядом с рядами, кнопки только переключают их (`useAnchoredPopover`) → описание (`Textarea` + Save/Cancel при расхождении с сохранённым) → `ChecklistSection` → `Created · Updated`.
-- `src/components/responsive-popover.tsx` - `ResponsivePopover`: Popover на десктопе (ограничен доступной высотой, прокручивается), `Drawer` (нижний лист) на мобильном; шапка с заголовком, необязательной стрелкой «назад» и ✕. Все popover-ы окна карточки - через него. Режим без триггера (`useAnchoredPopover` → `popoverProps` на корень, `buttonProps` на обычные кнопки): панель стоит у прямоугольника кнопки на момент клика, клик по своей кнопке переключает, а не считается кликом снаружи; на мобильном - управляемая шторка.
-- `src/components/board/labels/` - `label-strip.tsx` (полоски / чипы на лице; вся зона - одна кнопка `aria-pressed` поверх ссылки), `labels-expanded.tsx` (контекст доски), `card-labels-field.tsx` (блок в окне и кнопка `Labels`), `labels-popover.tsx` (экраны список → create / edit → delete), `label-form.tsx`, `label-mutations.tsx` (галочка - оптимистично в очереди карточки; создание/правка/удаление метки - ждут сервер).
-- `src/components/board/due/` - `due-badge.tsx` (бейдж на лице: цвет + статус текстом `sr-only`), `due-date-field.tsx` (чип в окне с ✕ и кнопка `Due date`), `due-date-picker.tsx` (shadcn `Calendar` + текстовое поле времени 24ч; уже заданное время сохраняется; Enter на дне или в поле времени закрывает popover).
-- `src/components/board/checklist/` - `checklist-section.tsx` (блок: название инлайн, прогресс `done/total` + полоска, `⋯` → удаление, пункты в своём `DndContext`, поле `Add an item`; новый порядок после дропа держит локальный `dropped`, пока не придёт кэш, как на доске), `checklist-item.tsx` (пункт: галочка, правка по клику, ручка перетаскивания, ✕; `ownEscape` - Esc в поле не закрывает окно), `add-checklist-popover.tsx`, `delete-checklist-dialog.tsx`, `checklist-mutations.tsx` (все в очереди карточки; создание чек-листа и пункта ждут сервер, остальное оптимистично и правит счётчики на доске). Закрытие (Esc/✕/клик мимо) - через `onOpenChange` у `Dialog`, `onClose` пробрасывается роутом и делает `navigate` на `/b/$boardId`.
-- `src/db/index.ts` - drizzle-клиент, драйвер по хосту `DATABASE_URL`: `localhost`/`127.0.0.1`/`::1` - `node-postgres` (пул `pg` один на процесс, кеш на `globalThis` из-за HMR), иначе `neon-http` (Neon: превью, прод, CI). Тип `Db` - общее подмножество: без `transaction` (нет в neon-http) и без `batch` (нет в pg), вызов любого из них - ошибка `typecheck` (`db-type.test-d.ts`). Экспортирует `db` и `databaseUrl`.
-- `src/db/connection.ts` - `isLocalDatabaseUrl`, `assertDbReachable` (один `select 1` до тестов; база локальная и недоступна - ошибка с подсказкой `docker compose up -d`).
-- `src/test/setup.ts` - unit/component setup (jest-dom + cleanup).
-- `src/test/setup.integration.ts` - integration setup: грузит `.env.test` (база `test`), `assertDbReachable`, `truncate` в `beforeEach`.
-- `src/test/load-test-env.ts` - `dotenv` `.env.test` (импортится первым, до `#/db`).
-- `src/test/db.ts` - сид-хелпер `seedUser` (прямой insert).
+- Коммит: prettier + eslint по изменённым файлам. Пуш: typecheck + unit. Хуки ставятся сами при `npm install`.
+- CI на PR и push в `master`: линт и типы, unit, integration, затем e2e. Integration и e2e идут на временных Neon-ветках.
+- После мержа в `master` CI накатывает миграции на прод, Vercel деплоит сам.
+
+## Структура
+
+Путь данных: роут или компонент → запрос из `lib` → серверная функция → `*-repo` через `access` → `db`.
+
+Точки входа (`src/`):
+
+- `router.tsx` - создаёт роутер и `QueryClient`, кладёт кэш в контекст роутера, связывает SSR роутера и Query.
+- `client.tsx`, `server.ts` - кастомные точки входа клиента и сервера: первым импортом инициализация Sentry (`instrument.*`), затем гидрация / обёрнутый Sentry `fetch`.
+- `start.ts` - глобальные middleware серверных функций: Sentry и CSRF.
+- `instrument.client.ts`, `instrument.server.ts`, `lib/sentry.ts` - инициализация Sentry: без DSN - no-op, только ошибки, строгий сбор данных (без тел, кук, заголовков, данных БД).
+
+Роуты (`routes/`):
+
+- `__root.tsx` - html-shell, тосты, 404. Кладёт в контекст сессию, таймзону (из cookie) и время запроса, пишет cookie таймзоны.
+- `index.tsx` - `/` редиректит на `/boards`. Дерево роутов (`routeTree.gen.ts`) генерируется.
+- `login.tsx`, `signup.tsx` - экраны входа и регистрации. `api/auth/$.ts` - проксирует запросы в Better Auth.
+- `boards/` - список досок.
+- `b/$boardId/route.tsx` - доска, layout для окна карточки. Лоадер проверяет id и параллельно грузит доску и метки; нет доски - notFound. Заголовок вкладки - название доски.
+- `b/$boardId/c/$cardId.tsx` - окно карточки поверх доски. Карточка берётся из кэша доски без отдельного запроса, догружается только чек-лист; нет карточки - тост и возврат на доску.
+
+Компоненты (`components/`):
+
+- Общие: экраны сообщений и ошибок, переключатель темы, редактируемое название, адаптивный поповер (на мобильном - нижний лист).
+- Auth и гость: форма входа и регистрации, гостевой вход, баннер гостя, выход.
+- `ui/` - примитивы shadcn, генерятся CLI.
+- `boards/` - список досок: плитки, создание, переименование, удаление.
+- `board/` - доска:
+    - вид доски: шапка и горизонтальный ряд колонок;
+    - колонки и карточки: добавление, переименование, перенос, удаление;
+    - окно карточки: название, описание, выполнение, перенос;
+    - перетаскивание карточек и колонок;
+    - мутации и их очереди.
+- `board/labels/` - метки доски: создание и правка, назначение на карточку, показ на карточке.
+- `board/due/` - срок карточки: выбор даты и времени, бейдж статуса.
+- `board/checklist/` - чек-лист карточки: пункты, отметка, порядок перетаскиванием, прогресс.
+
+`lib/`:
+
+- Доменная логика - чистые функции над доской, порядком, перетаскиванием, сроком, метками, чек-листом и квотами. Через них идут оптимистичные правки кэша.
+- Запросы - что и под каким ключом лежит в кэше. Отсюда же типы доски.
+- Auth - конфиг Better Auth, клиент, проверка пользователя на сервере, лимитер и гость. Подход - в разделе «Auth».
+- Хуки и инфраструктура - таймзона, гидрация, медиазапросы, SEO, аналитика, Sentry.
+
+`server/`:
+
+- Серверные функции по доменам: доски, метки, чек-листы. Получают пользователя, валидируют ввод, вызывают data-слой.
+- `*-repo.ts` - SQL по доменам.
+- `access.ts` - общая проверка владения, через неё идут все запросы.
+- `board-writes.ts`, `move-*.ts` - создание с квотами и переносы, вынесены ради тестов.
+- `guests.ts` - жизненный цикл гостя: чистка, потолок, демо-доска.
+- `debug.ts` - тестовая ошибка для Sentry, на проде 404.
+
+`db/`:
+
+- `schema.ts` - таблицы приложения и связи для реляционных запросов, ре-экспорт таблиц Better Auth (`auth-schema.ts`, генерится CLI). Поля - «Модель данных».
+- `index.ts` - клиент drizzle, драйвер по хосту. Тип базы - общее подмножество двух драйверов: транзакции и batch ловит typecheck. Локально пул один на процесс и переживает HMR.
+- `connection.ts` - проверка доступности базы перед тестами с подсказкой поднять Docker.
+
+`test/` - сетап unit (jest-dom) и integration (тестовое окружение грузится первым, проверка базы, очистка перед каждым тестом), сид пользователя.
+
+Вне `src`: `e2e/` - сценарии Playwright, `drizzle/` - SQL-миграции, `scripts/` - служебные скрипты, `.github/workflows/` - CI.
 
 ## Модель данных
 
-`boards`/`lists`/`cards`: `boards` (`ownerId` → `user.id`, cascade, `title`), `lists` (`boardId` → `boards.id`, cascade, `title`, `position` text `COLLATE "C"` - ключ порядка на доске), `cards` (`listId` → `lists.id`, cascade, `title`, `description` nullable, `position` text `COLLATE "C"` - ключ порядка в колонке). Каждая таблица - `id` (uuid, pk, defaultRandom)/`createdAt`/`updatedAt` (timestamptz). Индексы: `boards_owner_id_idx`, `lists_board_id_position_idx`, `cards_list_id_position_idx`.
+Сущности:
 
-Обогащение карточки (#120): `cards.completed_at` (null - не выполнена), `cards.due_date` (date, срок «весь день») / `cards.due_at` (timestamptz, момент) + check `cards_due_check` (не больше одного). `labels` (`boardId` → `boards`, cascade; `title` nullable, ≤30; `color` - ключ палитры; порядок `created_at, id`; уникальный индекс `(board_id, lower(title))` для непустых), `card_labels` (pk `(card_id, label_id)`, cascade с обеих сторон), `checklists` (`card_id` unique, cascade; `title`), `checklist_items` (`checklist_id` cascade, `title`, `done`, `position` text `COLLATE "C"`). Метки, связи, чек-листы и пункты удаляются навсегда каскадом; содержимое soft-удалённой карточки не трогается - Undo возвращает её целиком.
+- `boards` - доска: название, владелец.
+- `lists` - колонка доски: название, позиция, отметка мягкого удаления.
+- `cards` - карточка колонки: название, описание, позиция, выполнение, срок, отметка мягкого удаления.
+- `labels` - метка доски: название (может быть пустым), цвет из палитры.
+- `card_labels` - связь карточка ↔ метка.
+- `checklists` - чек-лист карточки: название.
+- `checklist_items` - пункт чек-листа: текст, отметка, позиция.
+- Better Auth: `user` (у гостя признак анонимности), `account` (учётки, хеш пароля), `session`, `verification`, `rate_limit` (счётчики лимитера).
 
-Auth (Better Auth): `user` (идентичность; `is_anonymous` - гость, плагин `anonymous`), `account` (учётки/провайдеры, 1:N; хеш пароля в `account.password`), `session` (серверные сессии), `verification` (одноразовые токены).
+У наших таблиц uuid-ключ и время создания; у связи карточка ↔ метка ключ - пара. Время изменения есть у досок, колонок и карточек; правки меток и чек-листа обновляют время изменения карточки.
+
+Схема:
+
+- Пользователь → доски → колонки → карточки. Владелец записан только у доски, колонки и карточки принадлежат ему через цепочку.
+- У карточки: метки через таблицу связей, не больше одного чек-листа, у чек-листа пункты.
+- Метки принадлежат доске.
+- Каскады сверху вниз: удаление пользователя, доски, колонки или карточки уносит всё, что под ними, включая метки, связи, чек-листы и пункты.
+- Индексы: по владельцу досок, по порядку внутри родителя, уникальность названия метки на доске без учёта регистра.
+- Наши таблицы связаны с таблицами Better Auth одной ссылкой: доска → пользователь.
+
+Правила поверх схемы:
+
+- Удаление: доска - навсегда, колонки и карточки - мягко ради Undo, запросы отфильтровывают удалённые. Содержимое карточки при мягком удалении не трогается, Undo возвращает её целиком.
+- Порядок - строковый ключ с побайтовой сортировкой, вставка между соседями меняет одну строку.
+- Срок двух видов: на день или к моменту, база не даёт оба сразу. Выполнено - время выполнения, пусто - не выполнена.
+- Метка вешается только из своей доски; перенос колонки на другую доску снимает связи с метками.
+- Квоты в базе не хранятся, это лимиты в коде.
 
 ## Роуты
 
-`/` редиректит на `/boards` · `/boards` список досок · `/b/$boardId` доска · `/b/$boardId/c/$cardId` окно карточки (дочерний роут доски) · неизвестный URL → root `notFoundComponent`.
+`/` → `/boards` · `/login`, `/signup` · `/boards` список досок · `/b/$boardId` доска · `/b/$boardId/c/$cardId` окно карточки.
+
+Окно карточки - дочерний роут доски: открывается поверх неё и имеет свой URL. Неизвестный URL - общий 404. Гварды - в «Auth».
 
 ## Сквозные паттерны
 
-- **Данные = серверное состояние в кэше Query.** Лоадеры префетчат через `context.queryClient.query({ ...opts, staleTime: 'static' })` (замена deprecated `ensureQueryData`); компоненты читают `useSuspenseQuery`.
-- **Серверные функции** (`createServerFn`) над досками централизованы в `src/server/boards.ts`; компоненты/роуты импортят их оттуда. Gotcha: добавление нового server-fn модуля на лету ломает HMR (`Buffer is not defined` / 500) - нужен рестарт dev-сервера.
-- **Создание не оптимистичное (#59):** в кэше только сущности, которые есть на сервере; создание ждёт ответ и кладёт в кэш запись с настоящим id. Временных id нет.
-- **Оптимистичные мутации** (rename/move/delete): `onMutate` = cancelQueries + snapshot + `setQueryData` (через чистую функцию из `lib`); `onError` = откат + `toast.error`; `onSettled` = invalidate. Дженерики `useMutation<void, Error, Vars, Ctx>` задаём явно (иначе ломается вывод типов).
-- **Удаление колонок и карточек - soft delete (#49):** `deleted_at` в `lists`/`cards`. Удаление сразу уходит на сервер (оптимистично убрать из кэша, ошибка - вернуть + тост), тост Undo (5с) появляется после ответа сервера; Undo - `restoreListServer`/`restoreCardServer` (`deleted_at = null`), элемент возвращается на место по `position` (`restoreListToBoard`/`restoreCardToBoard`). Карточки удалённой колонки не трогаются - скрыты вместе с ней. `getBoard`/`listBoards` и все мутации игнорируют удалённое. Отложенного запроса нет. Доски удаляются навсегда. Очистки удалённых записей пока нет.
-- **Формы:** TanStack Form. Валидация: per-field `onBlur` и `onSubmit` (`schema.shape.<field>`) + `canSubmitWhenInvalid: true` - ошибка не зажигается с первого символа, не триггерит соседние поля, а пустой сабмит подсвечивает все поля (form-level onSubmit не срабатывал при уже существующей onBlur-ошибке, #57). Кнопка блокируется только на время `isSubmitting`. Так в `auth-form`. Submit в `try/catch`: ошибка → `toast.error` без навигации; успех → `toast.success` + navigate. Валидаторы server fns - вторая линия. На ссылках-переходах внутри форм - `onMouseDown → preventDefault`, чтобы blur не срабатывал и клик не срывался.
-- **Rate limit:** только auth-роуты: лимитер Better Auth, счётчики в Postgres (`rate_limit`), см. «Auth». Server fns без лимита частоты; объём ограничен квотами.
-- **Гигиена ввода:** id во всех server fns - `z.uuid()` (отсекает мусор до БД); текстовые поля - `.trim().min(1).max(500)` (сервер + клиентская схема формы). Квоты: ≤ 20 досок на пользователя, ≤ 30 колонок на доску, ≤ 200 карточек в колонке (удалённые не считаются); при превышении - тост с причиной, текст в поле остаётся.
-- **notFound:** `getBoardServer` возвращает `undefined`/`null` для чужой или несуществующей доски; лоадер `/b/$boardId` валидирует `z.uuid()` и бросает `notFound()`, `BoardNotFound` - `notFoundComponent` роута.
-- **Ошибки чтения:** `errorComponent` на дата-роутах → `RouteError` (Retry). Настоящие сбои идут сюда; notFound - отдельный канал роутера.
-- **Observability (Sentry):** ошибки сервера (server fns/SSR через middleware + `wrapFetchWithSentry`) и клиента (`RouteError` → `captureException`). `release` = git SHA, `environment` = `VERCEL_ENV` (клиенту через `define` в `vite.config.ts`). Env: `SENTRY_DSN` (сервер), `VITE_SENTRY_DSN` (клиент, DSN не секрет). Source maps: Vite-плагин `sentryTanstackStart` в `vite.config.ts` подключается только при `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG`, `SENTRY_PROJECT`) - это env билда на Vercel; генерит hidden-карты, грузит в Sentry и удаляет `.map` из сборки. Локально и в CI токена нет - плагин не работает. Gotcha: не возвращать `external: [/^@sentry\//]` в nitro - Sentry не попадёт в `.output`, прод упадёт на старте.
-- **Vercel Web Analytics + Speed Insights:** `<Analytics />` и `<SpeedInsights />` в `__root.tsx` (включены в дашборде Vercel). Без cookies. В dev не шлют. `beforeSend` = `normalizeAnalyticsUrl` (`src/lib/analytics.ts`): `/b/<uuid>` → `/b/[boardId]`, `/c/<uuid>` → `/c/[cardId]` - React-вариант без поддержки роутов, иначе каждая правка отдельной строкой и id уходят в Vercel.
-- **Метаданные страниц:** каждый роут задаёт `head: () => ({ meta: pageMeta('<Экран>') })`; общие мета и иконки - в `head` корня. TanStack берёт title и мета с тем же `name`/`property` из самого глубокого матча, поэтому экран переопределяет корень. 404: корень и `/b/$boardId` проверяют `match.status === 'notFound' || match._notFound`. Статика в `public/`: `favicon.svg` (исходник), `favicon.ico` (16+32), `apple-touch-icon.png` (180), `icon-192/512.png`, `manifest.webmanifest`, `og-image.png` (1200×630) - заглушки на цветах токенов, PNG/ICO отрендерены из SVG. `og:image` абсолютный: `VITE_SITE_URL` в `vite.config.ts` из `VERCEL_PROJECT_PRODUCTION_URL` (прод) / `VERCEL_URL` (превью), локально пусто → относительный путь. Новый роут = добавить `head` с `pageMeta`.
-- **Порядок карточек и DnD (#81):** порядок - строковый ключ `cards.position` (fractional indexing, `fractional-indexing`), сортировка побайтовая (`COLLATE "C"`, затем `id`). Ключ считает только сервер: клиент шлёт соседей `prevCardId`/`nextCardId` (по индексу в списке без карточки, `cardMoveNeighbors`), сервер читает их ключи и ставит `generateKeyBetween`; соседи с `prev >= next` - перенумерация колонки (включая удалённые). Новая карточка - перед первой. Создание и перемещения карточек и колонок доски - одна очередь мутаций (`scope` `board-order-<boardId>`): каждое перемещение сразу в кэше, ошибка - тост + перечитывание без отката снапшота, перечитывание - только после последней мутации очереди. DnD (`@dnd-kit/core` + `sortable`, `BoardDnd`): на старте `cancelQueries` и локальная копия списков до броска; перенос между колонками - в локальной копии на `onDragOver`, вне колонок - возврат на исходное место; бросок - тот же `moveCard`, что у окна Move. `prefers-reduced-motion` - без наклона и анимаций.
-- **Порядок колонок (#97):** `lists.position` по тому же подходу (сервер считает ключ из соседей `prevListId`/`nextListId`, `renumberLists` при равных ключах). Новая колонка - после последней, включая удалённые (Undo не получает занятый ключ); `seedDemoBoard` даёт ключи через `generateNKeysBetween`. DnD колонки - только внутри доски, за шапку; перенос на другую доску - только окно Move… (вместе с карточками). Бросок / Move на то же место - без запроса.
-- **Обогащение карточки (#120):** доска - по-прежнему один запрос: у карточки поля срока и выполнения, id меток и счётчики чек-листа агрегатом. Метки доски - отдельный кэш `['labels', boardId]` (цвет и название берутся оттуда), пункты чек-листа - кэш `['checklist', cardId]`, префетч в лоадере окна. Мутации одной карточки (выполнено, срок, метка на карточке, чек-лист и пункты) - одна очередь `card-<cardId>` (`card-queue.ts`, по образцу ADR 60): переключатели и правки оптимистичны, ошибка - тост + перечитывание после последней мутации; создание метки, чек-листа и пункта ждёт сервер. Каждая правка содержимого обновляет `cards.updated_at`. Перенос колонки на другую доску снимает метки её карточек (сопоставления нет).
-- **Таймзона и SSR (#120):** клиент пишет таймзону устройства в cookie `tz`; сервер рендерит относительные даты (бейдж срока, `Created · Updated`) по ней и по времени запроса из контекста корня, после гидрации `useTimeZone`/`useNow` переключаются на устройство. Без cookie (первый визит) - UTC и перерисовка после гидрации. `due_date` сравнивается с локальной датой, `due_at` - с текущим моментом. Демо-доска гостя считает «сегодня» по cookie запроса входа.
-- **Тосты:** sonner, `<Toaster richColors position="bottom-right" />` в root. success / error / warning (удаление - жёлтый + иконка корзины).
-- **Тема:** `next-themes` `ThemeProvider` (`attribute="class"`, `defaultTheme="system"`) в `__root.tsx` вокруг `children`/`Toaster`/Analytics. Переключатель `ThemeToggle` в `board-view.tsx`, цикл light → dark → system. Выбор хранится в `localStorage` (ключ `theme`).
-- **Стили:** `cn` из пакета `cn`. Prettier: `semi`, `singleQuote`, `tabWidth: 4`, `trailingComma: all`. Тексты интерфейса - на английском.
+### Данные и кэш
 
-## Auth (Better Auth)
+- **Сервер - источник правды.** Данные - серверное состояние в кэше TanStack Query, своего стора нет. Роуты заранее грузят данные в кэш, компоненты читают из него.
+- **Серверные функции по доменам.** Компоненты и роуты ходят в базу только через серверные функции из `server/`. Новый модуль серверных функций ломает HMR (`Buffer is not defined` / 500) - нужен рестарт dev-сервера.
+- **Создание ждёт сервер.** Доска, колонка, карточка, метка, чек-лист и пункт появляются в кэше только после ответа сервера, с настоящим id. Временных id нет.
+- **Остальные правки оптимистичные.** Переименование, перенос, удаление и переключатели карточки сразу меняют кэш; при ошибке - откат и тост, затем перечитывание. Правки карточки и порядка при ошибке не откатывают снимок, а перечитывают данные.
+- **Очереди мутаций.** Их две: порядок доски (создание и перемещение карточек и колонок) и одна карточка (выполнено, срок, метки, чек-лист). Перечитывание - только после последней мутации очереди. Удаление и перенос неактивны, пока элемент синхронизируется. Очереди независимы: каждая перечитывает доску по своей последней мутации, не дожидаясь другой.
+- **Мягкое удаление.** Колонки и карточки удаляются сразу на сервере, тост Undo появляется после ответа; Undo возвращает элемент на прежнее место. Карточки удалённой колонки скрыты вместе с ней. Доски удаляются навсегда. Удалённое пока никто не чистит.
+- **Доска одним запросом.** Вместе с агрегатами карточки: срок, выполнение, id меток, прогресс чек-листа. Метки доски и пункты чек-листа - в своих кэшах. Окно карточки берёт её из кэша доски и догружает только чек-лист.
+- **Метки.** Вешаются только из той же доски. Перенос колонки на другую доску снимает метки её карточек, форма переноса предупреждает. Правки меток и чек-листа обновляют время изменения карточки.
 
-- Метод: email + password. Сессии серверные, кука `better-auth.session_token` (HttpOnly, SameSite=Lax, `Secure` под HTTPS). `requireEmailVerification: false` (dev). CSRF/хеши - из коробки. Включён `session.cookieCache` (getSession реже бьёт в БД).
-- **Rate limit:** `rateLimit.storage: 'database'` (таблица `rate_limit`, общая для всех serverless-инстансов). Вход - 5 за 60 с, регистрация - 3 за 600 с, остальное - 100 за 60 с. Ключ - IP + путь; IP из `x-forwarded-for` (`advanced.ipAddress.ipAddressHeaders`), без валидного IP - общий ключ `no-trusted-ip` (лимит не обходится; в `NODE_ENV=test`/dev Better Auth подставляет `127.0.0.1`). На 429 формы показывают «Too many attempts. Please try again in …». Выключается `AUTH_RATE_LIMIT_DISABLED=true` (любое другое значение или отсутствие - лимитер включён): в e2e - из `webServer.env` в `playwright.config.ts`, на превью - переменная Vercel только для окружения Preview (вне репо; verifier регистрирует новых юзеров на каждый прогон). На проде переменной нет. Временно включить лимитер на превью: убрать переменную в Vercel (или задать её только для нужной ветки) и сделать redeploy превью.
-- Схема таблиц генерится `npx @better-auth/cli generate --output src/db/auth-schema.ts`, миграция - `npm run db:generate`.
-- Эндпоинты под `/api/auth/*` (напр. `POST /api/auth/sign-up/email`, `GET /api/auth/ok`).
-- Сессию на сервере читать `auth.api.getSession({ headers })` (обёрнуто в `getSession`).
-- **Гварды:** root `beforeLoad` кладёт `session` в контекст роутера; защищённые роуты (`/`, `/b/$boardId`) в `beforeLoad` редиректят на `/login` если нет сессии; `/login` редиректит на `/` если сессия есть, `/signup` - если сессия не гостевая. Sign out - `SignOutButton` в шапках `BoardsView`/`BoardView`. Гвард - это UX; настоящая проверка владельца - в server fns (см. ниже).
-- **Гостевой режим (#84):** плагин `anonymous` (`generateName: 'Guest'`, email-заглушка генерится плагином и в UI не выводится). «Try as guest» на `/login` → `signIn.anonymous()` → `listBoardsServer()` → `/b/<id демо-доски>` (нет доски - `/boards`). `databaseHooks.user.create.before` при `isAnonymous`: удалить гостей старше 7 дней (каскад: доски, колонки, карточки, сессии), если осталось ≥ 100 - `APIError` 503 с кодом `GUEST_CAP_REACHED` + `Sentry.captureMessage('Guest cap reached', 'warning')`. `create.after`: `seedDemoBoard`. Гостевой вход - 3 за 600 с с IP. Квоты гостя 3/10/50 (`quotasFor` по `isAnonymous` сессии, на сервере). Выход гостя - `deleteAnonymousUser` (удаляет сессии, пользователя, куку). Регистрация из гостевого режима: плагин удаляет гостя и его данные, переноса нет.
-- **Скоупинг по владельцу:** все server fns над досками вызывают `requireUser()`; `boards-repo.ts` проверяет владельца в каждом запросе (join/`inArray`-подзапрос до `boards.owner_id`) - чужой id не читается и не меняется. `requireUserId` - это **серверная функция** (`createServerFn`), не обычная: обычная функция при импорте в клиентские модули тащит `better-auth` в клиентский бандл (ошибка `Buffer is not defined`); server fn оставляет на клиенте только fetch-стаб.
+### Порядок и перетаскивание
+
+- **Порядок по соседям.** Ключ порядка считает только сервер: клиент присылает соседей, сервер проверяет их и ставит ключ между ними. При коллизии ключей - перенумерация, включая удалённые. Новая карточка - первой, новая колонка - последней с учётом удалённых, чтобы Undo не получил занятый ключ.
+- **Перетаскивание.** Один DnD-контекст на карточки и колонки. Пока тянут - локальная копия списков, данные сервера применяются после броска; бросок вне колонок возвращает на место. Бросок - та же операция, что окно Move. Колонку тянут только внутри доски, на другую доску - через Move. У чек-листа свой DnD, порядок после дропа держится, пока не придёт кэш. Учитывается `prefers-reduced-motion`.
+
+### Ввод и ошибки
+
+- **Формы.** Клиентская валидация - для UX: ошибка не загорается с первого символа, пустой сабмит подсвечивает все поля. Серверная валидация - вторая линия.
+- **Гигиена ввода.** Id проверяются как uuid до похода в базу, текст обрезается и ограничен по длине на клиенте и на сервере.
+- **Квоты и частота.** Объём данных ограничен квотами на число сущностей, у гостя они меньше. Лимит частоты - только на auth, у серверных функций его нет.
+- **notFound.** Чужая и несуществующая доска неотличимы: обе - «не найдено».
+- **Ошибки чтения.** Сбои - экран с Retry; «не найдено» - отдельный канал роутера.
+
+### Интерфейс
+
+- **Тексты интерфейса** - на английском.
+- **Ссылка карточки** растянута на всю карточку, чтобы кнопка меток не была внутри ссылки.
+- **Метаданные.** Каждый роут задаёт свой заголовок, самый глубокий роут перекрывает корень.
+
+### Инфраструктура
+
+- **Таймзона и SSR.** Клиент пишет таймзону устройства в cookie; сервер рендерит даты по ней и по времени запроса, после гидрации - по устройству. Без cookie - UTC и перерисовка после гидрации. Срок на день сравнивается с локальной датой, срок к моменту - с текущим временем.
+- **Sentry.** Ошибки сервера и клиента. Нельзя выносить Sentry из бандла nitro - прод упадёт на старте.
+- **Vercel Analytics.** Без cookies; id в URL заменяются шаблоном, чтобы не утекали в Vercel.
+
+## Auth
+
+- **Сессии:** email + password на Better Auth. Сессия серверная, в браузере только HttpOnly-кука, сессия кэшируется в ней, чтобы реже читать БД. Подтверждение email выключено. Эндпоинты Better Auth - под `/api/auth/*`.
+- **Хосты:** Better Auth принимает запросы только с известных хостов: прод, превью Vercel, localhost. Новый домен или переименование проекта в Vercel без правки списка ломает вход с «Invalid origin».
+- **Скоупинг по владельцу:** серверные функции над досками сначала получают пользователя, data-слой проверяет владельца в каждом запросе по цепочке карточка → колонка → доска → владелец, вставки проверяют владельца заранее. Чужой или несуществующий id - пустой результат, данные не меняются. Проверка пользователя оформлена серверной функцией: обычная функция при импорте в клиентский код тащит `better-auth` в клиентский бандл (`Buffer is not defined`).
+- **CSRF:** все серверные функции закрыты глобальным CSRF-middleware. Это второй слой поверх `SameSite`-куки, не зависящий от браузера. Убирать его нельзя.
+- **Гварды:** только UX. Без сессии защищённые страницы ведут на `/login`, с сессией страницы входа и регистрации ведут в приложение (на регистрацию пускают только гостя). Защита - на сервере.
+- **Rate limit:** на вход, регистрацию и гостевой вход, по IP. Счётчики в базе, потому что serverless-инстансы не делят память. Без определимого IP все попадают в общий счётчик, и лимит не обходится. Выключается `AUTH_RATE_LIMIT_DISABLED=true` в e2e и на превью, где каждый прогон регистрирует новых пользователей. На проде включён.
+- **Гостевой режим:** вход без регистрации («Try as guest» на `/login`), сразу открывается демо-доска. Квоты у гостя меньше. Старые гости удаляются при создании новых, общее число гостей ограничено. Выход гостя удаляет его целиком. При регистрации из гостя данные не переносятся, а удаляются.
+- **Формы:** `method="post"`. До гидрации форма сабмитится нативно, и без него пароль уходит в URL.
 
 ## Тесты
 
-Vitest + React Testing Library + jsdom. Слои по «трофею»:
+Vitest (unit, integration) + Playwright (e2e).
 
-- **Unit** - чистые функции над доской (`src/lib/boards.ts`): добавление/переименование/удаление списка и карточки, поиск карточки, возврат удалённого на место (restore).
-- **Component** - `add-card.test.tsx`, `card-dialog.test.tsx`, `delete-list-dialog.test.tsx`, `list-title.test.tsx`: рендер, инлайн-редактирование (Enter/blur/Esc), диалоги подтверждения, `auth-form.test.tsx` (см. ниже). Границы мокаются: `@tanstack/react-start` (`useServerFn`), `@tanstack/react-router`, `sonner`. БД не участвует.
-- **Component (формы)** - `auth-form.test.tsx`: презентационная, моков нет. Валидация не с первого символа, ошибка по `onBlur`, `onSubmit(value)` при валидных данных, пустой сабмит - ошибки у обоих полей (#57), очистка ошибки только у поля в фокусе. Ошибку ассертим по `role="alert"` / тексту (`FieldError`).
-- **Integration** - `src/server/boards-repo.integration.test.ts` (проект `integration`, node + **база `test`**: локально Docker, в CI эфемерная Neon-ветка): скоуп/IDOR на настоящем SQL для всех функций `boards-repo` (включая попытку переноса карточки на чужую доску того же владельца); `src/db/backfill-boards.integration.test.ts` - перенос todo → доски, идемпотентность. Требует `.env.test` на ветку `test` (не main - `truncate` в `beforeEach` сотрёт!) + маркер `TEST_DB=1` (предохранитель: без него сетап бросает и тесты не идут). Только при `CI` (Neon по сети, транзиентные `ECONNRESET`) - `retry: 2` и таймауты 30 с; локально падение видно сразу.
-- **Не покрыто на этом уровне (→ E2E):** валидация и auth-гейты обёрток `boards.ts` (zod-отказ, `requireUserId`) - живут в `createServerFn`, в vitest напрямую не дёрнуть; проверяются в Playwright через реальный HTTP+сессию.
-- **E2E** - Playwright (`e2e/`, только Chromium, `workers: 1`). `webServer` поднимает app на `127.0.0.1:3100` против **базы `test`** (`.env.e2e`, `DATABASE_URL` через `webServer.env`, не main; в CI - эфемерная Neon-ветка). `e2e/global-setup.ts` - `assertDbReachable` до запуска. `auth.spec`: регистрация → пустой `/boards`, вход/выход, редирект неавторизованного. `isolation.spec`: чужая доска по прямой ссылке → `Board not found`. `boards.spec`: создать доску (открывается новая), переименовать, удалить последнюю (пустое состояние). `board.spec`: карточка - добавить (сверху, порядок после reload), переименовать (через окно карточки), переместить окном Move (в другой список на позицию, вниз в своём списке, «Move» неактивна для текущего места), перетащить (клавиатура в списке и между списками двумя ходами подряд, мышь между списками, бросок вне списков и `Esc` - без изменений), удалить с Undo и без (удаление сразу на сервере: переживает reload и перезапрос доски в окне Undo); список - добавить, переименовать, удалить (пустой, с Undo); окно карточки по прямой ссылке (`/b/$boardId/c/$cardId`). Хелперы `e2e/helpers/*`: `auth.ts` (`gotoHydrated` ждёт `networkidle` перед действиями - иначе клик до гидрации = нативный сабмит формы), `board.ts` (`gotoBoard`, локаторы по доступным именам компонентов доски: «List actions», «Card actions», «List title», «New card title» и т.п.), `db.ts` (общий клиент `src/db`; `resetDb` - полный сброс для `auth.setup.ts`, `resetBoards` - только доски, для `beforeEach` в `board.spec`, доска создаётся хелпером `seedBoard(email)` через базу; `gotoBoard(page, email)` сидит доску и открывает `/b/<id>`). Запуск `npm run test:e2e` (UI-дебаг `test:e2e:ui`). Gotcha: `localhost` на Windows резолвится в `::1` → готовность webServer не ловится, поэтому `127.0.0.1`. `timeout: CI ? 60с : 30с` - холодный старт webServer+Neon в CI.
-- **Обогащение карточки (#120):** unit - `due-date.test.ts` (табличная проверка статуса и текста при фиксированных часах и таймзоне), `labels.test.ts`, `checklist.test.ts`; integration - `card-enrichment.integration.test.ts` (ограничения БД), `labels-repo`/`checklists-repo.integration.test.ts` (изоляция, метка другой доски, каскады, перенос колонки, порядок пунктов), квоты в `quotas.integration.test.ts`; e2e (проект `crud`) - `card-face`, `due-date` (часы страницы подменяются `page.clock`), `labels`, `checklist`.spec; демо-данные - в `guest.spec`. `timezoneId: 'Pacific/Kiritimati'` (UTC+14) в общем `use` Playwright - отсутствие cookie таймзоны заметно. Component-тесты, импортирующие окно карточки, мокают `#/server/labels`, `#/server/checklists` и `use-time-zone`.
-- **Ещё не сделано:** P2 E2E (валидация/notFound за пределами изоляции).
+- Unit - чистая логика и компоненты. Границы (роутер, серверные функции, тосты) замоканы.
+- Integration - data-слой на настоящем Postgres.
+- E2E - приложение в браузере. Здесь же гейты и валидация серверных функций, которые в vitest не вызвать.
 
-Gotcha: vitest иногда падает с `Timeout waiting for worker to respond` (флап пула на старте) - это не падение тестов, повторный прогон проходит.
+Где лежат: unit и integration рядом с кодом, integration отличаются суффиксом `.integration.test.ts`. E2E - в `e2e/`, файл на область, общие хелперы в `e2e/helpers/`.
 
-- Маршруты: `/` -> редирект на `/boards` (для неавторизованных - `/login`); `/boards` (`src/routes/boards/index.tsx`) - страница досок (`BoardsView`, скелетон, `head: pageMeta('Boards')`). Доска по умолчанию и ленивое создание убраны: новый пользователь видит пустой список.
+Что проверяется сквозь все домены:
+
+- Изоляция: чужие данные недоступны ни через интерфейс, ни напрямую через серверные функции.
+- Сервер отказывает без сессии и на некорректный ввод.
+- Изменения сохраняются на сервере и переживают перезагрузку.
+- Целостность базы: ограничения, каскады, квоты.
+- Даты корректны в любой таймзоне (e2e идут в UTC+14).
+
+Предохранитель: integration и e2e работают только с базой `test` и чистят её. Integration без маркера `TEST_DB=1` не стартуют.
+
+Ретраи только в CI: integration и e2e ходят в Neon по сети и ловят транзиентные обрывы, поэтому там 2 повтора и увеличенные таймауты (e2e ещё и на холодный старт сервера). Локально ретраев нет, падение видно сразу.
+
+Флап: vitest иногда падает на старте с `Timeout waiting for worker to respond`, повторный прогон проходит.
+
+E2E поднимают сервер на `127.0.0.1`, не `localhost`: на Windows `localhost` резолвится в `::1`, и готовность сервера не ловится.

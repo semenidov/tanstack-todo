@@ -32,7 +32,7 @@ Work in the main repo `D:/sandbox/claude/programming/tanstack-todo`. New feature
 - Commit after each logical step and push early (draft PR right after the first push), so an interrupted run loses nothing.
 - In context keep only failures: trim logs, no screenshots unless the spec is visual.
 - Don't merge, don't force-push, don't touch `.env*` or `.github/**` unless the spec says so, never print secrets. Don't install dependencies or generate binary assets unless the spec says so.
-- Update `DOCUMENTATION.md` / `DECISIONS.md` only as the spec says, briefly.
+- Before the last push, read «Как поддерживать» at the top of `DOCUMENTATION.md` and update the map by those rules if your change adds or changes a domain, layer, boundary or approach. Don't touch `DECISIONS.md` - the main session keeps it.
 - Honesty: "verified" only if a test or CI proves it; everything else is "not verified".
 
 ## Local database
