@@ -8,14 +8,13 @@ import { UserRoundIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-/** "Try as guest" on /login (#84): creates a guest and opens its demo board. */
 export function GuestSignInButton() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [isPending, setIsPending] = useState(false);
 
     async function handleClick() {
-        // Disabled while pending: a second click would create a second guest.
+        // A second click would create a second guest.
         setIsPending(true);
         const { error } = await authClient.signIn.anonymous();
         if (error) {
@@ -23,10 +22,6 @@ export function GuestSignInButton() {
             setIsPending(false);
             return;
         }
-        // The sign-in response has no board id; the new guest owns only the
-        // demo board, so the list gives it. No board (seeding failed) or the
-        // list failed - /boards. The guest exists by now, so no toast and the
-        // button stays blocked: the plugin refuses a second guest sign-in.
         queryClient.clear();
         let demoId: string | undefined;
         try {
@@ -47,9 +42,6 @@ export function GuestSignInButton() {
             variant="outline"
             className="w-full"
             disabled={isPending}
-            // Keeps focus in the autofocused email field: its blur would show
-            // a validation error, shift the layout and lose the click (like
-            // the Sign up link).
             onMouseDown={(e) => e.preventDefault()}
             onClick={handleClick}
         >

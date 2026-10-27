@@ -6,7 +6,6 @@ import * as repo from '#/server/labels-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 
-// Server fns of board labels (#120). A label without a title is stored as null.
 const labelInputSchema = z.object({
     title: z
         .string()
@@ -56,19 +55,15 @@ export const setCardLabelServer = createServerFn({ method: 'POST' })
         z.object({
             cardId: z.uuid(),
             labelId: z.uuid(),
-            /** true - put the label on the card, false - take it off. */
             on: z.boolean(),
         }),
     )
     .handler(async ({ data }) => {
         const user = await requireUser();
         if (!data.on) {
-            // Taking off a label that is not there is a no-op, not an error.
             await repo.removeCardLabel(user.id, data.cardId, data.labelId);
             return;
         }
-        // A refusal (another board's label, a deleted card) reaches the client
-        // as an error: it shows a toast and refetches the board.
         const added = await writes.addCardLabelAs(
             user,
             data.cardId,

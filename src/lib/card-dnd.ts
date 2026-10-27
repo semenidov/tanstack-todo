@@ -6,12 +6,8 @@ import type {
 import type { Coordinates } from '@dnd-kit/utilities';
 import type { ListWithCards } from '#/lib/boards-query';
 
-// Drag-and-drop of cards. The drop targets ("over") are cards and whole list
-// columns; both are identified by id, and lists are told apart by looking the id up.
-
 export interface CardSpot {
     listId: string;
-    /** Index in the list without the card, as in `cardMoveNeighbors`. */
     index: number;
 }
 
@@ -26,12 +22,6 @@ function findCardSpot(
     return undefined;
 }
 
-/**
- * Where the dragged card lands when it is over `overId`:
- * - a card of its own list: that card's index (the sortable list shows it moved there);
- * - a card of another list: before that card;
- * - a list itself: its end (the pointer is below the last card or the list is empty).
- */
 export function cardDropTarget(
     lists: Array<ListWithCards>,
     activeId: string,
@@ -55,13 +45,6 @@ function center(rect: ClientRect): Coordinates {
     return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 }
 
-/**
- * The drop target under `point`: the list column containing it, then
- * - above its first card (title, AddCard): the first card, so the card goes first;
- * - below its last card or an empty list: the list, so the card goes last;
- * - otherwise the card with the nearest center.
- * Keyboard moves match a column by x only: the point may be below a short column.
- */
 export function pickCardDropId(
     lists: Array<ListWithCards>,
     rects: ReadonlyMap<UniqueIdentifier, ClientRect>,
@@ -97,11 +80,6 @@ export function pickCardDropId(
     return nearest.id;
 }
 
-/**
- * The point to move the dragged card's center to for an arrow key, read by
- * `pickCardDropId`: ↑/↓ - the next card of the list, ←/→ - the same position in
- * the neighbor list, or its end when it has fewer cards. Undefined: no move.
- */
 export function cardKeyboardPoint(
     lists: Array<ListWithCards>,
     rects: ReadonlyMap<UniqueIdentifier, ClientRect>,
@@ -111,7 +89,6 @@ export function cardKeyboardPoint(
 ): Coordinates | undefined {
     const from = findCardSpot(lists, activeId);
     if (!from) return undefined;
-    // Where the card is shown now: the sortable list shows it at the target spot.
     const current = (overId !== null &&
         cardDropTarget(lists, activeId, overId)) || {
         listId: from.list.id,
@@ -142,10 +119,6 @@ export function cardKeyboardPoint(
             return listRect && center(listRect);
         }
         const x = rect.left + rect.width / 2;
-        // The point stays put after the card moves in, so it must then fall inside
-        // the card's new slot, or the card would be bounced to another position.
-        // Upper part of the card at the same index: the card goes before it.
-        // Half a card below the last card: the card goes to the end.
         return current.index < cards.length
             ? { x, y: rect.top + rect.height / 4 }
             : { x, y: rect.bottom + rect.height / 2 };
@@ -154,13 +127,10 @@ export function cardKeyboardPoint(
     return undefined;
 }
 
-/** Kept across the announcement sets of one drag (they are rebuilt with the lists). */
 export interface CardDndAnnouncerState {
-    /** Right after the pick-up the card is over itself: don't talk over "Picked up". */
     quietOverId: UniqueIdentifier | null;
 }
 
-/** Screen reader texts for dragging a card with the keyboard or a pointer. */
 export function cardDndAnnouncements(
     lists: Array<ListWithCards>,
     state: CardDndAnnouncerState,

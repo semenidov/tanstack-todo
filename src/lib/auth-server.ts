@@ -10,7 +10,6 @@ export const getSession = createServerFn({ method: 'GET' }).handler(
     },
 );
 
-/** The session user as the board server fns need it: id and guest flag (#84). */
 export interface SessionUser {
     id: string;
     isAnonymous: boolean;

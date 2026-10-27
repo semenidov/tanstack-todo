@@ -9,16 +9,12 @@ import {
 
 interface ListSelectProps {
     id: string;
-    /** Lists, or boards in the list's Move… window: only id and title are read. */
     lists: Array<{ id: string; title: string }>;
     value: string;
     onValueChange: (listId: string) => void;
-    /** Extra trigger classes, e.g. the compact "in list" picker of the card window. */
     className?: string;
 }
 
-// List picker of the Move… popover and the card dialog. Long names (up to 200
-// chars, maybe one word) are cut with an ellipsis; the full name is in `title`.
 export function ListSelect({
     id,
     lists,
@@ -51,7 +47,6 @@ export function ListSelect({
                         key={list.id}
                         value={list.id}
                         title={list.title}
-                        // The item text wrapper must shrink too, or the option overflows.
                         className="max-w-[var(--radix-select-trigger-width)] *:[span]:last:min-w-0"
                     >
                         <span className="min-w-0 truncate">{list.title}</span>

@@ -16,8 +16,6 @@ export const Route = createFileRoute('/signup')({
     head: () => ({ meta: pageMeta('Sign up') }),
     component: SignupPage,
     beforeLoad: ({ context }) => {
-        // A guest may sign up (the banner links here); Better Auth then deletes
-        // the guest and its data (#84).
         if (context.session && !context.session.user.isAnonymous) {
             throw redirect({ to: '/' });
         }
@@ -39,11 +37,8 @@ function SignupPage() {
             );
             return;
         }
-        // A guest's cached boards are gone with the guest.
         queryClient.clear();
-        // Re-running this route's beforeLoad redirects the now signed-in user
-        // to `/` and on to `/boards`. A separate navigate('/') raced that
-        // redirect and could leave the URL at `/`.
+        // Let beforeLoad redirect: a separate navigate('/') races it.
         await router.invalidate();
     }
 

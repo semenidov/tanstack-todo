@@ -89,7 +89,6 @@ function useDeleteList(boardId: string) {
         );
     const invalidate = () => queryClient.invalidateQueries({ queryKey: key });
 
-    // Soft delete on the server right away, so a refetch at any moment matches the cache.
     const remove = async (list: ListWithCards) => {
         await queryClient.cancelQueries({ queryKey: key });
         removeFromCache(list.id);
@@ -150,8 +149,6 @@ export function ListColumn({ board, list, allLists }: ListColumnProps) {
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isMoveOpen, setIsMoveOpen] = useState(false);
-    // The popover opens once the menu has closed: opening it from onSelect would
-    // let the menu's focus return to its trigger and dismiss the popover at once.
     const openMoveOnMenuCloseRef = useRef(false);
     const titleButtonRef = useRef<HTMLButtonElement | null>(null);
     const renameList = useRenameList(boardId);
@@ -159,8 +156,6 @@ export function ListColumn({ board, list, allLists }: ListColumnProps) {
     const { moveListToBoard } = useMoveList(boardId);
     const isSyncing = useIsListSyncing(boardId, list.id);
     const reducedMotion = usePrefersReducedMotion();
-    // One sortable per column: it is also the drop target of dragged cards (the
-    // title and AddCard put a card first), so there is no separate droppable.
     const {
         attributes,
         listeners,
@@ -172,7 +167,6 @@ export function ListColumn({ board, list, allLists }: ListColumnProps) {
     } = useSortable({
         id: list.id,
         data: { type: 'list' },
-        // Neighbors jump instead of sliding apart.
         transition: reducedMotion ? null : undefined,
     });
 
@@ -202,7 +196,6 @@ export function ListColumn({ board, list, allLists }: ListColumnProps) {
                 }}
                 className={cn(
                     'flex max-h-full w-[85vw] shrink-0 snap-center flex-col rounded-lg border bg-card sm:w-72 sm:snap-start',
-                    // The placeholder where the dragged list will land.
                     isDragging &&
                         'border-dashed bg-muted shadow-none *:invisible',
                 )}
@@ -212,8 +205,6 @@ export function ListColumn({ board, list, allLists }: ListColumnProps) {
                     of the button bubbles here, and the button is the activator node. */}
                 <PopoverAnchor asChild>
                     <div
-                        // While renaming there is no title button (the activator):
-                        // Space in the input would pick the list up.
                         {...(isEditingTitle ? undefined : listeners)}
                         className="flex items-center justify-between gap-2 border-b px-3 py-2 select-none [-webkit-touch-callout:none]"
                     >
@@ -305,7 +296,6 @@ export function ListColumn({ board, list, allLists }: ListColumnProps) {
                 align="start"
                 aria-label="Move list"
                 onCloseAutoFocus={(e) => {
-                    // No trigger to return to: focus the list title, wherever it is now.
                     e.preventDefault();
                     titleButtonRef.current?.focus();
                 }}

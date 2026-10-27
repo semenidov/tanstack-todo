@@ -30,10 +30,8 @@ import type { AnyColumn } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 
 export function listBoards(userId: string) {
-    // Left joins keep boards without lists/cards; counting non-null ids gives 0 for them.
-    // A card belongs to one list, so count(cards.id) has no duplicates; lists repeat
-    // once per card, hence countDistinct. Soft-deleted rows are filtered in the join
-    // conditions, not in where: otherwise boards without live lists would disappear.
+    // Soft-deleted rows are filtered in the joins, not in where: otherwise boards
+    // without live lists disappear. Lists repeat once per card: countDistinct.
     return db
         .select({
             id: boards.id,
@@ -54,9 +52,6 @@ export function listBoards(userId: string) {
         .groupBy(boards.id)
         .orderBy(asc(boards.createdAt));
 }
-
-// Quotas: count the live rows, then insert. Without a transaction (neon-http) two
-// parallel creates at the boundary can overshoot by one - acceptable.
 
 async function assertBelowQuota(
     kind: QuotaKind,
@@ -86,7 +81,6 @@ export async function createBoard(
     title: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
-    // Boards are deleted for real, so every row counts.
     await assertBelowQuota(QuotaKind.Boards, quotas, () =>
         db
             .select({ n: count() })
@@ -100,10 +94,6 @@ export async function createBoard(
     return board;
 }
 
-/**
- * The guest's demo board (#84): board, lists in order, cards in the given order.
- * Due dates count from today in `timeZone` (the guest's cookie, #120).
- */
 export async function seedDemoBoard(
     userId: string,
     timeZone: string,
@@ -150,8 +140,6 @@ export async function seedDemoBoard(
         .values(cardRows.map(({ labels: _, checklist: __, ...card }) => card))
         .returning();
 
-    // Labels in creation order: one insert would give them one created_at and
-    // leave the order to random ids, so each gets its own millisecond.
     const labelRows = await db
         .insert(labels)
         .values(
@@ -177,7 +165,6 @@ export async function seedDemoBoard(
     );
     if (links.length > 0) await db.insert(cardLabels).values(links);
 
-    // Checklists: one insert of the checklists, one of all their items.
     const withChecklist = cardRows.flatMap(({ checklist, ...card }) => {
         if (!checklist) return [];
         const cardId = cardIdBySpot.get(`${card.listId}:${card.position}`);
@@ -227,11 +214,6 @@ export function deleteBoard(userId: string, boardId: string) {
         .returning();
 }
 
-/**
- * Items of the card's checklist (only done ones with `done`) as a scalar
- * subquery. `sql` wraps the builder query: relational query extras take SQL,
- * and a correlated subquery has no builder form there.
- */
 function checklistItemCount(cardId: AnyColumn, done?: true) {
     const items = db
         .select({ n: count() })
@@ -250,7 +232,6 @@ export async function getBoard(userId: string, boardId: string) {
     const board = await db.query.boards.findFirst({
         where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
         with: {
-            // deletedAt is always null here, so it is left out of the client types.
             lists: {
                 columns: { deletedAt: false },
                 where: (l) => isNull(l.deletedAt),
@@ -260,11 +241,7 @@ export async function getBoard(userId: string, boardId: string) {
                         columns: { deletedAt: false },
                         where: (c) => isNull(c.deletedAt),
                         orderBy: (c) => [asc(c.position), asc(c.id)],
-                        // Only the ids: colors and titles come from the board's
-                        // labels cache (labels-query.ts).
                         with: { cardLabels: { columns: { labelId: true } } },
-                        // Checklist progress for the card face (#120): counted
-                        // in this query, items are not loaded with the board.
                         extras: (card) => ({
                             checklistDone: checklistItemCount(card.id, true).as(
                                 'checklist_done',
@@ -293,15 +270,8 @@ export async function getBoard(userId: string, boardId: string) {
     };
 }
 
-// List order: like cards, `position` is a fractional-indexing key compared
-// byte-wise (COLLATE "C"), ties broken by id; keys are made only here.
-
-/**
- * Key after the last list of the board, deleted ones included: a new list goes
- * last, and Undo of a deleted list never finds its key taken by a newer one.
- */
+/** After the last list, deleted ones included: Undo never finds its key taken. */
 async function lastListPositionKey(boardId: string) {
-    // An aggregate always returns one row; max is null for a board without lists.
     const [last] = await db
         .select({ position: max(lists.position) })
         .from(lists)
@@ -345,8 +315,6 @@ export function renameList(userId: string, listId: string, title: string) {
         .returning();
 }
 
-// Soft delete: the list's cards stay untouched, they are hidden with the list and
-// come back on restore.
 export function deleteList(userId: string, listId: string) {
     return db
         .update(lists)
@@ -361,8 +329,6 @@ export function deleteList(userId: string, listId: string) {
         .returning();
 }
 
-// Restore makes a row live again, so it passes the same quota check as create.
-// The deleted row itself is not among the live ones it counts.
 export async function restoreList(
     userId: string,
     listId: string,
@@ -389,10 +355,6 @@ export async function restoreList(
         .returning();
 }
 
-/**
- * Live neighbor lists on the target board, by id. Undefined if any given id is
- * not a live list of that board (another board, deleted, missing).
- */
 async function readListNeighbors(
     boardId: string,
     neighborIds: Array<string>,
@@ -412,11 +374,6 @@ async function readListNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-/**
- * Gives every list of the board (deleted included, so Undo restores to the same
- * place) a fresh key in the current order. Like renumberList: sequential updates
- * without a transaction, a rare path.
- */
 async function renumberLists(boardId: string) {
     const rows = await db
         .select({ id: lists.id })
@@ -432,12 +389,6 @@ async function renumberLists(boardId: string) {
     }
 }
 
-/**
- * Moves a list between two neighbors on the target board: its own board or
- * another one of the same owner. Cards point at the list only, so they move with
- * it; on another board they lose their labels (labels belong to a board, #120).
- * Null on any refusal.
- */
 export async function moveList(
     userId: string,
     listId: string,
@@ -459,7 +410,6 @@ export async function moveList(
         where: (b) => and(eq(b.id, toBoardId), eq(b.ownerId, userId)),
     });
     if (!targetBoard) return null;
-    // A move onto another board adds a live list to it; within one board the count stays.
     if (toBoardId !== list.boardId) {
         await assertBelowQuota(QuotaKind.Lists, quotas, () =>
             countLiveLists(toBoardId),
@@ -477,7 +427,6 @@ export async function moveList(
         positionOf(neighbors, nextListId),
     );
     if (position === undefined) {
-        // Equal keys (two tabs, Undo onto a reused key): renumber and try once more.
         await renumberLists(toBoardId);
         neighbors = await readListNeighbors(toBoardId, neighborIds);
         if (!neighbors) return null;
@@ -485,7 +434,6 @@ export async function moveList(
             positionOf(neighbors, prevListId),
             positionOf(neighbors, nextListId),
         );
-        // Still out of order: the client sent neighbors in a stale order.
         if (position === undefined) return null;
     }
 
@@ -496,8 +444,8 @@ export async function moveList(
         .returning();
     const row = rows.at(0) ?? null;
     if (row && toBoardId !== list.boardId) {
-        // After the move, not before: a refused move keeps the labels. Deleted
-        // cards too, so their Undo doesn't bring back labels of the old board.
+        // After the move, so a refused move keeps the labels. Deleted cards too, so
+        // their Undo doesn't bring back labels of the old board.
         await db
             .delete(cardLabels)
             .where(
@@ -513,13 +461,7 @@ export async function moveList(
     return row;
 }
 
-// Card order: `position` is a fractional-indexing key compared byte-wise (the column
-// is COLLATE "C"), ties broken by id. Keys are made only here; the client sends the
-// neighbors the card should land between.
-
-/** Key before the first live card of the list: new cards go on top. */
 async function firstPositionKey(listId: string) {
-    // An aggregate always returns one row; min is null for an empty list.
     const [first] = await db
         .select({ position: min(cards.position) })
         .from(cards)
@@ -557,12 +499,10 @@ export function updateCard(
         title?: string;
         description?: string | null;
         completed?: boolean;
-        /** Both null - no due date (cards_due_check: never both set). */
         due?: Due;
     },
 ) {
     const { completed, due, ...fields } = data;
-    // updatedAt is bumped by the column's $onUpdate on every write.
     return db
         .update(cards)
         .set({
@@ -582,10 +522,6 @@ export function updateCard(
         .returning();
 }
 
-/**
- * Live neighbor cards in the target list, by id. Undefined if any given id is not
- * a live card of that list (another list or board, deleted, missing).
- */
 async function readNeighbors(
     listId: string,
     neighborIds: Array<string>,
@@ -605,11 +541,6 @@ async function readNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-/**
- * Gives every card of the list (deleted included, so Undo restores to the same
- * place) a fresh key in the current order. Sequential updates without a
- * transaction: a rare path, and the next renumbering fixes a partial failure.
- */
 async function renumberList(listId: string) {
     const rows = await db
         .select({ id: cards.id })
@@ -625,7 +556,6 @@ async function renumberList(listId: string) {
     }
 }
 
-/** Key strictly between the neighbors, or undefined if their keys are not ordered. */
 function keyBetween(
     prev: string | null,
     next: string | null,
@@ -658,7 +588,6 @@ export async function moveCard(
     });
     if (!targetList || targetList.board.ownerId !== userId) return null;
     if (targetList.boardId !== card.list.boardId) return null;
-    // A move into another list adds a live card to it; within one list the count stays.
     if (toListId !== card.listId) {
         await assertBelowQuota(QuotaKind.Cards, quotas, () =>
             countLiveCards(toListId),
@@ -676,8 +605,6 @@ export async function moveCard(
         positionOf(neighbors, nextCardId),
     );
     if (position === undefined) {
-        // Equal keys (two tabs inserted at one place, Undo restored a card onto a
-        // reused key): renumber and try once more.
         await renumberList(toListId);
         neighbors = await readNeighbors(toListId, neighborIds);
         if (!neighbors) return null;
@@ -685,7 +612,6 @@ export async function moveCard(
             positionOf(neighbors, prevCardId),
             positionOf(neighbors, nextCardId),
         );
-        // Still out of order: the client sent neighbors in a stale order.
         if (position === undefined) return null;
     }
 
@@ -711,7 +637,6 @@ export function deleteCard(userId: string, cardId: string) {
         .returning();
 }
 
-// A card in a deleted list stays hidden: ownedListIds skips deleted lists.
 export async function restoreCard(
     userId: string,
     cardId: string,

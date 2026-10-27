@@ -26,8 +26,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     {
         beforeLoad: async () => {
             const session = await getSession();
-            // Relative dates (due dates, "Created today") on the server: the
-            // zone from the cookie and the request time; see use-time-zone.ts.
             return {
                 session,
                 timeZone: getCookieTimeZone(),
@@ -82,7 +80,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 );
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-    // The server renders relative dates by this cookie on the next request.
     useEffect(() => writeTimeZoneCookie(), []);
 
     return (

@@ -7,15 +7,10 @@ import { Pool } from 'pg';
 import { isLocalDatabaseUrl } from './connection.ts';
 import * as schema from './schema.ts';
 
-/**
- * What both drivers support. No `transaction` (neon-http has none) and no
- * `batch` (pg has none): code that runs locally must also run on Vercel.
- */
 export type Db = Omit<
     PgDatabase<PgQueryResultHKT, typeof schema>,
     'transaction'
 > & {
-    // Raw driver, for static SQL files only (migration tests).
     $client: { query: (text: string) => Promise<unknown> };
 };
 
@@ -34,9 +29,7 @@ if (!url) {
 function localPool(connectionString: string): Pool {
     globalThis.__localPgPool ??= new Pool({
         connectionString,
-        // A stopped container refuses at once; this bounds other failures.
         connectionTimeoutMillis: 5000,
-        // Idle connections must not keep test runners and scripts alive.
         allowExitOnIdle: true,
     });
     return globalThis.__localPgPool;

@@ -9,11 +9,7 @@ export interface MoveCardInput {
     nextCardId: string | null;
 }
 
-/**
- * The body of `moveCardServer`, apart from it so a unit test can call it (vitest
- * has no Start runtime). Imported only inside the server fn handler: the client
- * build drops it together with the handler.
- */
+/** Import only inside the server fn handler, so the client build drops it. */
 export async function moveCardOrThrow(user: SessionUser, data: MoveCardInput) {
     const row = await repo.moveCard(
         user.id,
@@ -23,7 +19,5 @@ export async function moveCardOrThrow(user: SessionUser, data: MoveCardInput) {
         data.nextCardId,
         quotasFor(user),
     );
-    // A refusal (foreign or stale neighbors, deleted list) must reach the client
-    // as an error: it shows a toast and refetches the board.
     if (!row) throw new Error('Card was not moved');
 }

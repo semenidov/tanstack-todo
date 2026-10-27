@@ -11,7 +11,6 @@ if (process.env.TEST_DB !== '1') {
     );
 }
 
-// Fail the file at once (with the docker hint locally), not every test on a timeout.
 await assertDbReachable(db, databaseUrl);
 
 beforeEach(async () => {

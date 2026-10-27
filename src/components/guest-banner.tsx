@@ -15,11 +15,6 @@ function readDismissed(key: string) {
     }
 }
 
-/**
- * Guest mode notice on /boards and the board page; nothing for a regular user.
- * Dismissal is kept per guest in localStorage, so it renders only after hydration
- * (no flash for a guest who already closed it).
- */
 export function GuestBanner() {
     const isGuest = useIsGuest();
     const userId = useRouteContext({
@@ -38,7 +33,7 @@ export function GuestBanner() {
         try {
             localStorage.setItem(key, '1');
         } catch {
-            // Storage unavailable (private mode, quota): hide for this page only.
+            // Storage unavailable (private mode): hide for this page only.
         }
     };
 

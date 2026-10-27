@@ -8,7 +8,6 @@ import z from 'zod';
 
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().max(5000);
-// A whole day or an exact moment, never both; both null - no due date.
 const dueSchema = z
     .object({
         dueDate: z.iso.date().nullable(),

@@ -1,6 +1,4 @@
-// `!`: the container's resting `md:cursor-grab` comes later in the stylesheet and would win.
 const DRAGGING_CLASSES = ['select-none', 'cursor-grabbing!'];
-// Fallback for browsers without `scrollend`: the smooth settle is done well before this.
 const SETTLE_FALLBACK_MS = 600;
 
 export function getDragScrollLeft(
@@ -11,7 +9,6 @@ export function getDragScrollLeft(
     return startScrollLeft - (clientX - startX);
 }
 
-// Snap point closest to the current position; null when there is none.
 export function getNearestSnapLeft(
     snapLefts: number[],
     scrollLeft: number,
@@ -28,12 +25,10 @@ export function getNearestSnapLeft(
     return nearest;
 }
 
-// scrollLeft at which each child lands on its own `scroll-snap-align` (start/center/end).
 function getSnapLefts(container: HTMLElement): number[] {
     const box = container.getBoundingClientRect();
     const viewportLeft = box.left + container.clientLeft;
     const maxLeft = container.scrollWidth - container.clientWidth;
-    // CSS snap aligns to the snapport inset by scroll-padding; 'auto' parses to NaN -> 0.
     const style = getComputedStyle(container);
     const padLeft = parseFloat(style.scrollPaddingLeft) || 0;
     const padRight = parseFloat(style.scrollPaddingRight) || 0;
@@ -65,14 +60,12 @@ function attachDragScroll(container: HTMLElement): () => void {
     let drag: DragState | null = null;
     let cancelSettle: (() => void) | null = null;
 
-    // Snap stays off while the board settles, otherwise the browser jumps to a snap point.
     function restoreSnap() {
         cancelSettle?.();
         cancelSettle = null;
         container.style.scrollSnapType = '';
     }
 
-    // Glide to the nearest column, then hand control back to CSS scroll-snap.
     function settle() {
         const target = getNearestSnapLeft(
             getSnapLefts(container),
@@ -103,8 +96,7 @@ function attachDragScroll(container: HTMLElement): () => void {
         };
         container.setPointerCapture(e.pointerId);
         container.classList.add(...DRAGGING_CLASSES);
-        // Inline `none` beats any snap class: Tailwind's `snap-x` alone still snaps
-        // (`proximity`) and pulls the board back on every move - the jerky pan (#43).
+        // Inline `none` beats Tailwind's snap classes, which pull the board back.
         container.style.scrollSnapType = 'none';
     }
 
@@ -144,15 +136,6 @@ function dragScrollRef(el: HTMLElement | null) {
     return el ? attachDragScroll(el) : undefined;
 }
 
-/**
- * Horizontal pan by dragging the container's own background with the mouse.
- * Presses on descendants (columns, cards, buttons, inputs) and touch/pen input are ignored.
- * The board follows the mouse freely (scroll-snap off) and glides to the nearest column
- * on release, using each child's `scroll-snap-align`.
- * Returns a callback ref (React 19 ref cleanup): the container may mount later than the
- * component (board goes from empty to non-empty), which a ref object + effect would miss.
- * Drag state lives in a closure, so pointermove causes no re-renders.
- */
 export function useDragScroll() {
     return dragScrollRef;
 }

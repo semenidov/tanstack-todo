@@ -31,7 +31,6 @@ export function BoardView({ board, lists }: BoardData) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const prevListCountRef = useRef(lists.length);
 
-    // One ref for both: drag-pan listeners and the container handle for scrolling.
     const setContainerRef = useCallback(
         (el: HTMLDivElement | null) => {
             containerRef.current = el;
@@ -44,8 +43,6 @@ export function BoardView({ board, lists }: BoardData) {
         [dragScrollRef],
     );
 
-    // Scroll to a newly added list after it is rendered. A new list gets a key after
-    // all others, so it is always the last column before AddList.
     useLayoutEffect(() => {
         const prevCount = prevListCountRef.current;
         prevListCountRef.current = lists.length;
@@ -84,7 +81,6 @@ export function BoardView({ board, lists }: BoardData) {
                             onSave={(title) =>
                                 renameBoard.mutate(
                                     { boardId: board.id, title },
-                                    // The tab title comes from loader data, so re-run the loader.
                                     { onSettled: () => router.invalidate() },
                                 )
                             }
@@ -119,7 +115,6 @@ export function BoardView({ board, lists }: BoardData) {
                     </Empty>
                 </div>
             ) : (
-                // Labels expanded on one card are expanded on all cards of the board.
                 <LabelsExpandedProvider boardId={board.id}>
                     <BoardDnd board={board} lists={lists}>
                         {({ lists: shownLists, isDragging }) => (
@@ -127,7 +122,6 @@ export function BoardView({ board, lists }: BoardData) {
                                 ref={setContainerRef}
                                 className={cn(
                                     'flex flex-1 items-start gap-4 overflow-x-auto px-[7.5vw] py-4 sm:scroll-px-4 sm:p-4 md:cursor-grab md:*:cursor-auto',
-                                    // No snapping while a card is dragged: it would fight auto-scroll.
                                     isDragging
                                         ? 'snap-none'
                                         : 'snap-x snap-mandatory',

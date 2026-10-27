@@ -22,18 +22,14 @@ import {
 import type { Label } from '#/lib/labels';
 
 interface LabelFormProps {
-    /** Labels of the board, for the duplicate title check. */
     labels: ReadonlyArray<Label>;
-    /** The label being edited; none - a new label. */
     label?: Label;
     submitText: string;
     isPending: boolean;
     onSubmit: (values: LabelFormValues) => void;
-    /** Next to the submit button: Delete in the Edit screen. */
     extraAction?: ReactNode;
 }
 
-// Create / Edit label screen: preview, title (optional), color.
 export function LabelForm({
     labels,
     label,
@@ -100,7 +96,6 @@ export function LabelForm({
                                 checked={color === c}
                                 aria-label={LABEL_COLOR_STYLES[c].name}
                                 onChange={() => setColor(c)}
-                                // Transparent over the swatch: the swatch is what gets clicked.
                                 className="peer absolute inset-0 m-0 size-full opacity-0"
                             />
                             <span

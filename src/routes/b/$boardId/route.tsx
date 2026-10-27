@@ -31,7 +31,6 @@ export const Route = createFileRoute('/b/$boardId')({
         if (!z.uuid().safeParse(params.boardId).success) {
             throw notFound();
         }
-        // Labels in parallel with the board: the card faces need their colors.
         const [board] = await Promise.all([
             context.queryClient.query({
                 ...boardQueryOptions(params.boardId),

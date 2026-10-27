@@ -23,7 +23,6 @@ export function useRenameBoard() {
             queryClient.setQueryData(key, (old) =>
                 old ? renameBoardInList(old, vars.boardId, vars.title) : old,
             );
-            // The board page header reads the board cache (absent if it was never opened).
             queryClient.setQueryData(boardKey, (old) =>
                 old
                     ? { ...old, board: { ...old.board, title: vars.title } }

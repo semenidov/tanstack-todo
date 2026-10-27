@@ -22,17 +22,12 @@ interface BoardRef {
 
 interface MoveListFormProps {
     list: ListWithCards;
-    /** The board the list is on. */
     board: BoardRef;
-    /** The lists of that board, in the order shown. */
     lists: Array<ListWithCards>;
-    /** A move of the list or its cards is in the queue: no move to another board yet. */
     isSyncing: boolean;
-    /** `index` counts in the target board without the list: position N is N - 1. */
     onMove: (toBoard: BoardRef, index: number) => void;
 }
 
-// Content of the list's Move… popover: a board, a 1-based position on it, and Move.
 export function MoveListForm({
     list,
     board,
@@ -46,11 +41,9 @@ export function MoveListForm({
     const isOtherBoard = boardId !== board.id;
 
     const boardsQuery = useQuery(boardsListQueryOptions);
-    // Until the boards load, the current board is the only choice.
     const boards = boardsQuery.data ?? [board];
     const target = boards.find((b) => b.id === boardId) ?? board;
 
-    // Positions on another board come with its data, loaded when it is picked.
     const targetQuery = useQuery({
         ...boardQueryOptions(boardId),
         enabled: isOtherBoard,
@@ -58,13 +51,11 @@ export function MoveListForm({
     const targetLists = isOtherBoard ? targetQuery.data?.lists : lists;
 
     const others = targetLists?.filter((l) => l.id !== list.id) ?? [];
-    // On the current board 1..N, on another one 1..N+1: both are «others + 1».
     const positionCount = others.length + 1;
     const currentIndex = isOtherBoard
         ? -1
         : lists.findIndex((l) => l.id === list.id);
     const isSameSpot = currentIndex !== -1 && currentIndex === position - 1;
-    // Labels belong to a board: a move to another one takes them off the cards.
     const removedLabels = isOtherBoard ? listLabelLinkCount(list) : 0;
     const canMove =
         targetLists !== undefined &&

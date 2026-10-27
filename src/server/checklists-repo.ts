@@ -10,12 +10,6 @@ import {
 import { and, asc, count, eq, inArray, max } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 
-// The checklist of a card and its items (#120). Access by the chain checklist →
-// card → list → board → owner (access.ts). Checklists and items are deleted for
-// real (FK cascade); a soft-deleted card keeps its checklist for Undo. Every edit
-// bumps the card's updated_at: it is an edit of the card.
-
-/** Bumps updated_at of the checklist's card. */
 function touchChecklistCard(checklistId: string) {
     return db
         .update(cards)
@@ -31,7 +25,6 @@ function touchChecklistCard(checklistId: string) {
         );
 }
 
-/** The checklist of the user's live card with items in order, or null. */
 export async function getChecklist(userId: string, cardId: string) {
     const checklist = await db.query.checklists.findFirst({
         where: and(
@@ -47,7 +40,6 @@ export async function getChecklist(userId: string, cardId: string) {
     return checklist ?? null;
 }
 
-/** Null when the card is not the user's or already has a checklist (one per card). */
 export async function createChecklist(
     userId: string,
     cardId: string,
@@ -87,7 +79,6 @@ export async function renameChecklist(
     return checklist;
 }
 
-/** Deletes the checklist with its items (FK cascade). */
 export async function deleteChecklist(userId: string, checklistId: string) {
     const rows = await db
         .delete(checklists)
@@ -100,7 +91,6 @@ export async function deleteChecklist(userId: string, checklistId: string) {
         .returning();
     const checklist = rows.at(0);
     if (!checklist) return null;
-    // By the card id: the checklist row is gone.
     await db
         .update(cards)
         .set({ updatedAt: new Date() })
@@ -108,10 +98,6 @@ export async function deleteChecklist(userId: string, checklistId: string) {
     return checklist;
 }
 
-// Item order: `position` is a fractional-indexing key compared byte-wise
-// (COLLATE "C"), ties broken by id; keys are made only here (ADR 58).
-
-/** Adds an item last. Null when the checklist is not the user's. */
 export async function addChecklistItem(
     userId: string,
     checklistId: string,
@@ -128,7 +114,6 @@ export async function addChecklistItem(
             ),
         );
     if (owned.length === 0) return null;
-    // An aggregate always returns one row; max is null for an empty checklist.
     const [stats] = await db
         .select({ n: count(), last: max(checklistItems.position) })
         .from(checklistItems)
@@ -149,7 +134,6 @@ export async function addChecklistItem(
     return item;
 }
 
-/** The user's item, by the chain item → checklist → card → board. */
 function ownedItem(userId: string, itemId: string) {
     return and(
         eq(checklistItems.id, itemId),
@@ -184,7 +168,6 @@ export async function deleteChecklistItem(userId: string, itemId: string) {
     return item;
 }
 
-/** Keys of the neighbors in the checklist, or undefined if one is missing there. */
 async function readNeighbors(checklistId: string, neighborIds: string[]) {
     if (neighborIds.length === 0) return new Map<string, string>();
     const rows = await db
@@ -200,10 +183,6 @@ async function readNeighbors(checklistId: string, neighborIds: string[]) {
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-/**
- * Gives every item a fresh key in the current order. Sequential updates without
- * a transaction (ADR 22): a rare path, the next renumbering fixes a partial failure.
- */
 async function renumberChecklist(checklistId: string) {
     const rows = await db
         .select({ id: checklistItems.id })
@@ -219,7 +198,6 @@ async function renumberChecklist(checklistId: string) {
     }
 }
 
-/** Key strictly between the neighbors, or undefined if their keys are not ordered. */
 function keyBetween(
     prev: string | null,
     next: string | null,
@@ -228,11 +206,6 @@ function keyBetween(
     return generateKeyBetween(prev, next);
 }
 
-/**
- * Puts the item between its new neighbors (null - the start or the end). Null
- * when the item is not the user's or the neighbors are not in its checklist or
- * not in this order (the client saw a stale list).
- */
 export async function moveChecklistItem(
     userId: string,
     itemId: string,
@@ -257,10 +230,8 @@ export async function moveChecklistItem(
         return keyBetween(positionOf(prevItemId), positionOf(nextItemId));
     };
 
-    // null - a neighbor is not in the checklist; undefined - keys out of order.
     let position = await findKey();
     if (position === undefined) {
-        // Equal keys (two tabs added at once): renumber and try once more.
         await renumberChecklist(checklistId);
         position = await findKey();
     }
