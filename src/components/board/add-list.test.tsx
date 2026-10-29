@@ -53,6 +53,8 @@ function deferred<T>() {
     return { promise, resolve };
 }
 
+const onCreated = vi.fn();
+
 function renderAddList() {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false } },
@@ -60,7 +62,7 @@ function renderAddList() {
     queryClient.setQueryData(boardKey, board);
     render(
         <QueryClientProvider client={queryClient}>
-            <AddList boardId="board-1" />
+            <AddList boardId="board-1" onCreated={onCreated} />
         </QueryClientProvider>,
     );
     return queryClient;
@@ -85,6 +87,7 @@ describe('AddList', () => {
         });
         await vi.waitFor(() => expect(input).toHaveValue(''));
         expect(input).toHaveFocus();
+        expect(onCreated).toHaveBeenCalledExactlyOnceWith(savedList.id);
         expect(
             queryClient.getQueryData(boardKey)?.lists.map((l) => l.id),
         ).toEqual(['server-list-id']);
@@ -105,6 +108,7 @@ describe('AddList', () => {
         await user.keyboard('{Enter}');
         expect(addListSpy).toHaveBeenCalledTimes(1);
         expect(input).toHaveValue('Done');
+        expect(onCreated).not.toHaveBeenCalled();
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([]);
 
         pending.resolve(savedList);
@@ -127,6 +131,7 @@ describe('AddList', () => {
             ),
         );
         expect(input).toHaveValue('Done');
+        expect(onCreated).not.toHaveBeenCalled();
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([]);
     });
 

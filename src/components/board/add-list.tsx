@@ -10,7 +10,7 @@ import { Loader2Icon, PlusIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from 'cn';
 
-function useAddList(boardId: string) {
+function useAddList(boardId: string, onCreated: (listId: string) => void) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
 
@@ -25,6 +25,7 @@ function useAddList(boardId: string) {
             queryClient.setQueryData(key, (old) =>
                 old ? addListToBoard(old, { ...list, cards: [] }) : old,
             );
+            onCreated(list.id);
         },
         onError: (error) => {
             toast.error(
@@ -43,13 +44,14 @@ function useAddList(boardId: string) {
 interface AddListProps {
     boardId: string;
     className?: string;
+    onCreated: (listId: string) => void;
 }
 
-export function AddList({ boardId, className }: AddListProps) {
+export function AddList({ boardId, className, onCreated }: AddListProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [value, setValue] = useState('');
     const inputRef = useRef<HTMLInputElement>(null);
-    const addList = useAddList(boardId);
+    const addList = useAddList(boardId, onCreated);
 
     useEffect(() => {
         if (isEditing) inputRef.current?.focus();

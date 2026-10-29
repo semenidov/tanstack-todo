@@ -29,7 +29,7 @@ export function BoardView({ board, lists }: BoardData) {
     const [isEditing, setIsEditing] = useState(false);
     const dragScrollRef = useDragScroll();
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const prevListCountRef = useRef(lists.length);
+    const [createdListId, setCreatedListId] = useState<string | null>(null);
 
     const setContainerRef = useCallback(
         (el: HTMLDivElement | null) => {
@@ -44,15 +44,16 @@ export function BoardView({ board, lists }: BoardData) {
     );
 
     useLayoutEffect(() => {
-        const prevCount = prevListCountRef.current;
-        prevListCountRef.current = lists.length;
-        if (lists.length <= prevCount) return;
-        containerRef.current?.children[lists.length - 1]?.scrollIntoView({
+        if (!createdListId) return;
+        const index = lists.findIndex((list) => list.id === createdListId);
+        if (index === -1) return;
+        containerRef.current?.children[index]?.scrollIntoView({
             behavior: 'smooth',
             inline: 'center',
             block: 'nearest',
         });
-    }, [lists.length]);
+        setCreatedListId(null);
+    }, [lists, createdListId]);
 
     return (
         <div className="flex min-h-screen flex-col bg-muted/30">
@@ -109,6 +110,7 @@ export function BoardView({ board, lists }: BoardData) {
                         <EmptyContent>
                             <AddList
                                 boardId={board.id}
+                                onCreated={setCreatedListId}
                                 className="w-full max-w-72 sm:w-full"
                             />
                         </EmptyContent>
@@ -135,7 +137,10 @@ export function BoardView({ board, lists }: BoardData) {
                                         allLists={shownLists}
                                     />
                                 ))}
-                                <AddList boardId={board.id} />
+                                <AddList
+                                    boardId={board.id}
+                                    onCreated={setCreatedListId}
+                                />
                             </div>
                         )}
                     </BoardDnd>
