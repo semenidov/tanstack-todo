@@ -73,13 +73,10 @@ export function CardDialog({
     const { deleteWithUndo } = useDeleteCard(boardId);
     const isCompleted = card.completedAt !== null;
     const hasDue = card.dueDate !== null || card.dueAt !== null;
-    // The Labels and Due date popovers are rendered apart from their buttons,
-    // which move between the rows below once a block appears or goes (#133).
     const duePopover = useAnchoredPopover();
     const labelsPopover = useAnchoredPopover();
     const hasLabels = card.labelIds.length > 0;
 
-    // Blocks the card has, in one row: labels and due date.
     const blocks: Array<ReactNode> = [];
     if (hasLabels) {
         blocks.push(
@@ -102,8 +99,6 @@ export function CardDialog({
             />,
         );
     }
-    // Buttons for the blocks the card doesn't have yet, in the order
-    // Labels / Due date / Checklist; a block takes its place once added.
     const emptyBlocks: Array<ReactNode> = [];
     if (!hasLabels) {
         emptyBlocks.push(
@@ -118,9 +113,7 @@ export function CardDialog({
             <AddDueDateButton key="due" buttonProps={duePopover.buttonProps} />,
         );
     }
-    // Prefetched by the card route; undefined only while it loads.
     const { data: checklist } = useQuery(checklistQueryOptions(card.id));
-    // A checklist made just now opens with its "Add an item" field focused.
     const [isChecklistNew, setIsChecklistNew] = useState(false);
     if (checklist === null) {
         emptyBlocks.push(
@@ -159,8 +152,8 @@ export function CardDialog({
     }
 
     async function handleDelete() {
-        // Leave the card route first: removing the card from the cache while
-        // the route is still mounted triggers its "Card not found" fallback.
+        // Leave the route first: removing the card from the cache while it is
+        // mounted shows "Card not found".
         await onClose();
         void deleteWithUndo(card);
     }
@@ -174,7 +167,6 @@ export function CardDialog({
         >
             <DialogContent
                 showCloseButton={false}
-                // Inline checklist fields cancel their edit on Escape instead.
                 onEscapeKeyDown={(e) => {
                     if (
                         e.target instanceof Element &&
@@ -183,7 +175,6 @@ export function CardDialog({
                         e.preventDefault();
                     }
                 }}
-                // Mobile: full screen; from md (as useIsDesktop) a centered window.
                 className="max-md:inset-0 max-md:flex max-md:h-dvh max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-none max-md:p-4 md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto"
             >
                 {/* Header. Desktop: completed toggle → title and its list below
@@ -273,7 +264,6 @@ export function CardDialog({
                             id="card-list"
                             lists={lists}
                             value={list.id}
-                            // To the top of the chosen list; exact position - Move… on the card.
                             onValueChange={(toListId) =>
                                 moveCard(card.id, toListId, 0)
                             }
@@ -387,7 +377,6 @@ export function CardDialog({
     );
 }
 
-// "Created Oct 3 · Updated today", by the render time zone like due dates.
 function CardDates({ card }: { card: Card }) {
     const timeZone = useTimeZone();
     const now = useNow();

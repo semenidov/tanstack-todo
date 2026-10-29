@@ -7,8 +7,6 @@ import { buildDue, dueParts, localDateKey } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
 import { useNow, useTimeZone } from '#/lib/use-time-zone';
 
-// The calendar works with local Dates of the browser; the picker opens only
-// after hydration, when the render time zone is the device's one.
 function dateKeyToLocal(dateKey: string) {
     const [year, month, day] = dateKey.split('-').map(Number);
     return new Date(year, month - 1, day);
@@ -26,16 +24,9 @@ function isSameDue(a: Due, b: Due) {
 interface DueDatePickerProps {
     due: Due;
     onChange: (due: Due) => void;
-    /** Closes the popover: Enter on a day or in a valid time field. */
     onClose: () => void;
 }
 
-/**
- * A calendar and a 24-hour time field. Picking a day saves
- * it and keeps the time already set; an empty time means the whole day.
- * Enter closes: the day is already saved by the click, so a native Enter on
- * the focused day button would only pick the same day again (#120).
- */
 export function DueDatePicker({ due, onChange, onClose }: DueDatePickerProps) {
     const timeZone = useTimeZone();
     const now = useNow();
@@ -55,7 +46,6 @@ export function DueDatePicker({ due, onChange, onClose }: DueDatePickerProps) {
         change(buildDue(dateKey, savedTime, timeZone));
     }
 
-    /** Saves the typed time; false if it is invalid. */
     function commitTime() {
         if (!parts) return false;
         const next = buildDue(parts.date, timeText, timeZone);
@@ -83,7 +73,6 @@ export function DueDatePicker({ due, onChange, onClose }: DueDatePickerProps) {
                 onSelect={(date) => pickDate(localToDateKey(date))}
                 onDayKeyDown={(date, modifiers, e) => {
                     if (e.key !== 'Enter' || modifiers.disabled) return;
-                    // No native click: it would select the same day again.
                     e.preventDefault();
                     pickDate(localToDateKey(date));
                     onClose();

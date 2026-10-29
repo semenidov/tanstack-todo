@@ -23,21 +23,16 @@ import {
 } from '#/server/labels';
 
 export interface LabelFormValues {
-    /** As typed; the server trims it and stores an empty one as null. */
     title: string;
     color: LabelColor;
 }
 
-/** Toast text for a failed create or edit: a duplicate title, a quota, or `fallback`. */
 function labelErrorMessage(error: unknown, fallback: string) {
     if (error instanceof Error && error.message === LABEL_EXISTS_MESSAGE) {
         return LABEL_EXISTS_MESSAGE;
     }
     return createErrorMessage(error, fallback);
 }
-
-// Creating and editing a label wait for the server (ADR 56): the form stays
-// with the typed text until the label is saved, and an error leaves it as is.
 
 export function useCreateLabel(boardId: string) {
     const queryClient = useQueryClient();
@@ -88,7 +83,6 @@ export function useUpdateLabel(boardId: string) {
     });
 }
 
-/** Deletes the label for good (no Undo) and takes it off the board's cards. */
 export function useDeleteLabel(boardId: string) {
     const queryClient = useQueryClient();
     const labelsKey = labelsQueryOptions(boardId).queryKey;
@@ -114,12 +108,9 @@ export function useDeleteLabel(boardId: string) {
 
 export interface ToggleCardLabelVars {
     labelId: string;
-    /** true - put on the card, false - take off. */
     on: boolean;
 }
 
-// A checkbox in the labels popover: optimistic (ADR 56), in the card's queue
-// (card-queue.ts), so fast clicks reach the server in order.
 export function useToggleCardLabel(boardId: string, cardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
@@ -134,8 +125,6 @@ export function useToggleCardLabel(boardId: string, cardId: string) {
                 old ? setCardLabelInBoard(old, cardId, labelId, on) : old,
             );
         },
-        // No snapshot rollback: later toggles in the queue were applied on top
-        // of it. The server state is the truth, so refetch it.
         onError: (error) => {
             toast.error(
                 createErrorMessage(

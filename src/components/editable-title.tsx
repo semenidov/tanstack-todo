@@ -6,28 +6,18 @@ interface EditableTitleProps {
     title: string;
     isEditing: boolean;
     disabled?: boolean;
-    /** Classes of the button shown when not editing. */
     className?: string;
-    /** Classes of the input shown while editing. */
     inputClassName?: string;
-    /** Accessible name of the input. */
     'aria-label': string;
-    /** Extra button content next to the title, e.g. a counter. */
     children?: ReactNode;
-    /**
-     * The button is a drag handle (a list column): Space picks it up, so the
-     * native Space click must not start editing. Enter and click still do.
-     */
     spaceStartsDrag?: boolean;
     buttonRef?: Ref<HTMLButtonElement>;
-    /** The drag instructions of a drag handle. */
     'aria-describedby'?: string;
     onStartEditing: () => void;
     onCancelEditing: () => void;
     onSave: (title: string) => void;
 }
 
-/** Title that turns into an uncontrolled input on click; `isEditing` is owned by the parent. */
 export function EditableTitle({
     title,
     isEditing,
@@ -52,7 +42,6 @@ export function EditableTitle({
     }
 
     if (isEditing) {
-        // Mounted anew on every edit, so defaultValue always starts from the current title.
         return (
             <Input
                 autoFocus

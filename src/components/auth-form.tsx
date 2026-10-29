@@ -11,8 +11,6 @@ const authSchema = z.object({
     password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
-// Clears every validation-cause bucket so a stale error (from onSubmit,
-// onBlur, etc.) doesn't linger - merging `{}` into errorMap is a no-op.
 function clearFieldError(field: AnyFieldApi) {
     if (field.state.meta.errors.length === 0) {
         return;
@@ -41,11 +39,8 @@ export function AuthForm({
 }: AuthFormProps) {
     const form = useForm({
         defaultValues: { email: '', password: '' },
-        // Submit validation lives on each field, not form-level: TanStack Form
-        // aborts submit before form-level validators while any field already
-        // has an error (e.g. email's onBlur after autofocus), so the password
-        // error never appeared (#57). canSubmitWhenInvalid keeps the button
-        // enabled and lets handleSubmit re-validate every field.
+        // Validate on each field: TanStack Form aborts submit before form-level
+        // validators if any field already has an error.
         canSubmitWhenInvalid: true,
         onSubmit: async ({ value }) => {
             await onSubmit(value);

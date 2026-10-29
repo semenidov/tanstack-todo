@@ -5,7 +5,6 @@ import type {
     ListWithCards,
 } from '#/lib/boards-query';
 
-// DOM id of a card link on the board, used to return focus after the card dialog closes.
 export function cardLinkId(cardId: string): string {
     return `card-${cardId}`;
 }
@@ -40,8 +39,6 @@ export function removeListFromBoard(
     };
 }
 
-// List order on the board, same as the server and as compareCardOrder:
-// position byte-wise, then id.
 export function compareListOrder(
     a: Pick<ListWithCards, 'id' | 'position'>,
     b: Pick<ListWithCards, 'id' | 'position'>,
@@ -51,7 +48,6 @@ export function compareListOrder(
     return a.id < b.id ? -1 : 1;
 }
 
-// Undo of a list delete: back to its place on the board by position.
 export function restoreListToBoard(
     board: BoardData,
     list: ListWithCards,
@@ -63,8 +59,6 @@ export function restoreListToBoard(
     return { ...board, lists };
 }
 
-// `index` counts in the board without the moved list, as for cards: the same
-// index works for moves left and right. Move dialog position N is index N - 1.
 export function moveListInBoard(
     board: BoardData,
     listId: string,
@@ -82,8 +76,6 @@ export interface ListMoveNeighbors {
     nextListId: string | null;
 }
 
-// Neighbors of `index` on `board` without the list: its own board or the target
-// board of a move, where the list is not yet.
 export function listMoveNeighbors(
     board: BoardData,
     listId: string,
@@ -92,13 +84,11 @@ export function listMoveNeighbors(
     const lists = board.lists.filter((l) => l.id !== listId);
     const at = Math.max(0, Math.min(index, lists.length));
     return {
-        // .at(-1) would wrap to the last list, so index 0 has no prev explicitly.
         prevListId: at === 0 ? null : (lists.at(at - 1)?.id ?? null),
         nextListId: lists.at(at)?.id ?? null,
     };
 }
 
-// True when the move would leave the list where it is (no request needed).
 export function isSameListSpot(
     board: BoardData,
     listId: string,
@@ -108,7 +98,6 @@ export function isSameListSpot(
     return current === -1 || current === index;
 }
 
-// New cards sort first: the server gives them a key before the first card.
 export function addCardToList(
     board: BoardData,
     listId: string,
@@ -171,9 +160,6 @@ export interface CardMoveNeighbors {
     nextCardId: string | null;
 }
 
-// The target index counts in the list without the moved card, so the same index
-// works for moves down and up inside one list and for moves to another list.
-// Move dialog position N is index N - 1; a drop at index i has the card there.
 export function cardMoveNeighbors(
     board: BoardData,
     cardId: string,
@@ -185,15 +171,11 @@ export function cardMoveNeighbors(
     const cards = list.cards.filter((c) => c.id !== cardId);
     const at = Math.max(0, Math.min(index, cards.length));
     return {
-        // .at(-1) would wrap to the last card, so index 0 has no prev explicitly.
         prevCardId: at === 0 ? null : (cards.at(at - 1)?.id ?? null),
         nextCardId: cards.at(at)?.id ?? null,
     };
 }
 
-// Index (in the list without the card) that puts the card between neighbors taken
-// earlier, e.g. from the lists a drag showed: cards added since then don't shift it.
-// Undefined when the list or both neighbors are gone.
 export function cardIndexAfterNeighbors(
     board: BoardData,
     cardId: string,
@@ -210,7 +192,6 @@ export function cardIndexAfterNeighbors(
     return next === -1 ? undefined : next;
 }
 
-// True when the move would leave the card where it is (no request needed).
 export function isSameCardSpot(
     board: BoardData,
     cardId: string,
@@ -238,8 +219,6 @@ export function removeCardFromBoard(
     };
 }
 
-// Card order inside a list, same as the server: position byte-wise (keys are
-// ASCII, so JS string comparison matches COLLATE "C"), then id.
 export function compareCardOrder(
     a: Pick<Card, 'id' | 'position'>,
     b: Pick<Card, 'id' | 'position'>,
@@ -249,8 +228,6 @@ export function compareCardOrder(
     return a.id < b.id ? -1 : 1;
 }
 
-// Undo of a card delete: back to its place in its list by position.
-// No-op if the list is gone from the board.
 export function restoreCardToBoard(board: BoardData, card: Card): BoardData {
     if (findCardInBoard(board, card.id)) return board;
     return {
@@ -295,9 +272,6 @@ export function removeBoardFromList(
     return boards.filter((board) => board.id !== boardId);
 }
 
-// Labels on cards (#120): the board cache keeps only label ids per card.
-
-/** Puts the label on the card (`on`) or takes it off; the id order doesn't matter. */
 export function setCardLabelInBoard(
     board: BoardData,
     cardId: string,
@@ -320,7 +294,6 @@ export function setCardLabelInBoard(
     };
 }
 
-/** A deleted label leaves every card of the board. */
 export function removeLabelFromBoard(
     board: BoardData,
     labelId: string,
@@ -343,7 +316,6 @@ export function removeLabelFromBoard(
     };
 }
 
-/** Cards of the board with the label: for the delete confirmation. */
 export function labelCardCount(board: BoardData, labelId: string): number {
     return board.lists.reduce(
         (n, list) =>
@@ -352,15 +324,10 @@ export function labelCardCount(board: BoardData, labelId: string): number {
     );
 }
 
-/**
- * Card-label links in the list: a move to another board takes them all off, so
- * the Move form warns with this number (links, not distinct labels).
- */
 export function listLabelLinkCount(list: ListWithCards): number {
     return list.cards.reduce((n, card) => n + card.labelIds.length, 0);
 }
 
-/** Checklist progress of the card face (#120), after an edit in the card window. */
 export function setChecklistProgressInBoard(
     board: BoardData,
     cardId: string,

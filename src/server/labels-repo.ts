@@ -6,17 +6,11 @@ import type { Quotas } from '#/lib/quotas';
 import { findOwnedCard, ownedBoardIds, ownedCardIds } from '#/server/access';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
 
-// Labels of a board and labels on cards (#120). Access: a label is the user's
-// when its board is; a card is checked by the chain card → list → board, and a
-// label goes only on a card of its own board (no foreign label ids).
-
 export interface LabelInput {
-    /** Normalized: trimmed, null for an untitled label (never ''). */
     title: string | null;
     color: string;
 }
 
-/** Postgres unique_violation on the case-insensitive title index, anywhere in the cause chain. */
 function isDuplicateTitle(error: unknown): boolean {
     for (let e = error; e instanceof Error; e = e.cause) {
         if (
@@ -29,7 +23,6 @@ function isDuplicateTitle(error: unknown): boolean {
     return false;
 }
 
-/** Runs a label write; a duplicate title becomes the user-facing error. */
 async function withTitleCheck<T>(write: () => Promise<T>): Promise<T> {
     try {
         return await write();
@@ -39,7 +32,6 @@ async function withTitleCheck<T>(write: () => Promise<T>): Promise<T> {
     }
 }
 
-/** Labels of the user's board in creation order; empty for someone else's board. */
 export function listLabels(userId: string, boardId: string) {
     return db
         .select()
@@ -63,7 +55,6 @@ export async function createLabel(
         where: and(eq(boards.id, boardId), eq(boards.ownerId, userId)),
     });
     if (!board) return null;
-    // Labels are deleted for real, so every row counts.
     const [{ n }] = await db
         .select({ n: count() })
         .from(labels)
@@ -103,7 +94,6 @@ export async function updateLabel(
     return rows.at(0) ?? null;
 }
 
-/** Deletes the label for good; card_labels go with it (FK cascade). */
 export async function deleteLabel(userId: string, labelId: string) {
     const rows = await db
         .delete(labels)
@@ -117,7 +107,6 @@ export async function deleteLabel(userId: string, labelId: string) {
     return rows.at(0) ?? null;
 }
 
-/** Bumps the card's updated_at: a label change is an edit of the card. */
 function touchCard(cardId: string) {
     return db
         .update(cards)
@@ -125,10 +114,6 @@ function touchCard(cardId: string) {
         .where(eq(cards.id, cardId));
 }
 
-/**
- * Puts a label of the card's board on the user's live card. False when the card
- * or the label is not reachable (someone else's, deleted, another board).
- */
 export async function addCardLabel(
     userId: string,
     cardId: string,
@@ -151,7 +136,6 @@ export async function addCardLabel(
             quotas[QuotaKind.CardLabels],
         );
     }
-    // Already on the card (a repeated click): nothing to insert, still a success.
     await db
         .insert(cardLabels)
         .values({ cardId, labelId })
@@ -160,7 +144,6 @@ export async function addCardLabel(
     return true;
 }
 
-/** Takes the label off the user's live card. False when there was nothing to take off. */
 export async function removeCardLabel(
     userId: string,
     cardId: string,

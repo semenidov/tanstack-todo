@@ -36,12 +36,7 @@ export const auth = betterAuth({
         cookieCache: { enabled: true, maxAge: 5 * 60 },
     },
     rateLimit: {
-        // E2E and the verifier sign up many users from one IP and trip the sign-up
-        // limit (429). The Playwright web server and the Vercel Preview env set this
-        // flag; production does not have it.
         enabled: process.env.AUTH_RATE_LIMIT_DISABLED !== 'true',
-        // Counters in Postgres: in-memory ones live per serverless instance and
-        // barely limit anything on Vercel.
         storage: 'database',
         window: 60,
         max: 100,
@@ -52,26 +47,19 @@ export const auth = betterAuth({
         },
     },
     advanced: {
-        // Vercel sets x-forwarded-for to the single client IP. A request without a
-        // usable IP is not let through: Better Auth counts it in one shared
-        // per-path bucket.
         ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
     },
-    // Guest sandbox (#84). Signing up from guest mode deletes the guest and its
-    // data (plugin default, no transfer).
     plugins: [anonymous({ generateName: () => 'Guest' })],
     databaseHooks: {
         user: {
             create: {
-                // Database hook, not hooks.before on the path: here the data
-                // says for sure that this is a guest (`isAnonymous`), and the
-                // check runs after the plugin's "already a guest" refusal.
+                // Database hook: only here `isAnonymous` is known for sure, after the
+                // plugin's "already a guest" refusal.
                 before: async (user) => {
                     if (user.isAnonymous === true) await prepareGuestSignIn();
                 },
                 after: async (user, context) => {
                     if (user.isAnonymous !== true) return;
-                    // The demo board's "Today" is the guest's today (#120).
                     const cookies = context?.headers?.get('cookie');
                     await seedGuest(user.id, timeZoneFromCookies(cookies));
                 },

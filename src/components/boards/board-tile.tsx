@@ -18,8 +18,6 @@ interface BoardTileProps {
     onDelete: () => void;
 }
 
-// Title box is fixed at two lines and the count is pinned to the bottom, so
-// switching to the rename input doesn't move anything (CODING.md, Вёрстка).
 const TILE_CLASS =
     'flex h-24 flex-col justify-between rounded-lg border bg-card p-3 shadow-xs transition-colors';
 const TITLE_BOX_CLASS = 'h-10 pr-7 text-sm leading-5 font-medium';

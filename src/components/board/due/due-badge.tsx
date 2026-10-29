@@ -4,7 +4,6 @@ import { DueStatus, describeDue } from '#/lib/due-date';
 import type { Due, DueDescription } from '#/lib/due-date';
 import { useNow, useTimeZone } from '#/lib/use-time-zone';
 
-// Red - overdue, yellow - today or tomorrow, else neutral (inherits the text color).
 export const DUE_STATUS_CLASSES: Record<DueStatus, string> = {
     [DueStatus.Overdue]:
         'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
@@ -13,7 +12,6 @@ export const DUE_STATUS_CLASSES: Record<DueStatus, string> = {
     [DueStatus.Neutral]: '',
 };
 
-/** Status and text of the card's due date now, in the render time zone. */
 export function useDueDescription(
     due: Due,
     completed: boolean,
@@ -23,7 +21,6 @@ export function useDueDescription(
     return describeDue(due, { now, timeZone, completed });
 }
 
-/** The text of a due date with its status in words for screen readers. */
 export function DueText({ description }: { description: DueDescription }) {
     return (
         <>
@@ -34,7 +31,6 @@ export function DueText({ description }: { description: DueDescription }) {
     );
 }
 
-/** The due date badge on the card face; nothing without a due date. */
 export function DueBadge({ due, completed }: { due: Due; completed: boolean }) {
     const description = useDueDescription(due, completed);
     if (!description) return null;

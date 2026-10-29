@@ -55,12 +55,9 @@ interface ChecklistSectionProps {
     boardId: string;
     cardId: string;
     checklist: Checklist;
-    /** Just created: the "Add an item" field opens focused. */
     startAdding: boolean;
 }
 
-// The checklist block of the card window (#120): title (edited inline) with
-// done/total and ⋯, a progress bar, sortable items, "Add an item".
 export function ChecklistSection({
     boardId,
     cardId,
@@ -79,8 +76,6 @@ export function ChecklistSection({
         items: Checklist['items'];
     } | null>(null);
 
-    // The drop is in the cache already, but the new `checklist` prop comes a tick
-    // later: keep showing the drop so the items don't flash back (as on the board).
     const shownItems =
         dropped && dropped.base === checklist.items
             ? dropped.items
@@ -110,7 +105,6 @@ export function ChecklistSection({
         }),
     );
 
-    // Screen reader texts by item text, not by id.
     const announcements = useMemo<Announcements>(() => {
         const titleOf = (id: string | number) =>
             checklist.items.find((i) => i.id === id)?.title ?? '';
@@ -282,9 +276,6 @@ export function ChecklistSection({
     );
 }
 
-// "Add an item": Enter saves and keeps the field open for the next one, Esc
-// closes it. Not optimistic (ADR 56): the field waits read-only (focus stays)
-// and keeps the text on an error.
 function AddItem({
     boardId,
     cardId,

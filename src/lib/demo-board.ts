@@ -1,21 +1,11 @@
 import { LabelColor } from '#/lib/label-colors';
 
-// Content of the demo board a guest gets on sign-in (#84). Plain data: lists
-// left to right, cards top to bottom; seeded by `seedDemoBoard` in boards-repo.
-
 export interface DemoCard {
     title: string;
     description: string;
-    /** Marked done (#120): the demo shows one completed card. */
     completed?: boolean;
-    /**
-     * A whole-day due date, in days from the guest's today (by the time zone
-     * cookie): 0 - today, negative - overdue.
-     */
     dueInDays?: number;
-    /** Titles of the board's demo labels on the card (#120). */
     labels?: Array<string>;
-    /** The card's checklist (#120), items in order. */
     checklist?: DemoChecklist;
 }
 
@@ -36,7 +26,6 @@ export interface DemoList {
 
 export const DEMO_BOARD: {
     title: string;
-    /** In creation order. */
     labels: Array<DemoLabel>;
     lists: Array<DemoList>;
 } = {

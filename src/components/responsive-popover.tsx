@@ -20,14 +20,8 @@ import {
 } from '#/components/ui/popover';
 import { useIsDesktop } from '#/lib/use-media-query';
 
-// A popover on desktop, a bottom sheet (Drawer) on mobile, with the same parts:
-// <ResponsivePopover> <ResponsivePopoverTrigger asChild> <ResponsivePopoverContent title>.
-// Without a trigger (#133): <ResponsivePopover {...popoverProps}> with the
-// props of useAnchoredPopover, and its buttonProps on any plain buttons.
-
 const IsDesktopContext = createContext(true);
 
-/** Marks the buttons of an anchored popover; the value is its id. */
 const ANCHOR_BUTTON_ATTRIBUTE = 'data-popover-button';
 
 type Measurable = NonNullable<
@@ -35,19 +29,15 @@ type Measurable = NonNullable<
 >['current'];
 
 type ExternalAnchor = {
-    /** The button rect saved at the click: the popover doesn't follow it. */
     measurable: Measurable | null;
-    /** Clicks on the buttons with this id aren't outside: they toggle. */
     buttonId: string;
 };
 
-// The anchored popover's id for its content (null: an ordinary popover).
 const AnchorButtonIdContext = createContext<string | null>(null);
 
 type ResponsivePopoverProps = {
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
-    /** Popover without a trigger, placed at a saved rect (desktop only). */
     anchor?: ExternalAnchor;
     children: ReactNode;
 };
@@ -75,7 +65,6 @@ export function ResponsivePopover({
     );
 }
 
-/** Props of the plain buttons that open an anchored popover. */
 export type PopoverButtonProps = {
     [ANCHOR_BUTTON_ATTRIBUTE]: string;
     'aria-haspopup': 'dialog';
@@ -83,17 +72,10 @@ export type PopoverButtonProps = {
     onClick: (event: MouseEvent<HTMLElement>) => void;
 };
 
-/**
- * A popover opened by plain buttons instead of a Radix trigger: its root lives
- * apart from the buttons, so a button moving or remounting while it's open
- * (another row of the card window) neither closes nor moves it. A button click
- * saves the button rect as the anchor and toggles the popover.
- */
 export function useAnchoredPopover() {
     const buttonId = useId();
     const [open, setOpen] = useState(false);
-    // Created once per click: Popper compares it by reference on every render.
-    // Kept after closing, so the closing animation stays in place.
+    // Created once per click: Popper compares it by reference.
     const [measurable, setMeasurable] = useState<Measurable | null>(null);
 
     const buttonProps: PopoverButtonProps = {
@@ -133,11 +115,8 @@ export function ResponsivePopoverTrigger(
 }
 
 type ResponsivePopoverContentProps = {
-    /** Header text; also the accessible name of the popover or sheet. */
     title: ReactNode;
-    /** Shows a back arrow in the header: for screens inside one popover. */
     onBack?: () => void;
-    /** Popover alignment to the trigger (desktop only). */
     align?: ComponentProps<typeof PopoverContent>['align'];
     className?: string;
     children: ReactNode;
@@ -159,9 +138,8 @@ export function ResponsivePopoverContent({
             <PopoverContent
                 align={align}
                 aria-labelledby={titleId}
-                // A click on an own button toggles the popover by itself; as an
-                // outside click it would close the popover and the click would
-                // open it again.
+                // An own button toggles the popover itself; as an outside click it would
+                // close and reopen it.
                 onInteractOutside={(event) => {
                     if (
                         anchorButtonId !== null &&
@@ -173,8 +151,6 @@ export function ResponsivePopoverContent({
                         event.preventDefault();
                     }
                 }}
-                // A tall popover (the due date calendar) scrolls instead of
-                // leaving the viewport on short screens.
                 className="flex max-h-(--radix-popover-content-available-height) w-72 flex-col p-0"
             >
                 <div className="flex items-center gap-1 border-b px-2 py-1.5">

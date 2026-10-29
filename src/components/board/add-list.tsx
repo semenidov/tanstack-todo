@@ -14,11 +14,9 @@ function useAddList(boardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
 
-    // Not optimistic: the list enters the cache only with the id the server gave it.
     return useMutation({
         mutationFn: async (title: string) => {
             const list = await addListServer({ data: { boardId, title } });
-            // null: the board is gone or belongs to someone else.
             if (!list) throw new Error('List was not created');
             return list;
         },
@@ -65,7 +63,6 @@ export function AddList({ boardId, className }: AddListProps) {
     function handleSubmit() {
         const trimmed = value.trim();
         if (!trimmed || addList.isPending) return;
-        // Cleared only after success, so a failed request keeps the typed text.
         addList.mutate(trimmed, {
             onSuccess: () => {
                 setValue('');

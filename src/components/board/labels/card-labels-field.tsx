@@ -7,10 +7,6 @@ import type { Card } from '#/lib/boards-query';
 import { labelsOfCard } from '#/lib/labels';
 import { labelsQueryOptions } from '#/lib/labels-query';
 
-// The popover itself (LabelsPopover) is rendered by the card window: these
-// buttons only toggle it (#133).
-
-/** The "Labels" button in the row of empty blocks of the card window. */
 export function AddLabelsButton({
     buttonProps,
 }: {
@@ -24,7 +20,6 @@ export function AddLabelsButton({
     );
 }
 
-/** The labels block of the card window: chips in label order and «+». */
 export function CardLabelsField({
     boardId,
     card,

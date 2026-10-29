@@ -23,14 +23,9 @@ import { toast } from 'sonner';
 export interface MoveListVars extends ListMoveNeighbors {
     listId: string;
     toBoardId: string;
-    /** For the toast after a move to another board; not sent. */
     toBoardTitle: string;
 }
 
-/**
- * List moves go through the board's order queue together with card moves: the
- * server makes each key from what the previous requests already saved.
- */
 export function useMoveList(boardId: string) {
     const queryClient = useQueryClient();
     const key = boardQueryOptions(boardId).queryKey;
@@ -59,8 +54,6 @@ export function useMoveList(boardId: string) {
                 exact: true,
             });
         },
-        // No snapshot rollback (later moves were applied on top of it): the refetch
-        // after the last queued request brings the server state back.
         onError: (error) => {
             toast.error(
                 moveErrorMessage(
@@ -72,12 +65,7 @@ export function useMoveList(boardId: string) {
         onSettled: () => invalidateAfterLastBoardOrder(queryClient, boardId),
     });
 
-    /**
-     * Puts the list at `index` of this board (counted without the list) in the
-     * cache right away and queues the request. False when there is nothing to move.
-     */
     const moveList = (listId: string, index: number): boolean => {
-        // Synchronous cancel: a refetch in flight must not overwrite the move.
         void queryClient.cancelQueries({ queryKey: key });
         const board = queryClient.getQueryData(key);
         if (!board || isSameListSpot(board, listId, index)) return false;
@@ -92,11 +80,6 @@ export function useMoveList(boardId: string) {
         return true;
     };
 
-    /**
-     * Moves the list with its cards to `index` of another board. The neighbors come
-     * from that board's cached data (the Move window loads it); the list leaves
-     * this board's cache at once.
-     */
     const moveListToBoard = (
         listId: string,
         toBoard: { id: string; title: string },
@@ -124,10 +107,6 @@ export function useMoveList(boardId: string) {
     return { moveList, moveListToBoard };
 }
 
-/**
- * True while the queue has a move of the list or of a card into or out of it:
- * deleting the list or moving it to another board would race those requests.
- */
 export function useIsListSyncing(boardId: string, listId: string) {
     const pending = useMutationState({
         filters: {

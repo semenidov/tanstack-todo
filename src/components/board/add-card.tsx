@@ -27,7 +27,7 @@ export function AddCard({ boardId, listId }: AddCardProps) {
     function handleSubmit() {
         const trimmed = value.trim();
         if (!trimmed || addCard.isPending) return;
-        // Cleared only after success, so a failed request keeps the typed text.
+        // Keep the input on failure; clear it only after the server confirms.
         addCard.mutate(trimmed, {
             onSuccess: () => {
                 setValue('');

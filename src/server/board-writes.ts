@@ -5,13 +5,9 @@ import * as checklistsRepo from '#/server/checklists-repo';
 import * as labelsRepo from '#/server/labels-repo';
 import type { LabelInput } from '#/server/labels-repo';
 
-// Bodies of the server fns that add a live row (create, restore; move is in
-// move-card.ts). The repo functions default to the regular quotas, so the
-// session user's quotas are passed here, in one place, and an integration test
-// calls these functions for a guest (vitest has no Start runtime). Imported only
-// inside server fn handlers: the client build drops it with them.
+// Passes the session user's quotas (the repo defaults to the regular ones).
+// Import only inside server fn handlers, so the client build drops it.
 
-/** Postgres foreign_key_violation, anywhere in the cause chain (drizzle wraps the driver error). */
 function isForeignKeyViolation(error: unknown): boolean {
     for (let e = error; e instanceof Error; e = e.cause) {
         if ('code' in e && e.code === '23503') return true;
@@ -23,11 +19,8 @@ export async function createBoardAs(user: SessionUser, title: string) {
     try {
         return await repo.createBoard(user.id, title, quotasFor(user));
     } catch (error) {
-        // The session cookie cache (5 min) can outlive a deleted user (an
-        // expired guest, a guest signed out in another tab). The board insert
-        // is the one write without an owned row to check first, so it hits the
-        // FK: refuse it as unauthorized, without the SQL text. Caught here, not
-        // checked in requireUser: no extra query on every server fn.
+        // The cookie cache (5 min) can outlive a deleted guest: the board insert hits
+        // the FK, refuse it as unauthorized.
         if (isForeignKeyViolation(error)) throw new Error('Unauthorized');
         throw error;
     }

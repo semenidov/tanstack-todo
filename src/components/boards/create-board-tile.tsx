@@ -21,7 +21,6 @@ export function CreateBoardTile({ className }: CreateBoardTileProps) {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
-    // Not optimistic: the new board must be opened by its real id.
     const createBoard = useMutation({
         mutationFn: (title: string) => createBoardServer({ data: { title } }),
         onSuccess: async (board) => {

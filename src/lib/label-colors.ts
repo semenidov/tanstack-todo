@@ -1,6 +1,3 @@
-// The label palette (#120): labels store a key, the classes live here, so the
-// colors can change without touching the data.
-
 export enum LabelColor {
     Green = 'green',
     Lime = 'lime',
@@ -19,9 +16,7 @@ export const LABEL_COLORS = Object.values(LabelColor);
 export const DEFAULT_LABEL_COLOR = LabelColor.Green;
 
 interface LabelColorStyle {
-    /** Name for screen readers and for a label without a title. */
     name: string;
-    /** Background and text of a strip or a chip. */
     className: string;
 }
 
@@ -53,7 +48,6 @@ export const LABEL_COLOR_STYLES: Record<LabelColor, LabelColorStyle> = {
     [LabelColor.Gray]: { name: 'Gray', className: 'bg-zinc-500 text-white' },
 };
 
-/** The palette entry of a stored key; an unknown key falls back to gray. */
 export function labelColorStyle(color: string): LabelColorStyle {
     const key = LABEL_COLORS.find((c) => c === color) ?? LabelColor.Gray;
     return LABEL_COLOR_STYLES[key];

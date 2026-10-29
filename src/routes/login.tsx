@@ -31,9 +31,7 @@ function LoginPage() {
             );
             return;
         }
-        // Re-running this route's beforeLoad redirects the now signed-in user
-        // to `/` and on to `/boards`. A separate navigate('/') raced that
-        // redirect and could leave the URL at `/`.
+        // Let beforeLoad redirect: a separate navigate('/') races it.
         await router.invalidate();
     }
 

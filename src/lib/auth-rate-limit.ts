@@ -1,8 +1,4 @@
-// Shared by the server config (src/lib/auth.ts) and the auth forms, so the
-// "try again in ..." text always matches the actual window.
-
 export interface RateLimitRule {
-    /** Seconds. */
     window: number;
     max: number;
 }
@@ -19,7 +15,6 @@ function retryIn(windowSeconds: number) {
     return minutes === 1 ? 'a minute' : `${minutes} minutes`;
 }
 
-/** Toast text for a failed sign-in/sign-up: a 429 gets its own text, the rest - the server message. */
 export function authErrorMessage(
     error: { status: number; message?: string },
     limit: RateLimitRule,

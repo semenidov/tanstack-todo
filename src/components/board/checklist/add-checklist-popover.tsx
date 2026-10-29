@@ -17,11 +17,9 @@ import {
 interface AddChecklistPopoverProps {
     boardId: string;
     cardId: string;
-    /** After the checklist is saved: the window focuses its "Add an item" field. */
     onCreated: () => void;
 }
 
-/** The "Checklist" button in the row of empty blocks and its popover. */
 export function AddChecklistPopover({
     boardId,
     cardId,
@@ -68,7 +66,6 @@ function AddChecklistForm({
             onSubmit={(e) => {
                 e.preventDefault();
                 if (!trimmed || createChecklist.isPending) return;
-                // Not optimistic (ADR 56): the form waits, an error keeps the text.
                 createChecklist.mutate(trimmed, { onSuccess: onCreated });
             }}
         >

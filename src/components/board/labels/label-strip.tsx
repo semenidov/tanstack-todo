@@ -7,7 +7,6 @@ import { labelName, labelsOfCard } from '#/lib/labels';
 import type { Label } from '#/lib/labels';
 import { labelsQueryOptions } from '#/lib/labels-query';
 
-/** A label with its title (or only its color), cut with an ellipsis. */
 export function LabelChip({
     label,
     className,
@@ -31,15 +30,11 @@ export function LabelChip({
 
 interface LabelStripProps {
     labelIds: ReadonlyArray<string>;
-    /** On the board: a click toggles the titles. Drag previews are static. */
     interactive: boolean;
 }
 
-// The labels zone of a card face: color strips, or chips with titles while the
-// board's labels are expanded. In label creation order.
 export function LabelStrip(props: LabelStripProps) {
     const board = useBoardLabels();
-    // Outside a board there is no labels cache to read the colors from.
     if (!board) return null;
     return <BoardLabelStrip board={board} {...props} />;
 }
@@ -74,8 +69,7 @@ function BoardLabelStrip({
     if (!interactive) {
         return <div className="flex min-w-0 flex-wrap gap-1">{items}</div>;
     }
-    // relative z-10: above the card link's ::after, so a click toggles the
-    // labels and doesn't open or drag the card.
+    // z-10: above the card link's ::after, or a click opens or drags the card.
     return (
         <button
             type="button"

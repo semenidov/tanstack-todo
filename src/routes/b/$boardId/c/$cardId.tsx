@@ -11,8 +11,6 @@ import z from 'zod';
 
 export const Route = createFileRoute('/b/$boardId/c/$cardId')({
     component: CardRoute,
-    // The card lives in the parent board query's cache; only its checklist is
-    // fetched (#120): items are not loaded with the board.
     loader: async ({ context, params }) => {
         if (z.uuid().safeParse(params.cardId).success) {
             await context.queryClient.ensureQueryData(
@@ -52,8 +50,6 @@ function CardRoute() {
             lists={data.lists}
             onClose={async () => {
                 await navigate({ to: '/b/$boardId', params: { boardId } });
-                // The dialog is opened by navigation, not by a Radix trigger,
-                // so Radix has nothing to return focus to - do it explicitly.
                 document.getElementById(cardLinkId(cardId))?.focus();
             }}
         />

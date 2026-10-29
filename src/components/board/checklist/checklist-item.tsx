@@ -8,10 +8,6 @@ import { Input } from '#/components/ui/input';
 import { MAX_CHECKLIST_TEXT_LENGTH } from '#/lib/checklist';
 import type { ChecklistItem as Item } from '#/lib/checklist';
 
-/**
- * Marks a field that handles Escape itself (cancels its edit): the card window
- * doesn't close on it (CardDialog checks the attribute).
- */
 export const OWN_ESCAPE_ATTRIBUTE = 'data-own-escape';
 export const ownEscape = { [OWN_ESCAPE_ATTRIBUTE]: '' };
 
@@ -22,7 +18,6 @@ interface ChecklistItemProps {
     onDelete: () => void;
 }
 
-// A checklist row: drag handle, check, text (click to edit), ✕ on hover.
 export function ChecklistItem({
     item,
     onToggle,
@@ -74,7 +69,6 @@ export function ChecklistItem({
             </div>
             <div className="min-w-0 flex-1">
                 {isEditing ? (
-                    // Mounted anew on every edit: defaultValue is the current text.
                     <Input
                         autoFocus
                         defaultValue={item.title}
@@ -107,7 +101,6 @@ export function ChecklistItem({
                 size="icon-sm"
                 aria-label={`Delete item ${item.title}`}
                 onClick={onDelete}
-                // Shown on hover or focus; always on touch screens (no hover).
                 className="size-8 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
             >
                 <XIcon />

@@ -50,7 +50,6 @@ const SCREEN_TITLES: Record<Screen, string> = {
     [Screen.Delete]: 'Delete label?',
 };
 
-/** Where the back arrow leads: Delete → Edit, Create / Edit → the list. */
 function previousScreen(state: ScreenState): ScreenState | undefined {
     if (state.screen === Screen.List) return undefined;
     if (state.screen === Screen.Delete) {
@@ -68,12 +67,8 @@ export interface LabelsPopoverProps extends Omit<
     open: boolean;
 }
 
-// The labels of the board for one card (#120): screens list → create / edit →
-// delete inside one popover (a bottom sheet on mobile), with a back arrow.
-// The card window renders it apart from its "Labels" / «+» buttons (#133).
 export function LabelsPopover({ boardId, card, ...props }: LabelsPopoverProps) {
     const [state, setState] = useState<ScreenState>(LIST);
-    // Every opening starts from the list: reset on any way of closing.
     if (!props.open && state.screen !== Screen.List) setState(LIST);
     const previous = previousScreen(state);
 
@@ -101,7 +96,6 @@ interface LabelsScreensProps {
     onNavigate: (state: ScreenState) => void;
 }
 
-// Mounted only while the popover is open: the queries run for an open popover.
 function LabelsScreens({
     boardId,
     card,
@@ -119,8 +113,6 @@ function LabelsScreens({
             />
         );
     }
-    // Edit and Delete show the list instead if the label was deleted meanwhile
-    // (another tab).
     const labelId = state.screen === Screen.List ? undefined : state.labelId;
     const label = labels.find((l) => l.id === labelId);
     if (!label) {

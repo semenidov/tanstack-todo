@@ -7,17 +7,10 @@ import { CheckIcon, SquareCheckBigIcon, TextIcon } from 'lucide-react';
 
 interface CardFaceProps {
     card: Card;
-    /** The title: the card link on the board; plain text in drag previews. */
     title?: ReactNode;
 }
 
-// The card on the board and in drag previews (#120). Zones top to bottom:
-// labels → [completed check] title (up to 2 lines) → footer badges. An empty
-// zone is not rendered, so a card without extras looks like a plain title.
-// The menu is not part of the face: CardItem puts it in the top right corner,
-// over the right padding.
 export function CardFace({ card, title }: CardFaceProps) {
-    // Footer badges in a fixed order: due date → checklist → description.
     const badges: Array<ReactNode> = [];
     if (card.dueDate || card.dueAt) {
         badges.push(
@@ -55,8 +48,6 @@ export function CardFace({ card, title }: CardFaceProps) {
     return (
         <div className="flex flex-col gap-1.5 px-3 py-2 pr-8 text-sm select-none">
             {card.labelIds.length > 0 && (
-                // A title link means a card on the board: its labels toggle
-                // the titles; a drag preview shows them static.
                 <LabelStrip
                     labelIds={card.labelIds}
                     interactive={title !== undefined}
@@ -64,7 +55,6 @@ export function CardFace({ card, title }: CardFaceProps) {
             )}
             <div className="flex min-w-0 items-start gap-1.5">
                 {card.completedAt && (
-                    // h-5: one line of text-sm, so the check stays on the first line.
                     <span
                         role="img"
                         aria-label="Completed"

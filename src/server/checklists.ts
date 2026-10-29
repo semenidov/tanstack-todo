@@ -5,8 +5,6 @@ import * as repo from '#/server/checklists-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 
-// Server fns of a card's checklist (#120). A refusal (someone else's, deleted,
-// a stale order) reaches the client as an error: it shows a toast and refetches.
 const textSchema = z.string().trim().min(1).max(MAX_CHECKLIST_TEXT_LENGTH);
 
 export const getChecklistServer = createServerFn({ method: 'GET' })

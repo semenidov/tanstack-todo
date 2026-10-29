@@ -26,12 +26,6 @@ import {
     updateChecklistItemServer,
 } from '#/server/checklists';
 
-// Checklist of a card (#120). All its mutations run in the card's queue
-// (card-queue.ts). Creating the checklist and an item waits for the server
-// (ADR 56); edits, checks, moves and deletes are optimistic (ADR 56). The board
-// keeps only the done/total counts: every cache edit updates them too.
-
-/** Writes the checklist cache and the card's counts on the board. */
 function useChecklistCache(boardId: string, cardId: string) {
     const queryClient = useQueryClient();
     const checklistKey = checklistQueryOptions(cardId).queryKey;
@@ -55,10 +49,6 @@ function useChecklistCache(boardId: string, cardId: string) {
     };
 }
 
-/**
- * An optimistic edit: applied to the cache at once. No snapshot rollback (later
- * edits in the queue sit on top of it): on error the server state is refetched.
- */
 function useOptimisticChecklistMutation<TVars>(
     boardId: string,
     cardId: string,
@@ -127,7 +117,6 @@ export function useAddChecklistItem(
             await cache.cancel();
             cache.set((old) => (old ? addItemToChecklist(old, item) : old));
         },
-        // The typed text stays in the field: the caller clears it on success.
         onError: (error) => {
             toast.error(
                 createErrorMessage(
@@ -159,7 +148,6 @@ interface RenameChecklistVars {
     title: string;
 }
 
-/** Deletes the checklist with its items for good (no Undo). */
 export function useDeleteChecklist(boardId: string, cardId: string) {
     return useOptimisticChecklistMutation(boardId, cardId, {
         mutationFn: (checklistId: string) =>
@@ -175,7 +163,6 @@ export interface UpdateChecklistItemVars {
     done?: boolean;
 }
 
-/** The item's check and text. */
 export function useUpdateChecklistItem(boardId: string, cardId: string) {
     return useOptimisticChecklistMutation(boardId, cardId, {
         mutationFn: (vars: UpdateChecklistItemVars) =>
@@ -186,7 +173,6 @@ export function useUpdateChecklistItem(boardId: string, cardId: string) {
     });
 }
 
-/** Deletes the item for good (no Undo). */
 export function useDeleteChecklistItem(boardId: string, cardId: string) {
     return useOptimisticChecklistMutation(boardId, cardId, {
         mutationFn: (itemId: string) =>
@@ -199,17 +185,12 @@ export function useDeleteChecklistItem(boardId: string, cardId: string) {
 
 export interface MoveChecklistItemVars extends ChecklistItemNeighbors {
     itemId: string;
-    /** Index in the new order, for the cache. */
     toIndex: number;
 }
 
 /**
- * Moves the item: the cache by index, the server by the neighbors (ADR 58).
- * Returns a plain function, not the mutation: the cache is written synchronously
- * in the drop handler, like `moveCard` (card-mutations.tsx): `onMutate` would run
- * a few microtasks later. Not enough by itself: the cache reaches React a tick
- * later (TanStack Query notifies in a setTimeout), after dnd-kit has dropped the
- * transforms, so `ChecklistSection` also shows the drop from local state.
+ * Writes the cache synchronously in the drop handler: `onMutate` runs too late.
+ * React still sees the cache a tick later, so ChecklistSection keeps the drop.
  */
 export function useMoveChecklistItem(boardId: string, cardId: string) {
     const cache = useChecklistCache(boardId, cardId);
@@ -236,7 +217,6 @@ export function useMoveChecklistItem(boardId: string, cardId: string) {
     });
 
     return (vars: MoveChecklistItemVars) => {
-        // Synchronous cancel: a refetch in flight must not overwrite the move.
         for (const queryKey of keys) {
             void queryClient.cancelQueries({ queryKey });
         }

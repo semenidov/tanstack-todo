@@ -9,7 +9,6 @@ interface ListTitleProps {
     onStartEditing: () => void;
     onCancelEditing: () => void;
     onSave: (title: string) => void;
-    /** The title button is the list's drag handle: see `EditableTitle`. */
     buttonRef?: Ref<HTMLButtonElement>;
     'aria-describedby'?: string;
 }

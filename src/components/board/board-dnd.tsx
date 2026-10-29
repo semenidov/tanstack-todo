@@ -57,8 +57,6 @@ import {
 import { useHydrated } from '#/lib/use-hydrated';
 import { usePrefersReducedMotion } from '#/lib/use-prefers-reduced-motion';
 
-// Space picks a card or a list up: Enter stays with the card link (opens the
-// card) and the list title button (renames the list).
 const KEYBOARD_CODES = {
     start: [KeyboardCode.Space],
     cancel: [KeyboardCode.Esc],
@@ -72,7 +70,6 @@ const ARROW_CODES: Array<string> = [
     KeyboardCode.Right,
 ];
 
-// Lists change height while a card moves between them: measure them all the time.
 const MEASURING = { droppable: { strategy: MeasuringStrategy.Always } };
 
 enum DragType {
@@ -83,17 +80,11 @@ enum DragType {
 interface DragState {
     type: DragType;
     activeId: string;
-    /** The lists at pick-up: the card goes back here when it leaves all lists. */
     startLists: Array<ListWithCards>;
-    /**
-     * The lists shown while dragging, with the card moved between lists. A list
-     * is shown moved by the sortable transforms only: these stay as at pick-up.
-     */
     lists: Array<ListWithCards>;
 }
 
 interface DroppedState {
-    /** The `lists` prop at the drop: shown until the cache brings the move. */
     base: Array<ListWithCards>;
     lists: Array<ListWithCards>;
 }
@@ -107,14 +98,6 @@ interface BoardDndProps {
     }) => ReactNode;
 }
 
-/**
- * Drag-and-drop of cards inside and between lists and of lists inside the board
- * (mouse, touch, keyboard), in one context: nested contexts would not share the
- * sensors. Collision detection, arrow keys and announcements branch on the type
- * of the dragged item. While dragging, the board shows a local copy of the lists:
- * server data that arrives meanwhile is applied after the drop. The drop goes
- * through the same move queue as the Move windows.
- */
 export function BoardDnd({ board, lists, children }: BoardDndProps) {
     const queryClient = useQueryClient();
     const { moveCardNextTo } = useMoveCard(board.id);
@@ -124,22 +107,19 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     const [drag, setDrag] = useState<DragState | null>(null);
     const [dropped, setDropped] = useState<DroppedState | null>(null);
 
-    // The drop is in the cache already, but the new `lists` prop comes a tick later:
-    // keep showing the drop so the card doesn't flash back to where it was.
+    // The cache updates a tick before the `lists` prop: keep the drop, or the
+    // card flashes back.
     const shownLists = drag
         ? drag.lists
         : dropped && dropped.base === lists
           ? dropped.lists
           : lists;
 
-    // The keyboard sensor keeps its options from the pick-up: read lists through a ref.
     const shownListsRef = useRef(shownLists);
     useLayoutEffect(() => {
         shownListsRef.current = shownLists;
     });
 
-    // Right after the card moves to another list the measured rects are stale and
-    // would bounce it back: keep it over itself until the next frame.
     const justMovedToListRef = useRef(false);
     useEffect(() => {
         if (!justMovedToListRef.current) return;
@@ -153,7 +133,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
         () =>
             ({ active, collisionRect, droppableRects, pointerCoordinates }) => {
                 if (isListId(shownLists, active.id)) {
-                    // A list goes by the center of the dragged column, by x only.
                     const id = pickListDropId(shownLists, droppableRects, {
                         x: collisionRect.left + collisionRect.width / 2,
                         y: collisionRect.top + collisionRect.height / 2,
@@ -193,7 +172,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
                         over ? String(over.id) : null,
                         event.code,
                     );
-                    // Sideways only: columns differ in height.
                     return (
                         point && {
                             x: point.x - collisionRect.width / 2,
@@ -262,7 +240,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     ) => moveCardInBoard({ board, lists: from }, cardId, listId, index).lists;
 
     function handleDragStart({ active }: DragStartEvent) {
-        // A refetch in flight must not land in the middle of the drag.
         void queryClient.cancelQueries({
             queryKey: boardQueryOptions(board.id).queryKey,
         });
@@ -278,10 +255,8 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     }
 
     function handleDragOver({ over }: DragOverEvent) {
-        // A list is shown at its target by the sortable row itself.
         if (!drag || drag.type === DragType.List) return;
         if (!over) {
-            // Outside the lists: the placeholder goes back where the card was.
             if (drag.lists !== drag.startLists) {
                 setDrag({ ...drag, lists: drag.startLists });
             }
@@ -301,8 +276,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
             (c) => c.id === drag.activeId,
         );
         if (target.listId === from.list.id) {
-            // Over a card of its own list the sortable list shows the move itself;
-            // over the list (below the last card) move the card to the end.
             if (over.id !== from.list.id || target.index === fromIndex) return;
         } else {
             justMovedToListRef.current = true;
@@ -331,7 +304,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
             String(over.id),
         );
         if (!target) return;
-        // Neighbors from the lists the user saw: the cache may have changed meanwhile.
         const neighbors = cardMoveNeighbors(
             { board, lists: drag.lists },
             drag.activeId,
@@ -378,7 +350,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
 
     return (
         <DndContext
-            // A fixed id keeps aria-describedby the same on the server and the client.
             id="card-dnd"
             sensors={sensors}
             collisionDetection={collisionDetection}
@@ -420,7 +391,6 @@ export function BoardDnd({ board, lists, children }: BoardDndProps) {
     );
 }
 
-// The card under the pointer while dragging: its face without the link and menu.
 function CardPreview({ card, tilted }: { card: Card; tilted: boolean }) {
     return (
         <div
@@ -434,8 +404,6 @@ function CardPreview({ card, tilted }: { card: Card; tilted: boolean }) {
     );
 }
 
-// The column under the pointer while dragging: a static copy with all its cards,
-// without the menu, AddCard and links.
 function ListPreview({
     list,
     tilted,

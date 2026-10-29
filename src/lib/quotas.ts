@@ -1,15 +1,9 @@
-// Content quotas: checked on the server before every insert (boards-repo), shown to
-// the user by the create mutations.
-
 export enum QuotaKind {
     Boards = 'boards',
     Lists = 'lists',
     Cards = 'cards',
-    /** Labels of one board. */
     Labels = 'labels',
-    /** Labels on one card. */
     CardLabels = 'card-labels',
-    /** Items of one checklist. */
     ChecklistItems = 'checklist-items',
 }
 
@@ -31,7 +25,6 @@ export const USER_QUOTAS: Quotas = {
     [QuotaKind.ChecklistItems]: MAX_ITEMS_PER_CHECKLIST,
 };
 
-// Guest sandbox (#84): smaller limits, a lifetime and a cap on live guests.
 export const GUEST_TTL_DAYS = 7;
 export const MAX_ACTIVE_GUESTS = 100;
 
@@ -44,13 +37,12 @@ export const GUEST_QUOTAS: Quotas = {
     [QuotaKind.ChecklistItems]: 20,
 };
 
-/** Limits for the session user: picked on the server, never sent by the client. */
 export function quotasFor(user: { isAnonymous: boolean }): Quotas {
     return user.isAnonymous ? GUEST_QUOTAS : USER_QUOTAS;
 }
 
-// A server fn error reaches the client as `new Error(message)` (the rest is
-// dropped), so the kind and the limit travel in the message.
+// Only `message` survives server fn serialization: the kind and the limit
+// travel in it.
 const PREFIX = 'quota-exceeded';
 
 export class QuotaExceededError extends Error {
@@ -82,24 +74,18 @@ const QUOTA_LIMIT_TEXT: Record<QuotaKind, (limit: number) => string> = {
         `the limit of ${n} items in this checklist`,
 };
 
-/** Toast text for a failed create: the quota reason, or `fallback` for any other error. */
 export function createErrorMessage(error: unknown, fallback: string) {
     const quota = parseQuotaError(error);
     if (!quota) return fallback;
     return `You've reached ${QUOTA_LIMIT_TEXT[quota.kind](quota.limit)}.`;
 }
 
-/** Toast text for a failed Undo (restore of a deleted list or card). */
 export function restoreErrorMessage(error: unknown, fallback: string) {
     const quota = parseQuotaError(error);
     if (!quota) return fallback;
     return `Can't restore: you've reached ${QUOTA_LIMIT_TEXT[quota.kind](quota.limit)}.`;
 }
 
-/**
- * Toast text for a refused card or list move: only a full target (a list for a
- * card, a board for a list) has its own text.
- */
 export function moveErrorMessage(error: unknown, fallback: string) {
     const quota = parseQuotaError(error);
     if (quota?.kind === QuotaKind.Cards) {

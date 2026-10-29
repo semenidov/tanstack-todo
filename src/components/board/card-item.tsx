@@ -28,7 +28,6 @@ import { usePrefersReducedMotion } from '#/lib/use-prefers-reduced-motion';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon, LoaderCircleIcon } from 'lucide-react';
 
-// A move confirmed faster than this shows no spinner.
 const SYNC_SPINNER_DELAY_MS = 300;
 
 interface CardItemProps {
@@ -43,8 +42,8 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
     const isSyncing = useIsCardSyncing(boardId, card.id);
     const showSpinner = useDelayedFlag(isSyncing, SYNC_SPINNER_DELAY_MS);
     const [isMoveOpen, setIsMoveOpen] = useState(false);
-    // The popover opens once the menu has closed: opening it from onSelect would
-    // let the menu's focus return to its trigger and dismiss the popover at once.
+    // Open after the menu closes: from onSelect the menu returns focus to its
+    // trigger and dismisses the popover.
     const openMoveOnMenuCloseRef = useRef(false);
     const reducedMotion = usePrefersReducedMotion();
     const {
@@ -57,7 +56,6 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
         isDragging,
     } = useSortable({
         id: card.id,
-        // Neighbors jump instead of sliding apart.
         transition: reducedMotion ? null : undefined,
     });
 
@@ -73,7 +71,6 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
                     aria-busy={showSpinner || undefined}
                     className={cn(
                         'group/card relative rounded-md border bg-background shadow-xs',
-                        // The placeholder where the dragged card will land.
                         isDragging &&
                             'border-dashed bg-muted shadow-none *:invisible',
                     )}
@@ -81,10 +78,6 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
                     <CardFace
                         card={card}
                         title={
-                            // The link is the drag handle: Space picks the card up, Enter opens it.
-                            // Its ::after covers the whole card, so a press anywhere drags or opens it;
-                            // the menu (and later the labels) sit above it. No native link drag,
-                            // no iOS link preview or text selection on long press.
                             <Link
                                 to="/b/$boardId/c/$cardId"
                                 params={{ boardId, cardId: card.id }}
@@ -153,7 +146,6 @@ export function CardItem({ boardId, card, lists }: CardItemProps) {
                 align="start"
                 aria-label="Move card"
                 onCloseAutoFocus={(e) => {
-                    // No trigger to return to: focus the card, wherever it is now.
                     e.preventDefault();
                     document.getElementById(cardLinkId(card.id))?.focus();
                 }}

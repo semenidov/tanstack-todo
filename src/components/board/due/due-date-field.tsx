@@ -26,9 +26,6 @@ interface DueDatePopoverProps extends Omit<
     onOpenChange: (open: boolean) => void;
 }
 
-// Rendered by the card window apart from the "Due date" button and the chip,
-// which only toggle it: picking the first day swaps them, the popover stays
-// open and in place (#133).
 export function DueDatePopover({
     due,
     onChange,
@@ -47,7 +44,6 @@ export function DueDatePopover({
     );
 }
 
-/** The "Due date" button in the row of empty blocks of the card window. */
 export function AddDueDateButton({
     buttonProps,
 }: {
@@ -61,7 +57,6 @@ export function AddDueDateButton({
     );
 }
 
-/** The due date block of the card window: a chip opening the picker and ✕. */
 export function DueDateField({
     due,
     onChange,
