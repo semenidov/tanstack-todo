@@ -9,7 +9,6 @@ export interface MoveCardInput {
     nextCardId: string | null;
 }
 
-/** Import only inside the server fn handler, so the client build drops it. */
 export async function moveCardOrThrow(user: SessionUser, data: MoveCardInput) {
     const row = await repo.moveCard(
         user.id,

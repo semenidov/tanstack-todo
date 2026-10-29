@@ -214,6 +214,7 @@ export function deleteBoard(userId: string, boardId: string) {
         .returning();
 }
 
+// Relational query extras take SQL, and correlated subqueries have no builder form.
 function checklistItemCount(cardId: AnyColumn, done?: true) {
     const items = db
         .select({ n: count() })

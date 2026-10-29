@@ -40,7 +40,6 @@ export const lists = pgTable(
             .notNull()
             .references(() => boards.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
-        // COLLATE "C" is set in the migration: drizzle has no column collation.
         position: text('position').notNull(),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
         updatedAt: timestamp({ withTimezone: true })
@@ -61,7 +60,6 @@ export const cards = pgTable(
             .references(() => lists.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
         description: text('description'),
-        // COLLATE "C" is set in the migration: drizzle has no column collation.
         position: text('position').notNull(),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
         updatedAt: timestamp({ withTimezone: true })
@@ -77,6 +75,7 @@ export const cards = pgTable(
         index('cards_list_id_position_idx').on(t.listId, t.position),
         check(
             'cards_due_check',
+            // sql: Drizzle has no builder for check expressions.
             sql`${t.dueDate} is null or ${t.dueAt} is null`,
         ),
     ],
@@ -96,6 +95,7 @@ export const labels = pgTable(
     (t) => [
         index('labels_board_id_created_at_idx').on(t.boardId, t.createdAt),
         uniqueIndex('labels_board_id_title_unique')
+            // sql: Drizzle has no builder for index expressions.
             .on(t.boardId, sql`lower(${t.title})`)
             .where(sql`${t.title} is not null`),
     ],

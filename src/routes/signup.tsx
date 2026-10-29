@@ -38,7 +38,6 @@ function SignupPage() {
             return;
         }
         queryClient.clear();
-        // Let beforeLoad redirect: a separate navigate('/') races it.
         await router.invalidate();
     }
 

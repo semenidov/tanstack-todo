@@ -9,7 +9,6 @@ export interface MoveListInput {
     nextListId: string | null;
 }
 
-/** Import only inside the server fn handler, so the client build drops it. */
 export async function moveListOrThrow(user: SessionUser, data: MoveListInput) {
     const row = await repo.moveList(
         user.id,

@@ -7,7 +7,6 @@ export const cardMutationOptions = (cardId: string) => ({
     scope: { id: `card-${cardId}` },
 });
 
-// Refetch only after the last queued request, or the card flickers back.
 export function invalidateAfterLastCardMutation(
     queryClient: QueryClient,
     cardId: string,

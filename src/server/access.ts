@@ -50,5 +50,6 @@ export async function findOwnedCard(userId: string, cardId: string) {
                 eq(boards.ownerId, userId),
             ),
         );
+    // .at(0): destructuring [row] would be typed as always present.
     return rows.at(0);
 }
