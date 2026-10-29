@@ -1,0 +1,9 @@
+name = "implementer"
+description = "Implements an assigned task or fix, verifies the result and reports back to the orchestrator."
+developer_instructions = "Read and follow Agents/implementer.md from the repository root before starting the task. Use gh in the shell for GitHub operations."
+
+[features]
+shell_tool = true
+apps = false
+plugins = false
+memories = false
