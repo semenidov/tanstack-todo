@@ -472,3 +472,34 @@ test('drags a list with the keyboard: Space picks it up instead of renaming', as
         .poll(() => listTitles(page))
         .toEqual(['Done', 'Later', 'To do']);
 });
+
+test('undo list deletion preserves scroll and Add list still scrolls', async ({
+    page,
+}) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    for (let i = 3; i <= 7; i++) {
+        await addList(page, `List ${i}`);
+        await expect(page.getByLabel('New list title')).toHaveValue('');
+        await page.getByLabel('New list title').press('Escape');
+    }
+    const row = page.locator('.overflow-x-auto');
+    await row.evaluate((el) => {
+        el.scrollLeft = 0;
+    });
+    await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBe(0);
+    await listColumn(page, 'To do')
+        .getByRole('button', { name: 'List actions' })
+        .click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(listColumn(page, 'To do')).toBeVisible();
+    // Allow an unwanted smooth scroll to finish before measuring.
+    await page.waitForTimeout(700);
+    expect(await row.evaluate((el) => el.scrollLeft)).toBe(0);
+    await addList(page, 'Last list');
+    await expect(page.getByLabel('New list title')).toHaveValue('');
+    await expect(page.getByLabel('New list title')).toBeFocused();
+    await expect
+        .poll(() => row.evaluate((el) => el.scrollLeft))
+        .toBeGreaterThan(1000);
+});

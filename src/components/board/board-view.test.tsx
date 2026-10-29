@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardView } from '#/components/board/board-view';
 import type { BoardData, ListWithCards } from '#/lib/boards-query';
@@ -37,7 +37,9 @@ vi.mock('#/components/board/board-dnd', () => ({
     }) => children({ lists, isDragging: false }),
 }));
 vi.mock('#/components/board/add-list', () => ({
-    AddList: () => <div data-testid="add-list" />,
+    AddList: ({ onCreated }: { onCreated: (id: string) => void }) => (
+        <button onClick={() => onCreated('l3')}>Create list</button>
+    ),
 }));
 
 const board = { id: 'b1', title: 'Board' } as BoardData['board'];
@@ -76,17 +78,30 @@ describe('BoardView scroll to new list', () => {
             <BoardView board={board} lists={makeLists(2)} />,
         );
 
+        fireEvent.click(screen.getByText('Create list'));
         rerender(<BoardView board={board} lists={makeLists(3)} />);
 
         expect(scrollIntoView).toHaveBeenCalledTimes(1);
         expect(scrollIntoView.mock.contexts[0]).toBe(
             screen.getByTestId('list-l3'),
         );
+        rerender(<BoardView board={board} lists={makeLists(4)} />);
+        expect(scrollIntoView).toHaveBeenCalledTimes(1);
         expect(scrollIntoView).toHaveBeenCalledWith({
             behavior: 'smooth',
             inline: 'center',
             block: 'nearest',
         });
+    });
+
+    it('does not scroll on restore, rollback or refetch growth', () => {
+        const { rerender } = render(
+            <BoardView board={board} lists={makeLists(7)} />,
+        );
+        rerender(<BoardView board={board} lists={makeLists(6)} />);
+        rerender(<BoardView board={board} lists={makeLists(7)} />);
+        rerender(<BoardView board={board} lists={makeLists(8)} />);
+        expect(scrollIntoView).not.toHaveBeenCalled();
     });
 
     it('does not scroll when a list is removed', () => {
