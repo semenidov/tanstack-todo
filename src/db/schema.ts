@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { relations, sql } from 'drizzle-orm';
 import {
     boolean,
@@ -23,6 +24,7 @@ export const boards = pgTable(
             .notNull()
             .references(() => user.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
+        inviteToken: text('invite_token').unique(),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
         updatedAt: timestamp({ withTimezone: true })
             .defaultNow()
@@ -30,6 +32,25 @@ export const boards = pgTable(
             .$onUpdate(() => new Date()),
     },
     (t) => [index('boards_owner_id_idx').on(t.ownerId)],
+);
+
+export const boardMembers = pgTable(
+    'board_members',
+    {
+        boardId: uuid('board_id')
+            .notNull()
+            .references(() => boards.id, { onDelete: 'cascade' }),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        role: text('role', { enum: [Role.Editor] })
+            .notNull()
+            .default(Role.Editor),
+    },
+    (t) => [
+        uniqueIndex('board_members_board_user_unique').on(t.boardId, t.userId),
+        index('board_members_user_id_idx').on(t.userId),
+    ],
 );
 
 export const lists = pgTable(
@@ -151,6 +172,7 @@ export const checklistItems = pgTable(
 export const boardsRelations = relations(boards, ({ many }) => ({
     lists: many(lists),
     labels: many(labels),
+    members: many(boardMembers),
 }));
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -202,4 +224,12 @@ export const checklistItemsRelations = relations(checklistItems, ({ one }) => ({
         fields: [checklistItems.checklistId],
         references: [checklists.id],
     }),
+}));
+
+export const boardMembersRelations = relations(boardMembers, ({ one }) => ({
+    board: one(boards, {
+        fields: [boardMembers.boardId],
+        references: [boards.id],
+    }),
+    user: one(user, { fields: [boardMembers.userId], references: [user.id] }),
 }));
