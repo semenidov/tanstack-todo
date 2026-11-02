@@ -42,9 +42,13 @@ export function MoveListForm({
     const isOtherBoard = boardId !== board.id;
 
     const boardsQuery = useQuery(boardsListQueryOptions);
-    const boards = boardsQuery.data?.filter((item) =>
-        can(item.myRole, Action.ListMoveToBoard),
-    ) ?? [board];
+    const source = boardsQuery.data?.find((item) => item.id === board.id);
+    const canMoveToBoard = source && can(source.myRole, Action.ListMoveToBoard);
+    const boards = canMoveToBoard
+        ? (boardsQuery.data?.filter((item) =>
+              can(item.myRole, Action.ListMoveToBoard),
+          ) ?? [board])
+        : [board];
     const target = boards.find((b) => b.id === boardId) ?? board;
 
     const targetQuery = useQuery({

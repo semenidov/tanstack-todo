@@ -1,3 +1,4 @@
+import { isBoardAccessDenied } from '#/lib/board-access';
 import { BoardSkeleton } from '#/components/board/board-skeleton';
 import { BoardView } from '#/components/board/board-view';
 import { MessageScreen } from '#/components/message-screen';
@@ -81,7 +82,8 @@ function BoardNotFound() {
 
 function BoardPage() {
     const { boardId } = Route.useParams();
-    const { data } = useSuspenseQuery(boardQueryOptions(boardId));
+    const { data, error } = useSuspenseQuery(boardQueryOptions(boardId));
+    if (isBoardAccessDenied(error)) return <BoardNotFound />;
 
     return (
         <>

@@ -1,5 +1,11 @@
+import {
+    authorizeBoard,
+    authorizeList,
+    authorizeCard,
+    requireAffected,
+    BOARD_ACCESS_DENIED,
+} from '#/server/authorize';
 import { Action } from '#/lib/permissions';
-import { authorizeBoard, BOARD_ACCESS_DENIED } from '#/server/authorize';
 import { requireUser } from '#/lib/auth-server';
 import * as writes from '#/server/board-writes';
 import * as repo from '#/server/boards-repo';
@@ -36,14 +42,33 @@ export const renameBoardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ boardId: z.uuid(), title: titleSchema }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.renameBoard(userId, data.boardId, data.title);
+        requireAffected(
+            await repo.renameBoard(
+                await authorizeBoard(
+                    { id: userId },
+                    data.boardId,
+                    Action.BoardRename,
+                ),
+                data.boardId,
+                data.title,
+            ),
+        );
     });
 
 export const deleteBoardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ boardId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteBoard(userId, data.boardId);
+        requireAffected(
+            await repo.deleteBoard(
+                await authorizeBoard(
+                    { id: userId },
+                    data.boardId,
+                    Action.BoardDelete,
+                ),
+                data.boardId,
+            ),
+        );
     });
 
 export const getBoardServer = createServerFn({ method: 'GET' })
@@ -70,14 +95,33 @@ export const renameListServer = createServerFn({ method: 'POST' })
     .validator(z.object({ listId: z.uuid(), title: titleSchema }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.renameList(userId, data.listId, data.title);
+        requireAffected(
+            await repo.renameList(
+                await authorizeList(
+                    { id: userId },
+                    data.listId,
+                    Action.ContentEdit,
+                ),
+                data.listId,
+                data.title,
+            ),
+        );
     });
 
 export const deleteListServer = createServerFn({ method: 'POST' })
     .validator(z.object({ listId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteList(userId, data.listId);
+        requireAffected(
+            await repo.deleteList(
+                await authorizeList(
+                    { id: userId },
+                    data.listId,
+                    Action.ContentEdit,
+                ),
+                data.listId,
+            ),
+        );
     });
 
 export const restoreListServer = createServerFn({ method: 'POST' })
@@ -104,16 +148,28 @@ export const updateCardServer = createServerFn({ method: 'POST' })
     )
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.updateCard(userId, data.cardId, {
-            title: data.title,
-            description: data.description,
-            completed: data.completed,
-            due: data.due && {
-                dueDate: data.due.dueDate,
-                dueAt:
-                    data.due.dueAt === null ? null : new Date(data.due.dueAt),
-            },
-        });
+        requireAffected(
+            await repo.updateCard(
+                await authorizeCard(
+                    { id: userId },
+                    data.cardId,
+                    Action.ContentEdit,
+                ),
+                data.cardId,
+                {
+                    title: data.title,
+                    description: data.description,
+                    completed: data.completed,
+                    due: data.due && {
+                        dueDate: data.due.dueDate,
+                        dueAt:
+                            data.due.dueAt === null
+                                ? null
+                                : new Date(data.due.dueAt),
+                    },
+                },
+            ),
+        );
     });
 
 export const moveCardServer = createServerFn({ method: 'POST' })
@@ -142,7 +198,16 @@ export const deleteCardServer = createServerFn({ method: 'POST' })
     .validator(z.object({ cardId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteCard(userId, data.cardId);
+        requireAffected(
+            await repo.deleteCard(
+                await authorizeCard(
+                    { id: userId },
+                    data.cardId,
+                    Action.ContentEdit,
+                ),
+                data.cardId,
+            ),
+        );
     });
 
 export const restoreCardServer = createServerFn({ method: 'POST' })

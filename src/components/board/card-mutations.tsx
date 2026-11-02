@@ -53,7 +53,7 @@ export function useAddCard(boardId: string, listId: string) {
         ...boardOrderMutationOptions(boardId),
         mutationFn: async (title: string) => {
             const card = await addCardServer({ data: { listId, title } });
-            if (!card) throw new Error('Card was not created');
+
             return card;
         },
         onSuccess: async (card) => {

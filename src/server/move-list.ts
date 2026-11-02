@@ -1,3 +1,9 @@
+import {
+    authorizeBoard,
+    authorizeList,
+    requireAffected,
+} from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
@@ -10,13 +16,26 @@ export interface MoveListInput {
 }
 
 export async function moveListOrThrow(user: SessionUser, data: MoveListInput) {
-    const row = await repo.moveList(
-        user.id,
-        data.listId,
-        data.toBoardId,
-        data.prevListId,
-        data.nextListId,
-        quotasFor(user),
+    let source = await authorizeList(user, data.listId, Action.ContentEdit);
+    const target =
+        data.toBoardId === source.boardId
+            ? source
+            : await authorizeBoard(
+                  user,
+                  data.toBoardId,
+                  Action.ListMoveToBoard,
+              );
+    if (data.toBoardId !== source.boardId)
+        source = await authorizeList(user, data.listId, Action.ListMoveToBoard);
+    requireAffected(
+        await repo.moveList(
+            source,
+            data.listId,
+            target,
+            data.toBoardId,
+            data.prevListId,
+            data.nextListId,
+            quotasFor(user),
+        ),
     );
-    if (!row) throw new Error('List was not moved');
 }

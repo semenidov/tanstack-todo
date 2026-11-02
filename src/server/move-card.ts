@@ -1,3 +1,5 @@
+import { authorizeCard, requireAffected } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
@@ -10,13 +12,14 @@ export interface MoveCardInput {
 }
 
 export async function moveCardOrThrow(user: SessionUser, data: MoveCardInput) {
-    const row = await repo.moveCard(
-        user.id,
-        data.cardId,
-        data.toListId,
-        data.prevCardId,
-        data.nextCardId,
-        quotasFor(user),
+    requireAffected(
+        await repo.moveCard(
+            await authorizeCard(user, data.cardId, Action.ContentEdit),
+            data.cardId,
+            data.toListId,
+            data.prevCardId,
+            data.nextCardId,
+            quotasFor(user),
+        ),
     );
-    if (!row) throw new Error('Card was not moved');
 }

@@ -1,3 +1,11 @@
+import {
+    authorizeBoard,
+    authorizeList,
+    authorizeCard,
+    authorizeChecklist,
+    requireAffected,
+} from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
@@ -26,47 +34,97 @@ export async function createBoardAs(user: SessionUser, title: string) {
     }
 }
 
-export function addListAs(user: SessionUser, boardId: string, title: string) {
-    return repo.addList(user.id, boardId, title, quotasFor(user));
+export async function addListAs(
+    user: SessionUser,
+    boardId: string,
+    title: string,
+) {
+    return requireAffected(
+        await repo.addList(
+            await authorizeBoard(user, boardId, Action.ContentEdit),
+            boardId,
+            title,
+            quotasFor(user),
+        ),
+    );
 }
 
-export function restoreListAs(user: SessionUser, listId: string) {
-    return repo.restoreList(user.id, listId, quotasFor(user));
+export async function restoreListAs(user: SessionUser, listId: string) {
+    return requireAffected(
+        await repo.restoreList(
+            await authorizeList(user, listId, Action.ContentEdit, true),
+            listId,
+            quotasFor(user),
+        ),
+    );
 }
 
-export function addCardAs(user: SessionUser, listId: string, title: string) {
-    return repo.addCard(user.id, listId, title, quotasFor(user));
+export async function addCardAs(
+    user: SessionUser,
+    listId: string,
+    title: string,
+) {
+    return requireAffected(
+        await repo.addCard(
+            await authorizeList(user, listId, Action.ContentEdit),
+            listId,
+            title,
+            quotasFor(user),
+        ),
+    );
 }
 
-export function restoreCardAs(user: SessionUser, cardId: string) {
-    return repo.restoreCard(user.id, cardId, quotasFor(user));
+export async function restoreCardAs(user: SessionUser, cardId: string) {
+    return requireAffected(
+        await repo.restoreCard(
+            await authorizeCard(user, cardId, Action.ContentEdit, true),
+            cardId,
+            quotasFor(user),
+        ),
+    );
 }
 
-export function createLabelAs(
+export async function createLabelAs(
     user: SessionUser,
     boardId: string,
     input: LabelInput,
 ) {
-    return labelsRepo.createLabel(user.id, boardId, input, quotasFor(user));
+    return requireAffected(
+        await labelsRepo.createLabel(
+            await authorizeBoard(user, boardId, Action.ContentEdit),
+            boardId,
+            input,
+            quotasFor(user),
+        ),
+    );
 }
 
-export function addCardLabelAs(
+export async function addCardLabelAs(
     user: SessionUser,
     cardId: string,
     labelId: string,
 ) {
-    return labelsRepo.addCardLabel(user.id, cardId, labelId, quotasFor(user));
+    return requireAffected(
+        await labelsRepo.addCardLabel(
+            await authorizeCard(user, cardId, Action.ContentEdit),
+            cardId,
+            labelId,
+            quotasFor(user),
+        ),
+    );
 }
 
-export function addChecklistItemAs(
+export async function addChecklistItemAs(
     user: SessionUser,
     checklistId: string,
     title: string,
 ) {
-    return checklistsRepo.addChecklistItem(
-        user.id,
-        checklistId,
-        title,
-        quotasFor(user),
+    return requireAffected(
+        await checklistsRepo.addChecklistItem(
+            await authorizeChecklist(user, checklistId, Action.ContentEdit),
+            checklistId,
+            title,
+            quotasFor(user),
+        ),
     );
 }

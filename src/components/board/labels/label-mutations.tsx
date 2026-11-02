@@ -47,6 +47,9 @@ export function useCreateLabel(boardId: string) {
             );
         },
         onError: (error) => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
             toast.error(
                 labelErrorMessage(
                     error,
@@ -73,6 +76,9 @@ export function useUpdateLabel(boardId: string) {
             );
         },
         onError: (error) => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
             toast.error(
                 labelErrorMessage(
                     error,
@@ -101,6 +107,9 @@ export function useDeleteLabel(boardId: string) {
             );
         },
         onError: () => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
             toast.error("Couldn't delete the label. Please try again.");
         },
     });
@@ -126,6 +135,9 @@ export function useToggleCardLabel(boardId: string, cardId: string) {
             );
         },
         onError: (error) => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
             toast.error(
                 createErrorMessage(
                     error,

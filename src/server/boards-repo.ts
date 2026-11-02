@@ -18,8 +18,8 @@ import {
 } from '#/db/schema';
 import {
     accessibleBoardIds,
-    ownedBoardIds,
-    ownedListIds,
+    scopedBoardIds,
+    accessibleListIds,
 } from '#/server/access';
 import {
     and,
@@ -213,18 +213,32 @@ export async function seedDemoBoard(
     return board;
 }
 
-export function renameBoard(userId: string, boardId: string, title: string) {
+export function renameBoard(
+    access: BoardAccess,
+    boardId: string,
+    title: string,
+) {
     return db
         .update(boards)
         .set({ title })
-        .where(and(eq(boards.id, boardId), eq(boards.ownerId, userId)))
+        .where(
+            and(
+                eq(boards.id, boardId),
+                inArray(boards.id, scopedBoardIds(access)),
+            ),
+        )
         .returning();
 }
 
-export function deleteBoard(userId: string, boardId: string) {
+export function deleteBoard(access: BoardAccess, boardId: string) {
     return db
         .delete(boards)
-        .where(and(eq(boards.id, boardId), eq(boards.ownerId, userId)))
+        .where(
+            and(
+                eq(boards.id, boardId),
+                inArray(boards.id, scopedBoardIds(access)),
+            ),
+        )
         .returning();
 }
 
@@ -300,13 +314,14 @@ async function lastListPositionKey(boardId: string) {
 }
 
 export async function addList(
-    userId: string,
+    access: BoardAccess,
     boardId: string,
     title: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
     const board = await db.query.boards.findFirst({
-        where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
+        where: (b) =>
+            and(eq(b.id, boardId), inArray(b.id, scopedBoardIds(access))),
     });
     if (!board) return null;
     await assertBelowQuota(QuotaKind.Lists, quotas, () =>
@@ -316,33 +331,53 @@ export async function addList(
     const position = await lastListPositionKey(boardId);
     const [row] = await db
         .insert(lists)
-        .values({ boardId, title, position })
+        .select(
+            db
+                .select({
+                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    boardId: boards.id,
+                    title: sql<string>`${title}`.as('title'),
+                    position: sql<string>`${position}`.as('position'),
+                    createdAt: sql<Date>`now()`.as('created_at'),
+                    updatedAt: sql<Date>`now()`.as('updated_at'),
+                    deletedAt: sql<Date | null>`null::timestamptz`.as(
+                        'deleted_at',
+                    ),
+                })
+                .from(boards)
+                .where(
+                    and(
+                        eq(boards.id, boardId),
+                        inArray(boards.id, scopedBoardIds(access)),
+                    ),
+                ),
+        )
         .returning();
     return row;
 }
 
-export function renameList(userId: string, listId: string, title: string) {
+export function renameList(access: BoardAccess, listId: string, title: string) {
     return db
         .update(lists)
         .set({ title })
         .where(
             and(
                 eq(lists.id, listId),
-                inArray(lists.boardId, ownedBoardIds(userId)),
+                inArray(lists.boardId, scopedBoardIds(access)),
                 isNull(lists.deletedAt),
             ),
         )
         .returning();
 }
 
-export function deleteList(userId: string, listId: string) {
+export function deleteList(access: BoardAccess, listId: string) {
     return db
         .update(lists)
         .set({ deletedAt: new Date() })
         .where(
             and(
                 eq(lists.id, listId),
-                inArray(lists.boardId, ownedBoardIds(userId)),
+                inArray(lists.boardId, scopedBoardIds(access)),
                 isNull(lists.deletedAt),
             ),
         )
@@ -350,15 +385,16 @@ export function deleteList(userId: string, listId: string) {
 }
 
 export async function restoreList(
-    userId: string,
+    access: BoardAccess,
     listId: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
     const list = await db.query.lists.findFirst({
-        where: (l) => eq(l.id, listId),
+        where: (l) =>
+            and(eq(l.id, listId), inArray(l.boardId, scopedBoardIds(access))),
         with: { board: true },
     });
-    if (list?.deletedAt && list.board.ownerId === userId) {
+    if (list?.deletedAt && list.boardId === access.boardId) {
         await assertBelowQuota(QuotaKind.Lists, quotas, () =>
             countLiveLists(list.boardId),
         );
@@ -369,7 +405,7 @@ export async function restoreList(
         .where(
             and(
                 eq(lists.id, listId),
-                inArray(lists.boardId, ownedBoardIds(userId)),
+                inArray(lists.boardId, scopedBoardIds(access)),
             ),
         )
         .returning();
@@ -394,7 +430,7 @@ async function readListNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-async function renumberLists(boardId: string) {
+async function renumberLists(access: BoardAccess, boardId: string) {
     const rows = await db
         .select({ id: lists.id })
         .from(lists)
@@ -405,13 +441,19 @@ async function renumberLists(boardId: string) {
         await db
             .update(lists)
             .set({ position: keys[i] })
-            .where(eq(lists.id, row.id));
+            .where(
+                and(
+                    eq(lists.id, row.id),
+                    inArray(lists.boardId, scopedBoardIds(access)),
+                ),
+            );
     }
 }
 
 export async function moveList(
-    userId: string,
+    access: BoardAccess,
     listId: string,
+    targetAccess: BoardAccess,
     toBoardId: string,
     prevListId: string | null,
     nextListId: string | null,
@@ -421,13 +463,22 @@ export async function moveList(
     if (prevListId !== null && prevListId === nextListId) return null;
 
     const list = await db.query.lists.findFirst({
-        where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
+        where: (l) =>
+            and(
+                eq(l.id, listId),
+                inArray(l.boardId, scopedBoardIds(access)),
+                isNull(l.deletedAt),
+            ),
         with: { board: true },
     });
-    if (!list || list.board.ownerId !== userId) return null;
+    if (!list) return null;
 
     const targetBoard = await db.query.boards.findFirst({
-        where: (b) => and(eq(b.id, toBoardId), eq(b.ownerId, userId)),
+        where: (b) =>
+            and(
+                eq(b.id, toBoardId),
+                inArray(b.id, scopedBoardIds(targetAccess)),
+            ),
     });
     if (!targetBoard) return null;
     if (toBoardId !== list.boardId) {
@@ -447,7 +498,7 @@ export async function moveList(
         positionOf(neighbors, nextListId),
     );
     if (position === undefined) {
-        await renumberLists(toBoardId);
+        await renumberLists(targetAccess, toBoardId);
         neighbors = await readListNeighbors(toBoardId, neighborIds);
         if (!neighbors) return null;
         position = keyBetween(
@@ -460,7 +511,14 @@ export async function moveList(
     const rows = await db
         .update(lists)
         .set({ boardId: toBoardId, position })
-        .where(and(eq(lists.id, listId), isNull(lists.deletedAt)))
+        .where(
+            and(
+                eq(lists.id, listId),
+                inArray(lists.boardId, scopedBoardIds(access)),
+                inArray(sql`${toBoardId}`, scopedBoardIds(targetAccess)),
+                isNull(lists.deletedAt),
+            ),
+        )
         .returning();
     const row = rows.at(0) ?? null;
     if (row && toBoardId !== list.boardId) {
@@ -490,16 +548,21 @@ async function firstPositionKey(listId: string) {
 }
 
 export async function addCard(
-    userId: string,
+    access: BoardAccess,
     listId: string,
     title: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
     const list = await db.query.lists.findFirst({
-        where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
+        where: (l) =>
+            and(
+                eq(l.id, listId),
+                inArray(l.boardId, scopedBoardIds(access)),
+                isNull(l.deletedAt),
+            ),
         with: { board: true },
     });
-    if (!list || list.board.ownerId !== userId) return null;
+    if (!list) return null;
     await assertBelowQuota(QuotaKind.Cards, quotas, () =>
         countLiveCards(listId),
     );
@@ -507,13 +570,41 @@ export async function addCard(
     const position = await firstPositionKey(listId);
     const [row] = await db
         .insert(cards)
-        .values({ listId, title, position })
+        .select(
+            db
+                .select({
+                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    listId: lists.id,
+                    title: sql<string>`${title}`.as('title'),
+                    description: sql<string | null>`null::text`.as(
+                        'description',
+                    ),
+                    position: sql<string>`${position}`.as('position'),
+                    createdAt: sql<Date>`now()`.as('created_at'),
+                    updatedAt: sql<Date>`now()`.as('updated_at'),
+                    deletedAt: sql<Date | null>`null::timestamptz`.as(
+                        'deleted_at',
+                    ),
+                    completedAt: sql<Date | null>`null::timestamptz`.as(
+                        'completed_at',
+                    ),
+                    dueDate: sql<string | null>`null::date`.as('due_date'),
+                    dueAt: sql<Date | null>`null::timestamptz`.as('due_at'),
+                })
+                .from(lists)
+                .where(
+                    and(
+                        eq(lists.id, listId),
+                        inArray(lists.id, accessibleListIds(access)),
+                    ),
+                ),
+        )
         .returning();
     return row;
 }
 
 export function updateCard(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     data: {
         title?: string;
@@ -535,7 +626,7 @@ export function updateCard(
         .where(
             and(
                 eq(cards.id, cardId),
-                inArray(cards.listId, ownedListIds(userId)),
+                inArray(cards.listId, accessibleListIds(access)),
                 isNull(cards.deletedAt),
             ),
         )
@@ -561,7 +652,7 @@ async function readNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-async function renumberList(listId: string) {
+async function renumberList(access: BoardAccess, listId: string) {
     const rows = await db
         .select({ id: cards.id })
         .from(cards)
@@ -572,7 +663,12 @@ async function renumberList(listId: string) {
         await db
             .update(cards)
             .set({ position: keys[i] })
-            .where(eq(cards.id, row.id));
+            .where(
+                and(
+                    eq(cards.id, row.id),
+                    inArray(cards.listId, accessibleListIds(access)),
+                ),
+            );
     }
 }
 
@@ -585,7 +681,7 @@ function keyBetween(
 }
 
 export async function moveCard(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     toListId: string,
     prevCardId: string | null,
@@ -596,17 +692,27 @@ export async function moveCard(
     if (prevCardId !== null && prevCardId === nextCardId) return null;
 
     const card = await db.query.cards.findFirst({
-        where: (c) => and(eq(c.id, cardId), isNull(c.deletedAt)),
+        where: (c) =>
+            and(
+                eq(c.id, cardId),
+                inArray(c.listId, accessibleListIds(access)),
+                isNull(c.deletedAt),
+            ),
         with: { list: { with: { board: true } } },
     });
-    if (!card || card.list.deletedAt || card.list.board.ownerId !== userId)
+    if (!card || card.list.deletedAt || card.list.boardId !== access.boardId)
         return null;
 
     const targetList = await db.query.lists.findFirst({
-        where: (l) => and(eq(l.id, toListId), isNull(l.deletedAt)),
+        where: (l) =>
+            and(
+                eq(l.id, toListId),
+                inArray(l.id, accessibleListIds(access)),
+                isNull(l.deletedAt),
+            ),
         with: { board: true },
     });
-    if (!targetList || targetList.board.ownerId !== userId) return null;
+    if (!targetList || targetList.boardId !== access.boardId) return null;
     if (targetList.boardId !== card.list.boardId) return null;
     if (toListId !== card.listId) {
         await assertBelowQuota(QuotaKind.Cards, quotas, () =>
@@ -625,7 +731,7 @@ export async function moveCard(
         positionOf(neighbors, nextCardId),
     );
     if (position === undefined) {
-        await renumberList(toListId);
+        await renumberList(access, toListId);
         neighbors = await readNeighbors(toListId, neighborIds);
         if (!neighbors) return null;
         position = keyBetween(
@@ -638,19 +744,26 @@ export async function moveCard(
     const rows = await db
         .update(cards)
         .set({ listId: toListId, position })
-        .where(and(eq(cards.id, cardId), isNull(cards.deletedAt)))
+        .where(
+            and(
+                eq(cards.id, cardId),
+                inArray(cards.listId, accessibleListIds(access)),
+                inArray(sql`${toListId}`, accessibleListIds(access)),
+                isNull(cards.deletedAt),
+            ),
+        )
         .returning();
     return rows.at(0) ?? null;
 }
 
-export function deleteCard(userId: string, cardId: string) {
+export function deleteCard(access: BoardAccess, cardId: string) {
     return db
         .update(cards)
         .set({ deletedAt: new Date() })
         .where(
             and(
                 eq(cards.id, cardId),
-                inArray(cards.listId, ownedListIds(userId)),
+                inArray(cards.listId, accessibleListIds(access)),
                 isNull(cards.deletedAt),
             ),
         )
@@ -658,18 +771,19 @@ export function deleteCard(userId: string, cardId: string) {
 }
 
 export async function restoreCard(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
     const card = await db.query.cards.findFirst({
-        where: (c) => eq(c.id, cardId),
+        where: (c) =>
+            and(eq(c.id, cardId), inArray(c.listId, accessibleListIds(access))),
         with: { list: { with: { board: true } } },
     });
     if (
         card?.deletedAt &&
         !card.list.deletedAt &&
-        card.list.board.ownerId === userId
+        card.list.boardId === access.boardId
     ) {
         await assertBelowQuota(QuotaKind.Cards, quotas, () =>
             countLiveCards(card.listId),
@@ -681,7 +795,7 @@ export async function restoreCard(
         .where(
             and(
                 eq(cards.id, cardId),
-                inArray(cards.listId, ownedListIds(userId)),
+                inArray(cards.listId, accessibleListIds(access)),
             ),
         )
         .returning();

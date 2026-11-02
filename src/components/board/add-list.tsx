@@ -17,7 +17,7 @@ function useAddList(boardId: string, onCreated: (listId: string) => void) {
     return useMutation({
         mutationFn: async (title: string) => {
             const list = await addListServer({ data: { boardId, title } });
-            if (!list) throw new Error('List was not created');
+
             return list;
         },
         onSuccess: async (list) => {

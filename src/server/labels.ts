@@ -1,5 +1,10 @@
+import {
+    authorizeBoard,
+    authorizeCard,
+    authorizeLabel,
+    requireAffected,
+} from '#/server/authorize';
 import { Action } from '#/lib/permissions';
-import { authorizeBoard } from '#/server/authorize';
 import { requireUser } from '#/lib/auth-server';
 import { LabelColor } from '#/lib/label-colors';
 import { MAX_LABEL_TITLE_LENGTH, normalizeLabelTitle } from '#/lib/labels';
@@ -34,7 +39,7 @@ export const createLabelServer = createServerFn({ method: 'POST' })
             boardId,
             input,
         );
-        if (!label) throw new Error('Label was not created');
+
         return label;
     });
 
@@ -42,8 +47,18 @@ export const updateLabelServer = createServerFn({ method: 'POST' })
     .validator(labelInputSchema.extend({ labelId: z.uuid() }))
     .handler(async ({ data: { labelId, ...input } }) => {
         const { id: userId } = await requireUser();
-        const label = await repo.updateLabel(userId, labelId, input);
-        if (!label) throw new Error('Label was not saved');
+        const label = requireAffected(
+            await repo.updateLabel(
+                await authorizeLabel(
+                    { id: userId },
+                    labelId,
+                    Action.ContentEdit,
+                ),
+                labelId,
+                input,
+            ),
+        );
+
         return label;
     });
 
@@ -51,7 +66,16 @@ export const deleteLabelServer = createServerFn({ method: 'POST' })
     .validator(z.object({ labelId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteLabel(userId, data.labelId);
+        requireAffected(
+            await repo.deleteLabel(
+                await authorizeLabel(
+                    { id: userId },
+                    data.labelId,
+                    Action.ContentEdit,
+                ),
+                data.labelId,
+            ),
+        );
     });
 
 export const setCardLabelServer = createServerFn({ method: 'POST' })
@@ -65,7 +89,13 @@ export const setCardLabelServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const user = await requireUser();
         if (!data.on) {
-            await repo.removeCardLabel(user.id, data.cardId, data.labelId);
+            requireAffected(
+                await repo.removeCardLabel(
+                    await authorizeCard(user, data.cardId, Action.ContentEdit),
+                    data.cardId,
+                    data.labelId,
+                ),
+            );
             return;
         }
         const added = await writes.addCardLabelAs(

@@ -6,11 +6,11 @@ import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import {
     accessibleBoardIds,
-    findOwnedCard,
-    ownedBoardIds,
-    ownedCardIds,
+    findAccessibleCard,
+    scopedBoardIds,
+    accessibleCardIds,
 } from '#/server/access';
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 
 export interface LabelInput {
     title: string | null;
@@ -52,13 +52,16 @@ export function listLabels(access: BoardAccess) {
 }
 
 export async function createLabel(
-    userId: string,
+    access: BoardAccess,
     boardId: string,
     input: LabelInput,
     quotas: Quotas = USER_QUOTAS,
 ) {
     const board = await db.query.boards.findFirst({
-        where: and(eq(boards.id, boardId), eq(boards.ownerId, userId)),
+        where: and(
+            eq(boards.id, boardId),
+            inArray(boards.id, scopedBoardIds(access)),
+        ),
     });
     if (!board) return null;
     const [{ n }] = await db
@@ -74,14 +77,30 @@ export async function createLabel(
     const [row] = await withTitleCheck(() =>
         db
             .insert(labels)
-            .values({ boardId, ...input })
+            .select(
+                db
+                    .select({
+                        id: sql<string>`gen_random_uuid()`.as('id'),
+                        boardId: boards.id,
+                        title: sql<string | null>`${input.title}`.as('title'),
+                        color: sql<string>`${input.color}`.as('color'),
+                        createdAt: sql<Date>`now()`.as('created_at'),
+                    })
+                    .from(boards)
+                    .where(
+                        and(
+                            eq(boards.id, boardId),
+                            inArray(boards.id, scopedBoardIds(access)),
+                        ),
+                    ),
+            )
             .returning(),
     );
     return row;
 }
 
 export async function updateLabel(
-    userId: string,
+    access: BoardAccess,
     labelId: string,
     input: LabelInput,
 ) {
@@ -92,7 +111,7 @@ export async function updateLabel(
             .where(
                 and(
                     eq(labels.id, labelId),
-                    inArray(labels.boardId, ownedBoardIds(userId)),
+                    inArray(labels.boardId, scopedBoardIds(access)),
                 ),
             )
             .returning(),
@@ -100,33 +119,38 @@ export async function updateLabel(
     return rows.at(0) ?? null;
 }
 
-export async function deleteLabel(userId: string, labelId: string) {
+export async function deleteLabel(access: BoardAccess, labelId: string) {
     const rows = await db
         .delete(labels)
         .where(
             and(
                 eq(labels.id, labelId),
-                inArray(labels.boardId, ownedBoardIds(userId)),
+                inArray(labels.boardId, scopedBoardIds(access)),
             ),
         )
         .returning();
     return rows.at(0) ?? null;
 }
 
-function touchCard(cardId: string) {
+function touchCard(access: BoardAccess, cardId: string) {
     return db
         .update(cards)
         .set({ updatedAt: new Date() })
-        .where(eq(cards.id, cardId));
+        .where(
+            and(
+                eq(cards.id, cardId),
+                inArray(cards.id, accessibleCardIds(access)),
+            ),
+        );
 }
 
 export async function addCardLabel(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     labelId: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
-    const card = await findOwnedCard(userId, cardId);
+    const card = await findAccessibleCard(access, cardId);
     if (!card) return false;
     const label = await db.query.labels.findFirst({
         where: and(eq(labels.id, labelId), eq(labels.boardId, card.boardId)),
@@ -142,16 +166,43 @@ export async function addCardLabel(
             quotas[QuotaKind.CardLabels],
         );
     }
-    await db
+    const rows = await db
         .insert(cardLabels)
-        .values({ cardId, labelId })
-        .onConflictDoNothing();
-    await touchCard(cardId);
+        .select(
+            db
+                .select({
+                    cardId: cards.id,
+                    labelId: sql<string>`${labelId}::uuid`.as('labelId'),
+                })
+                .from(cards)
+                .where(
+                    and(
+                        eq(cards.id, cardId),
+                        inArray(cards.id, accessibleCardIds(access)),
+                        inArray(
+                            sql`${labelId}`,
+                            db
+                                .select({ id: labels.id })
+                                .from(labels)
+                                .where(
+                                    inArray(
+                                        labels.boardId,
+                                        scopedBoardIds(access),
+                                    ),
+                                ),
+                        ),
+                    ),
+                ),
+        )
+        .onConflictDoNothing()
+        .returning();
+    if (rows.length === 0) return false;
+    await touchCard(access, cardId);
     return true;
 }
 
 export async function removeCardLabel(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     labelId: string,
 ) {
@@ -161,11 +212,11 @@ export async function removeCardLabel(
             and(
                 eq(cardLabels.cardId, cardId),
                 eq(cardLabels.labelId, labelId),
-                inArray(cardLabels.cardId, ownedCardIds(userId)),
+                inArray(cardLabels.cardId, accessibleCardIds(access)),
             ),
         )
         .returning();
     if (rows.length === 0) return false;
-    await touchCard(cardId);
+    await touchCard(access, cardId);
     return true;
 }
