@@ -1,3 +1,5 @@
+import { authorizeBoard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
 import { cards, lists } from '#/db/schema';
@@ -33,7 +35,9 @@ async function seedLists(userId: string, keys: Array<string>) {
 
 /** List ids of the board in getBoard order. */
 async function listOrder(userId: string, boardId: string) {
-    const result = await getBoard(userId, boardId);
+    const result = await getBoard(
+        await authorizeBoard({ id: userId }, boardId, Action.BoardRead),
+    );
     return result?.lists.map((l) => l.id) ?? [];
 }
 
@@ -128,7 +132,13 @@ describe('moveList', () => {
             moving,
             target.ids[1],
         ]);
-        const result = await getBoard(a.id, target.board.id);
+        const result = await getBoard(
+            await authorizeBoard(
+                { id: a.id },
+                target.board.id,
+                Action.BoardRead,
+            ),
+        );
         expect(result?.lists[1].cards.map((c) => c.id)).toEqual([
             last!.id,
             first!.id,

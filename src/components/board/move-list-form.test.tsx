@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
@@ -70,13 +71,35 @@ const current = { id: 'board-1', title: 'Current' };
 const lists = [makeList('a'), makeList('b'), makeList('c')];
 
 const boards: Array<BoardSummary> = [
-    { id: 'board-1', title: 'Current', listCount: 3, cardCount: 0 },
-    { id: 'board-2', title: 'Other', listCount: 2, cardCount: 0 },
-    { id: 'board-3', title: 'Slow', listCount: 1, cardCount: 0 },
+    {
+        myRole: Role.Owner,
+        ownerName: 'Test User',
+        id: 'board-1',
+        title: 'Current',
+        listCount: 3,
+        cardCount: 0,
+    },
+    {
+        myRole: Role.Owner,
+        ownerName: 'Test User',
+        id: 'board-2',
+        title: 'Other',
+        listCount: 2,
+        cardCount: 0,
+    },
+    {
+        myRole: Role.Owner,
+        ownerName: 'Test User',
+        id: 'board-3',
+        title: 'Slow',
+        listCount: 1,
+        cardCount: 0,
+    },
 ];
 
 const otherBoard: BoardData = {
     board: {
+        myRole: Role.Owner,
         id: 'board-2',
         ownerId: 'user-1',
         title: 'Other',

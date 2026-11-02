@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -70,6 +71,7 @@ function makeList(id: string, cardIds: Array<string>): ListWithCards {
 
 const board: BoardData = {
     board: {
+        myRole: Role.Owner,
         id: 'board-1',
         ownerId: 'user-1',
         title: 'Board',

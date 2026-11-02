@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -70,6 +71,7 @@ function makeList(
 function makeBoard(id: string, lists: Array<ListWithCards>): BoardData {
     return {
         board: {
+            myRole: Role.Owner,
             id,
             ownerId: 'user-1',
             title: id === 'board-1' ? 'Board' : 'Other board',

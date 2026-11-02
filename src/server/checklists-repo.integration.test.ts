@@ -1,3 +1,5 @@
+import { authorizeBoard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '#/db';
 import { cards, checklistItems, lists } from '#/db/schema';
@@ -57,7 +59,9 @@ async function updatedAt() {
 }
 
 async function boardCard() {
-    const board = await getBoard(ownerId, boardId);
+    const board = await getBoard(
+        await authorizeBoard({ id: ownerId }, boardId, Action.BoardRead),
+    );
     return board?.lists[0].cards[0];
 }
 

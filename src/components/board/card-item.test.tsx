@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -92,6 +93,7 @@ function makeList(id: string, cardIds: Array<string>): ListWithCards {
 const lists = [makeList('a', ['c1', 'c2'])];
 const board: BoardData = {
     board: {
+        myRole: Role.Owner,
         id: 'board-1',
         ownerId: 'user-1',
         title: 'Board',

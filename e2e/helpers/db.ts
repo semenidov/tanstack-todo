@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { user } from '../../src/db/auth-schema';
 import { db } from '../../src/db';
-import { boards, lists } from '../../src/db/schema';
+import { boardMembers, boards, lists } from '../../src/db/schema';
 
 // `sql` only for truncate: the query builder has no truncate.
 export async function resetDb() {
@@ -33,4 +33,13 @@ export async function seedBoard(email: string, title = 'My tasks') {
 export async function resetBoards() {
     // Cascades to the board's lists and cards.
     await db.execute(sql`truncate table "boards" restart identity cascade`);
+}
+
+/** Temporary membership seed until the Join flow is available. */
+export async function seedBoardMember(boardId: string, email: string) {
+    const member = await db.query.user.findFirst({
+        where: eq(user.email, email),
+    });
+    if (!member) throw new Error('E2E: member user not found');
+    await db.insert(boardMembers).values({ boardId, userId: member.id });
 }

@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -36,6 +37,7 @@ const savedList: SavedList = {
 
 const board: BoardData = {
     board: {
+        myRole: Role.Owner,
         id: 'board-1',
         ownerId: 'user-1',
         title: 'My tasks',
