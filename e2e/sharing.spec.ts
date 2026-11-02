@@ -9,6 +9,72 @@ import { expect, test } from '@playwright/test';
 import { gotoHydrated, signup, uniqueEmail } from './helpers/auth';
 import { seedBoard, seedBoardMember, removeBoardMembers } from './helpers/db';
 
+test('member has a read-only board title and leaves through confirmation', async ({
+    browser,
+}) => {
+    const owner = await browser.newContext();
+    const member = await browser.newContext();
+    try {
+        const ownerPage = await owner.newPage();
+        const ownerEmail = uniqueEmail('leave-owner');
+        await signup(ownerPage, ownerEmail);
+        const title = 'Leave this team';
+        const boardId = await seedBoard(ownerEmail, title);
+        const page = await member.newPage();
+        const memberEmail = uniqueEmail('leave-member');
+        await signup(page, memberEmail);
+        await seedBoardMember(boardId, memberEmail);
+        await gotoHydrated(page, `/b/${boardId}`);
+        await expect(
+            page.getByRole('heading', { name: title, exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByRole('button', { name: title, exact: true }),
+        ).toHaveCount(0);
+        await page.getByRole('link', { name: 'Back to boards' }).click();
+        await expect(page).toHaveURL('/boards');
+        const tile = page
+            .getByRole('link')
+            .filter({ hasText: title })
+            .locator('..');
+        await tile.getByRole('button', { name: 'Board actions' }).click();
+        await expect(page.getByRole('menuitem')).toHaveText(['Leave']);
+        await page
+            .getByRole('menuitem', { name: 'Leave', exact: true })
+            .click();
+        await expect(page.getByRole('alertdialog')).toContainText(
+            `Leave board "${title}"?`,
+        );
+        await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+        await expect(tile).toBeVisible();
+        await tile.getByRole('button', { name: 'Board actions' }).click();
+        await page
+            .getByRole('menuitem', { name: 'Leave', exact: true })
+            .click();
+        await page.getByRole('button', { name: 'Leave', exact: true }).click();
+        await expect(
+            page.getByRole('heading', { name: 'Shared with me' }),
+        ).toHaveCount(0);
+        await page.reload();
+        await expect(
+            page.getByRole('link').filter({ hasText: title }),
+        ).toHaveCount(0);
+        await gotoHydrated(page, `/b/${boardId}`);
+        await expect(
+            page.getByRole('heading', {
+                name: "Board not found or you don't have access",
+            }),
+        ).toBeVisible();
+        await gotoHydrated(ownerPage, `/b/${boardId}`);
+        await expect(
+            ownerPage.getByRole('heading', { name: title, exact: true }),
+        ).toBeVisible();
+    } finally {
+        await owner.close();
+        await member.close();
+    }
+});
+
 test('member sees and opens a shared board; outsider is denied', async ({
     browser,
 }) => {

@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardView } from '#/components/board/board-view';
@@ -42,7 +43,11 @@ vi.mock('#/components/board/add-list', () => ({
     ),
 }));
 
-const board = { id: 'b1', title: 'Board' } as BoardData['board'];
+const board = {
+    id: 'b1',
+    title: 'Board',
+    myRole: Role.Owner,
+} as BoardData['board'];
 
 function makeLists(count: number): ListWithCards[] {
     return Array.from(
@@ -112,5 +117,26 @@ describe('BoardView scroll to new list', () => {
         rerender(<BoardView board={board} lists={makeLists(2)} />);
 
         expect(scrollIntoView).not.toHaveBeenCalled();
+    });
+});
+
+describe('BoardView title permissions', () => {
+    it('renders a plain title for an editor', () => {
+        render(
+            <BoardView board={{ ...board, myRole: Role.Editor }} lists={[]} />,
+        );
+        expect(
+            screen.getByRole('heading', { name: 'Board' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Board' }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Board title')).not.toBeInTheDocument();
+    });
+
+    it('lets the owner edit the title', () => {
+        render(<BoardView board={board} lists={[]} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Board' }));
+        expect(screen.getByLabelText('Board title')).toBeInTheDocument();
     });
 });

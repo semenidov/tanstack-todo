@@ -28,7 +28,14 @@ const board = {
 };
 
 function renderTile(onRename = vi.fn()) {
-    render(<BoardTile board={board} onRename={onRename} onDelete={vi.fn()} />);
+    render(
+        <BoardTile
+            board={board}
+            onRename={onRename}
+            onDelete={vi.fn()}
+            onLeave={vi.fn()}
+        />,
+    );
     return onRename;
 }
 
@@ -81,5 +88,43 @@ describe('BoardTile', () => {
 
         expect(onRename).not.toHaveBeenCalled();
         expect(screen.getByRole('link')).toHaveTextContent('Roadmap');
+    });
+});
+
+describe('BoardTile permissions and Leave', () => {
+    it('offers only Leave for an editor and requires confirmation', async () => {
+        const user = userEvent.setup();
+        const onLeave = vi.fn();
+        render(
+            <BoardTile
+                board={{ ...board, myRole: Role.Editor }}
+                onRename={vi.fn()}
+                onDelete={vi.fn()}
+                onLeave={onLeave}
+            />,
+        );
+        await user.click(screen.getByRole('button', { name: 'Board actions' }));
+        expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+        await user.click(screen.getByRole('menuitem', { name: 'Leave' }));
+        expect(
+            screen.getByRole('heading', { name: 'Leave board "Roadmap"?' }),
+        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+        expect(onLeave).not.toHaveBeenCalled();
+        await user.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onLeave).not.toHaveBeenCalled();
+        await user.click(screen.getByRole('button', { name: 'Board actions' }));
+        await user.click(screen.getByRole('menuitem', { name: 'Leave' }));
+        await user.click(screen.getByRole('button', { name: 'Leave' }));
+        expect(onLeave).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers Rename and Delete, without Leave, to the owner', async () => {
+        const user = userEvent.setup();
+        renderTile();
+        await user.click(screen.getByRole('button', { name: 'Board actions' }));
+        expect(
+            screen.getAllByRole('menuitem').map((item) => item.textContent),
+        ).toEqual(['Rename', 'Delete…']);
     });
 });
