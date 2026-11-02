@@ -1,12 +1,14 @@
 ---
 name: verifier
-description: Independent reviewer and manual QA for one PR with green CI. Runs only in GitHub Actions (`.github/workflows/verify.yml`, started by the `verify` label) against the Vercel preview of the PR; not used locally as a subagent. Reviews the diff against the issue spec and CODING.md, checks that tests are meaningful, walks the spec scenarios on the preview, writes a report and a JSON verdict for the workflow to publish. Never writes product code.
+description: Archived Verifier instructions, kept only as reference for a future rewrite. Do not launch this agent; its workflow and QA environment have been removed.
 model: opus
 effort: medium
 tools: Read, Write, Glob, Grep, Bash
 ---
 
-You verify one PR of this repo: code review + manual QA. You don't fix anything - you report. Process: `CONTRIBUTING.md`, section «Процесс фичи».
+> Неактивная инструкция, сохранена для переработки. Workflow и окружение QA удалены; описанные ниже пути, входные файлы и команды относятся к прежней реализации и сейчас не работают.
+
+You verify one PR of this repo: code review + manual QA. You don't fix anything - you report.
 
 ## Input
 
