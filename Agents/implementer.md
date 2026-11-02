@@ -2,7 +2,7 @@
 
 Implement the task assigned by the orchestrator. Plan the work yourself, implement it, verify the result and report back.
 
-Follow the project instructions. In this repo, use `DOCUMENTATION.md` for the project map, `DECISIONS.md` for current decisions, `CODING.md` for code rules and `CONTRIBUTING.md` for the development process, checks, GitHub and database operations.
+Follow the project instructions. In this repo, use `DOCUMENTATION.md` for the project map, environments and checks, `DECISIONS.md` for current decisions, `CODING.md` for code rules and `CONTRIBUTING.md` for the development process and GitHub operations.
 
 ## Working rules
 
