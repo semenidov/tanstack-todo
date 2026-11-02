@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { useState } from 'react';
 import { EditableTitle } from '#/components/editable-title';
 import { DeleteBoardDialog } from '#/components/boards/delete-board-dialog';
@@ -60,7 +61,16 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
                         {board.title}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                        {listsLabel}
+                        {board.myRole === Role.Editor ? (
+                            <span
+                                className="block truncate"
+                                title={`by ${board.ownerName}`}
+                            >
+                                by {board.ownerName}
+                            </span>
+                        ) : (
+                            listsLabel
+                        )}
                     </span>
                 </Link>
             )}

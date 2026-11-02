@@ -1,3 +1,5 @@
+import { Action } from '#/lib/permissions';
+import { authorizeBoard, BOARD_ACCESS_DENIED } from '#/server/authorize';
 import { requireUser } from '#/lib/auth-server';
 import * as writes from '#/server/board-writes';
 import * as repo from '#/server/boards-repo';
@@ -48,7 +50,14 @@ export const getBoardServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())
     .handler(async ({ data: boardId }) => {
         const { id: userId } = await requireUser();
-        return repo.getBoard(userId, boardId);
+        const access = await authorizeBoard(
+            { id: userId },
+            boardId,
+            Action.BoardRead,
+        );
+        const board = await repo.getBoard(access);
+        if (!board) throw new Error(BOARD_ACCESS_DENIED);
+        return board;
     });
 
 export const addListServer = createServerFn({ method: 'POST' })

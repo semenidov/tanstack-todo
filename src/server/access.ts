@@ -1,6 +1,6 @@
 import { db } from '#/db';
-import { boards, cards, checklists, lists } from '#/db/schema';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { boardMembers, boards, cards, checklists, lists } from '#/db/schema';
+import { and, eq, inArray, isNull, or } from 'drizzle-orm';
 
 export function ownedBoardIds(userId: string) {
     return db
@@ -52,4 +52,37 @@ export async function findOwnedCard(userId: string, cardId: string) {
         );
     // .at(0): destructuring [row] would be typed as always present.
     return rows.at(0);
+}
+
+// Read predicates stay separate until all writes require authorization passes.
+export function accessibleBoardIds(userId: string) {
+    return db
+        .select({ id: boards.id })
+        .from(boards)
+        .where(
+            or(
+                eq(boards.ownerId, userId),
+                inArray(
+                    boards.id,
+                    db
+                        .select({ id: boardMembers.boardId })
+                        .from(boardMembers)
+                        .where(eq(boardMembers.userId, userId)),
+                ),
+            ),
+        );
+}
+
+export function accessibleCardIds(userId: string) {
+    return db
+        .select({ id: cards.id })
+        .from(cards)
+        .innerJoin(lists, eq(cards.listId, lists.id))
+        .where(
+            and(
+                inArray(lists.boardId, accessibleBoardIds(userId)),
+                isNull(lists.deletedAt),
+                isNull(cards.deletedAt),
+            ),
+        );
 }

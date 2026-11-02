@@ -31,16 +31,25 @@ export const Route = createFileRoute('/b/$boardId')({
         if (!z.uuid().safeParse(params.boardId).success) {
             throw notFound();
         }
-        const [board] = await Promise.all([
-            context.queryClient.query({
-                ...boardQueryOptions(params.boardId),
-                staleTime: 'static',
-            }),
-            context.queryClient.ensureQueryData(
-                labelsQueryOptions(params.boardId),
-            ),
-        ]);
-        if (!board) throw notFound();
+        let board;
+        try {
+            [board] = await Promise.all([
+                context.queryClient.query({
+                    ...boardQueryOptions(params.boardId),
+                    staleTime: 'static',
+                }),
+                context.queryClient.ensureQueryData(
+                    labelsQueryOptions(params.boardId),
+                ),
+            ]);
+        } catch (error) {
+            if (
+                error instanceof Error &&
+                error.message === "Board not found or you don't have access"
+            )
+                throw notFound();
+            throw error;
+        }
         return board;
     },
     head: ({ match, loaderData }) => ({
@@ -56,7 +65,7 @@ function BoardNotFound() {
     return (
         <MessageScreen
             icon={<SearchXIcon className="size-8 text-muted-foreground" />}
-            title="Board not found"
+            title="Board not found or you don't have access"
             description="This board doesn't exist or you don't have access to it."
             action={
                 <Button asChild>
@@ -73,8 +82,6 @@ function BoardNotFound() {
 function BoardPage() {
     const { boardId } = Route.useParams();
     const { data } = useSuspenseQuery(boardQueryOptions(boardId));
-
-    if (!data) return <BoardNotFound />;
 
     return (
         <>

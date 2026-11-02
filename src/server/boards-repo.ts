@@ -1,3 +1,5 @@
+import { Role } from '#/lib/permissions';
+import type { BoardAccess } from '#/server/authorize';
 import { db } from '#/db';
 import { DEMO_BOARD } from '#/lib/demo-board';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
@@ -6,6 +8,7 @@ import { addDays, localDateKey } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
 import {
     boards,
+    user,
     cardLabels,
     cards,
     checklistItems,
@@ -13,7 +16,11 @@ import {
     labels,
     lists,
 } from '#/db/schema';
-import { ownedBoardIds, ownedListIds } from '#/server/access';
+import {
+    accessibleBoardIds,
+    ownedBoardIds,
+    ownedListIds,
+} from '#/server/access';
 import {
     and,
     asc,
@@ -29,17 +36,20 @@ import {
 import type { AnyColumn } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 
-export function listBoards(userId: string) {
+export async function listBoards(userId: string) {
     // Soft-deleted rows are filtered in the joins, not in where: otherwise boards
     // without live lists disappear. Lists repeat once per card: countDistinct.
-    return db
+    const rows = await db
         .select({
             id: boards.id,
             title: boards.title,
+            ownerId: boards.ownerId,
+            ownerName: user.name,
             listCount: countDistinct(lists.id),
             cardCount: count(cards.id),
         })
         .from(boards)
+        .innerJoin(user, eq(user.id, boards.ownerId))
         .leftJoin(
             lists,
             and(eq(lists.boardId, boards.id), isNull(lists.deletedAt)),
@@ -48,9 +58,13 @@ export function listBoards(userId: string) {
             cards,
             and(eq(cards.listId, lists.id), isNull(cards.deletedAt)),
         )
-        .where(eq(boards.ownerId, userId))
-        .groupBy(boards.id)
+        .where(inArray(boards.id, accessibleBoardIds(userId)))
+        .groupBy(boards.id, user.id)
         .orderBy(asc(boards.createdAt));
+    return rows.map(({ ownerId, ...board }) => ({
+        ...board,
+        myRole: ownerId === userId ? Role.Owner : Role.Editor,
+    }));
 }
 
 async function assertBelowQuota(
@@ -229,9 +243,14 @@ function checklistItemCount(cardId: AnyColumn, done?: true) {
     return sql`(${items})`.mapWith(Number);
 }
 
-export async function getBoard(userId: string, boardId: string) {
+export async function getBoard(access: BoardAccess) {
     const board = await db.query.boards.findFirst({
-        where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
+        columns: { inviteToken: false },
+        where: (b) =>
+            and(
+                eq(b.id, access.boardId),
+                inArray(b.id, accessibleBoardIds(access.userId)),
+            ),
         with: {
             lists: {
                 columns: { deletedAt: false },
@@ -260,7 +279,7 @@ export async function getBoard(userId: string, boardId: string) {
 
     const { lists: boardLists, ...boardFields } = board;
     return {
-        board: boardFields,
+        board: { ...boardFields, myRole: access.role },
         lists: boardLists.map((list) => ({
             ...list,
             cards: list.cards.map(({ cardLabels: links, ...card }) => ({

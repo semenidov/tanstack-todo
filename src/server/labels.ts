@@ -1,3 +1,5 @@
+import { Action } from '#/lib/permissions';
+import { authorizeBoard } from '#/server/authorize';
 import { requireUser } from '#/lib/auth-server';
 import { LabelColor } from '#/lib/label-colors';
 import { MAX_LABEL_TITLE_LENGTH, normalizeLabelTitle } from '#/lib/labels';
@@ -19,7 +21,9 @@ export const getLabelsServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())
     .handler(async ({ data: boardId }) => {
         const { id: userId } = await requireUser();
-        return repo.listLabels(userId, boardId);
+        return repo.listLabels(
+            await authorizeBoard({ id: userId }, boardId, Action.BoardRead),
+        );
     });
 
 export const createLabelServer = createServerFn({ method: 'POST' })

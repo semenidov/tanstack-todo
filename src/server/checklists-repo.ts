@@ -3,8 +3,8 @@ import { cards, checklistItems, checklists } from '#/db/schema';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import {
+    accessibleCardIds,
     findOwnedCard,
-    ownedCardIds,
     ownedChecklistIds,
 } from '#/server/access';
 import { and, asc, count, eq, inArray, max } from 'drizzle-orm';
@@ -29,7 +29,7 @@ export async function getChecklist(userId: string, cardId: string) {
     const checklist = await db.query.checklists.findFirst({
         where: and(
             eq(checklists.cardId, cardId),
-            inArray(checklists.cardId, ownedCardIds(userId)),
+            inArray(checklists.cardId, accessibleCardIds(userId)),
         ),
         with: {
             items: {

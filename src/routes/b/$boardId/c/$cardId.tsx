@@ -31,10 +31,10 @@ function CardRoute() {
     const navigate = useNavigate();
     const { data } = useSuspenseQuery(boardQueryOptions(boardId));
 
-    const found = data && findCardInBoard(data, cardId);
+    const found = findCardInBoard(data, cardId);
 
     useEffect(() => {
-        if (data && !found) {
+        if (!found) {
             toast.error('Card not found');
             navigate({ to: '/b/$boardId', params: { boardId } });
         }

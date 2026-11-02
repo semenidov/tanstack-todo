@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { BoardTile } from '#/components/boards/board-tile';
 import {
     useDeleteBoard,
@@ -23,6 +24,8 @@ interface BoardsViewProps {
 }
 
 export function BoardsView({ boards }: BoardsViewProps) {
+    const ownedBoards = boards.filter((board) => board.myRole === Role.Owner);
+    const sharedBoards = boards.filter((board) => board.myRole !== Role.Owner);
     const renameBoard = useRenameBoard();
     const deleteBoard = useDeleteBoard();
 
@@ -57,21 +60,48 @@ export function BoardsView({ boards }: BoardsViewProps) {
                     </Empty>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-4">
-                    {boards.map((board) => (
-                        <BoardTile
-                            key={board.id}
-                            board={board}
-                            onRename={(title) =>
-                                renameBoard.mutate({
-                                    boardId: board.id,
-                                    title,
-                                })
-                            }
-                            onDelete={() => deleteBoard.mutate(board.id)}
-                        />
-                    ))}
-                    <CreateBoardTile />
+                <div className="p-4">
+                    <h2 className="mb-3 text-lg font-semibold">My boards</h2>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        {ownedBoards.map((board) => (
+                            <BoardTile
+                                key={board.id}
+                                board={board}
+                                onRename={(title) =>
+                                    renameBoard.mutate({
+                                        boardId: board.id,
+                                        title,
+                                    })
+                                }
+                                onDelete={() => deleteBoard.mutate(board.id)}
+                            />
+                        ))}
+                        <CreateBoardTile />
+                    </div>
+                    {sharedBoards.length > 0 && (
+                        <section className="mt-6">
+                            <h2 className="mb-3 text-lg font-semibold">
+                                Shared with me
+                            </h2>
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                {sharedBoards.map((board) => (
+                                    <BoardTile
+                                        key={board.id}
+                                        board={board}
+                                        onRename={(title) =>
+                                            renameBoard.mutate({
+                                                boardId: board.id,
+                                                title,
+                                            })
+                                        }
+                                        onDelete={() =>
+                                            deleteBoard.mutate(board.id)
+                                        }
+                                    />
+                                ))}
+                            </div>
+                        </section>
+                    )}
                 </div>
             )}
         </div>
