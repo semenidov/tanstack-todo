@@ -1,3 +1,4 @@
+import { testAccess } from '#/test/access';
 import { authorizeBoard } from '#/server/authorize';
 import { Action } from '#/lib/permissions';
 import { describe, expect, it } from 'vitest';
@@ -69,10 +70,14 @@ describe('list order', () => {
     it('addList puts the new list after the last one, deleted included', async () => {
         const a = await seedUser();
         const { board, ids } = await seedLists(a.id, ['a0', 'a1']);
-        await deleteList(a.id, ids[1]);
+        await deleteList(await testAccess(a.id, ids[1]), ids[1]);
 
-        const added = await addList(a.id, board.id, 'new');
-        await restoreList(a.id, ids[1]);
+        const added = await addList(
+            await testAccess(a.id, board.id),
+            board.id,
+            'new',
+        );
+        await restoreList(await testAccess(a.id, ids[1]), ids[1]);
 
         expect(await listOrder(a.id, board.id)).toEqual([
             ids[0],
@@ -85,7 +90,11 @@ describe('list order', () => {
         const a = await seedUser();
         const board = await createBoard(a.id, 'Board');
 
-        const added = await addList(a.id, board.id, 'first');
+        const added = await addList(
+            await testAccess(a.id, board.id),
+            board.id,
+            'first',
+        );
         expect(added?.position).toBe('a0');
     });
 });
@@ -96,13 +105,36 @@ describe('moveList', () => {
         const { board, ids } = await seedLists(a.id, ['a0', 'a1', 'a2']);
         const [x, y, z] = ids;
 
-        expect(await moveList(a.id, x, board.id, z, null)).not.toBeNull();
+        expect(
+            await moveList(
+                await testAccess(a.id, x),
+                x,
+                await testAccess(a.id, board.id),
+                board.id,
+                z,
+                null,
+            ),
+        ).not.toBeNull();
         expect(await listOrder(a.id, board.id)).toEqual([y, z, x]);
 
-        await moveList(a.id, x, board.id, null, y);
+        await moveList(
+            await testAccess(a.id, x),
+            x,
+            await testAccess(a.id, board.id),
+            board.id,
+            null,
+            y,
+        );
         expect(await listOrder(a.id, board.id)).toEqual([x, y, z]);
 
-        await moveList(a.id, z, board.id, x, y);
+        await moveList(
+            await testAccess(a.id, z),
+            z,
+            await testAccess(a.id, board.id),
+            board.id,
+            x,
+            y,
+        );
         expect(await listOrder(a.id, board.id)).toEqual([x, z, y]);
     });
 
@@ -111,15 +143,28 @@ describe('moveList', () => {
         const source = await seedLists(a.id, ['a0', 'a1']);
         const target = await seedLists(a.id, ['a0', 'a1']);
         const [moving, staying] = source.ids;
-        const first = await addCard(a.id, moving, 'first');
-        const deleted = await addCard(a.id, moving, 'deleted');
-        const last = await addCard(a.id, moving, 'last');
-        await deleteCard(a.id, deleted!.id);
+        const first = await addCard(
+            await testAccess(a.id, moving),
+            moving,
+            'first',
+        );
+        const deleted = await addCard(
+            await testAccess(a.id, moving),
+            moving,
+            'deleted',
+        );
+        const last = await addCard(
+            await testAccess(a.id, moving),
+            moving,
+            'last',
+        );
+        await deleteCard(await testAccess(a.id, deleted!.id), deleted!.id);
         const cardsBefore = await cardsOf(moving);
 
         const row = await moveList(
-            a.id,
+            await testAccess(a.id, moving),
             moving,
+            await testAccess(a.id, target.board.id),
             target.board.id,
             target.ids[0],
             target.ids[1],
@@ -152,7 +197,14 @@ describe('moveList', () => {
         const source = await seedLists(a.id, ['a0']);
         const target = await createBoard(a.id, 'Empty');
 
-        const row = await moveList(a.id, source.ids[0], target.id, null, null);
+        const row = await moveList(
+            await testAccess(a.id, source.ids[0]),
+            source.ids[0],
+            await testAccess(a.id, target.id),
+            target.id,
+            null,
+            null,
+        );
         expect(row?.boardId).toBe(target.id);
         expect(await listOrder(a.id, target.id)).toEqual([source.ids[0]]);
     });
@@ -177,21 +229,42 @@ describe('moveList', () => {
             const target = await seedLists(a.id, ['a0']);
             const [moving, sourceNeighbor] = source.ids;
 
-            await expectRefused(moving, () =>
-                moveList(a.id, moving, target.board.id, sourceNeighbor, null),
+            await expectRefused(moving, async () =>
+                moveList(
+                    await testAccess(a.id, moving),
+                    moving,
+                    await testAccess(a.id, target.board.id),
+                    target.board.id,
+                    sourceNeighbor,
+                    null,
+                ),
             );
-            await expectRefused(moving, () =>
-                moveList(a.id, moving, source.board.id, target.ids[0], null),
+            await expectRefused(moving, async () =>
+                moveList(
+                    await testAccess(a.id, moving),
+                    moving,
+                    await testAccess(a.id, source.board.id),
+                    source.board.id,
+                    target.ids[0],
+                    null,
+                ),
             );
         });
 
         it('a deleted neighbor', async () => {
             const a = await seedUser();
             const { board, ids } = await seedLists(a.id, ['a0', 'a1', 'a2']);
-            await deleteList(a.id, ids[2]);
+            await deleteList(await testAccess(a.id, ids[2]), ids[2]);
 
-            await expectRefused(ids[0], () =>
-                moveList(a.id, ids[0], board.id, ids[2], null),
+            await expectRefused(ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, ids[0]),
+                    ids[0],
+                    await testAccess(a.id, board.id),
+                    board.id,
+                    ids[2],
+                    null,
+                ),
             );
         });
 
@@ -199,14 +272,35 @@ describe('moveList', () => {
             const a = await seedUser();
             const { board, ids } = await seedLists(a.id, ['a0', 'a1']);
 
-            await expectRefused(ids[0], () =>
-                moveList(a.id, ids[0], board.id, ids[0], null),
+            await expectRefused(ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, ids[0]),
+                    ids[0],
+                    await testAccess(a.id, board.id),
+                    board.id,
+                    ids[0],
+                    null,
+                ),
             );
-            await expectRefused(ids[0], () =>
-                moveList(a.id, ids[0], board.id, null, ids[0]),
+            await expectRefused(ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, ids[0]),
+                    ids[0],
+                    await testAccess(a.id, board.id),
+                    board.id,
+                    null,
+                    ids[0],
+                ),
             );
-            await expectRefused(ids[0], () =>
-                moveList(a.id, ids[0], board.id, ids[1], ids[1]),
+            await expectRefused(ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, ids[0]),
+                    ids[0],
+                    await testAccess(a.id, board.id),
+                    board.id,
+                    ids[1],
+                    ids[1],
+                ),
             );
         });
 
@@ -216,17 +310,25 @@ describe('moveList', () => {
             const foreign = await seedLists(b.id, ['a0', 'a1']);
             const mine = await createBoard(a.id, 'Mine');
 
-            await expectRefused(foreign.ids[0], () =>
+            await expectRefused(foreign.ids[0], async () =>
                 moveList(
-                    a.id,
+                    await testAccess(a.id, foreign.ids[0]),
                     foreign.ids[0],
+                    await testAccess(a.id, foreign.board.id),
                     foreign.board.id,
                     foreign.ids[1],
                     null,
                 ),
             );
-            await expectRefused(foreign.ids[0], () =>
-                moveList(a.id, foreign.ids[0], mine.id, null, null),
+            await expectRefused(foreign.ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, foreign.ids[0]),
+                    foreign.ids[0],
+                    await testAccess(a.id, mine.id),
+                    mine.id,
+                    null,
+                    null,
+                ),
             );
         });
 
@@ -236,13 +338,21 @@ describe('moveList', () => {
             const mine = await seedLists(a.id, ['a0']);
             const foreign = await seedLists(b.id, ['a0']);
 
-            await expectRefused(mine.ids[0], () =>
-                moveList(a.id, mine.ids[0], foreign.board.id, null, null),
-            );
-            await expectRefused(mine.ids[0], () =>
+            await expectRefused(mine.ids[0], async () =>
                 moveList(
-                    a.id,
+                    await testAccess(a.id, mine.ids[0]),
                     mine.ids[0],
+                    await testAccess(a.id, foreign.board.id),
+                    foreign.board.id,
+                    null,
+                    null,
+                ),
+            );
+            await expectRefused(mine.ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, mine.ids[0]),
+                    mine.ids[0],
+                    await testAccess(a.id, foreign.board.id),
                     foreign.board.id,
                     foreign.ids[0],
                     null,
@@ -257,23 +367,44 @@ describe('moveList', () => {
             const a = await seedUser();
             const mine = await seedLists(a.id, ['a0']);
             const gone = await createBoard(a.id, 'Gone');
-            await deleteBoard(a.id, gone.id);
+            await deleteBoard(await testAccess(a.id, gone.id), gone.id);
 
-            await expectRefused(mine.ids[0], () =>
-                moveList(a.id, mine.ids[0], gone.id, null, null),
+            await expectRefused(mine.ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, mine.ids[0]),
+                    mine.ids[0],
+                    await testAccess(a.id, gone.id),
+                    gone.id,
+                    null,
+                    null,
+                ),
             );
-            await expectRefused(mine.ids[0], () =>
-                moveList(a.id, mine.ids[0], MISSING_ID, null, null),
+            await expectRefused(mine.ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, mine.ids[0]),
+                    mine.ids[0],
+                    await testAccess(a.id, MISSING_ID),
+                    MISSING_ID,
+                    null,
+                    null,
+                ),
             );
         });
 
         it('a deleted list', async () => {
             const a = await seedUser();
             const { board, ids } = await seedLists(a.id, ['a0', 'a1']);
-            await deleteList(a.id, ids[0]);
+            await deleteList(await testAccess(a.id, ids[0]), ids[0]);
 
-            await expectRefused(ids[0], () =>
-                moveList(a.id, ids[0], board.id, ids[1], null),
+            await expectRefused(ids[0], async () =>
+                moveList(
+                    await testAccess(a.id, ids[0]),
+                    ids[0],
+                    await testAccess(a.id, board.id),
+                    board.id,
+                    ids[1],
+                    null,
+                ),
             );
         });
     });
@@ -285,8 +416,9 @@ describe('moveList', () => {
         const [, first, second] = await listOrder(a.id, target.board.id);
 
         const row = await moveList(
-            a.id,
+            await testAccess(a.id, source.ids[0]),
             source.ids[0],
+            await testAccess(a.id, target.board.id),
             target.board.id,
             first,
             second,
@@ -310,11 +442,18 @@ describe('moveList', () => {
     it('renumbering keeps deleted lists in their place', async () => {
         const a = await seedUser();
         const { board, ids } = await seedLists(a.id, ['a0', 'a1', 'a1', 'a2']);
-        await deleteList(a.id, ids[0]);
+        await deleteList(await testAccess(a.id, ids[0]), ids[0]);
         const [first, second, last] = await listOrder(a.id, board.id);
 
-        await moveList(a.id, last, board.id, first, second);
-        await restoreList(a.id, ids[0]);
+        await moveList(
+            await testAccess(a.id, last),
+            last,
+            await testAccess(a.id, board.id),
+            board.id,
+            first,
+            second,
+        );
+        await restoreList(await testAccess(a.id, ids[0]), ids[0]);
 
         expect(await listOrder(a.id, board.id)).toEqual([
             ids[0],
@@ -328,11 +467,25 @@ describe('moveList', () => {
         const a = await seedUser();
         const { board, ids } = await seedLists(a.id, ['a0', 'a1', 'a2', 'a3']);
         const [w, x, y, z] = ids;
-        await deleteList(a.id, x);
+        await deleteList(await testAccess(a.id, x), x);
 
-        await moveList(a.id, z, board.id, null, w);
-        await moveList(a.id, w, board.id, y, null);
-        await restoreList(a.id, x);
+        await moveList(
+            await testAccess(a.id, z),
+            z,
+            await testAccess(a.id, board.id),
+            board.id,
+            null,
+            w,
+        );
+        await moveList(
+            await testAccess(a.id, w),
+            w,
+            await testAccess(a.id, board.id),
+            board.id,
+            y,
+            null,
+        );
+        await restoreList(await testAccess(a.id, x), x);
 
         expect(await listOrder(a.id, board.id)).toEqual([z, x, y, w]);
     });

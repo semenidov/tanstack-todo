@@ -7,6 +7,25 @@ const { moveListRepo } = vi.hoisted(() => ({
     moveListRepo: vi.fn<(...args: Array<unknown>) => Promise<unknown>>(),
 }));
 
+vi.mock('#/server/authorize', () => ({
+    authorizeCard: vi.fn(async (user) => ({
+        userId: user.id,
+        boardId: 'source',
+    })),
+    authorizeList: vi.fn(async (user) => ({
+        userId: user.id,
+        boardId: 'source',
+    })),
+    authorizeBoard: vi.fn(async (user, boardId) => ({
+        userId: user.id,
+        boardId,
+    })),
+    requireAffected: (row: unknown) => {
+        if (!row) throw new Error("Board not found or you don't have access");
+        return row;
+    },
+}));
+
 vi.mock('#/lib/auth-server', () => ({ requireUser: vi.fn() }));
 
 vi.mock('#/server/boards-repo', () => ({
@@ -31,11 +50,12 @@ describe('moveListOrThrow (moveListServer)', () => {
         moveListRepo.mockResolvedValue(null);
 
         await expect(moveListOrThrow(user, data)).rejects.toThrow(
-            'List was not moved',
+            "Board not found or you don't have access",
         );
         expect(moveListRepo).toHaveBeenCalledWith(
-            'user-1',
+            { userId: 'user-1', boardId: 'source' },
             data.listId,
+            { userId: expect.any(String), boardId: data.toBoardId },
             data.toBoardId,
             null,
             data.nextListId,
@@ -54,8 +74,9 @@ describe('moveListOrThrow (moveListServer)', () => {
 
         await moveListOrThrow({ id: 'guest-1', isAnonymous: true }, data);
         expect(moveListRepo).toHaveBeenCalledWith(
-            'guest-1',
+            { userId: 'guest-1', boardId: 'source' },
             data.listId,
+            { userId: expect.any(String), boardId: data.toBoardId },
             data.toBoardId,
             null,
             data.nextListId,

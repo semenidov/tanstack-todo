@@ -1,6 +1,13 @@
+import {
+    addCard,
+    addList,
+    cardRow,
+    moveCardTo,
+    cardTitles,
+} from './helpers/board';
 import { expect, test } from '@playwright/test';
 import { gotoHydrated, signup, uniqueEmail } from './helpers/auth';
-import { seedBoard, seedBoardMember } from './helpers/db';
+import { seedBoard, seedBoardMember, removeBoardMembers } from './helpers/db';
 
 test('member sees and opens a shared board; outsider is denied', async ({
     browser,
@@ -44,5 +51,51 @@ test('member sees and opens a shared board; outsider is denied', async ({
         await owner.close();
         await member.close();
         await outsider.close();
+    }
+});
+
+test('member content persists and the next write after removal opens access denied', async ({
+    browser,
+}) => {
+    const owner = await browser.newContext();
+    const member = await browser.newContext();
+    try {
+        const ownerPage = await owner.newPage();
+        const ownerEmail = uniqueEmail('write-owner');
+        await signup(ownerPage, ownerEmail);
+        const boardId = await seedBoard(ownerEmail, 'Team');
+        const page = await member.newPage();
+        const email = uniqueEmail('write-member');
+        await signup(page, email);
+        await seedBoardMember(boardId, email);
+        await gotoHydrated(page, `/b/${boardId}`);
+        await addList(page, 'Member list');
+        await addCard(page, 'To do', 'Member card');
+        await moveCardTo(page, 'Member card', 'Done', 1);
+        await expect
+            .poll(() => cardTitles(page, 'Done'))
+            .toEqual(['Member card']);
+        await page.reload();
+        await expect(cardRow(page, 'Member card')).toBeVisible();
+        await expect(
+            page.getByText('Member list', { exact: true }),
+        ).toBeVisible();
+        await cardRow(page, 'Member card').getByRole('link').click();
+        const dialog = page.getByRole('dialog');
+        await dialog
+            .getByRole('button', { name: 'Member card', exact: true })
+            .click();
+        await removeBoardMembers(boardId);
+        await dialog.getByLabel('Card title').fill('Revoked edit');
+        await dialog.getByLabel('Card title').press('Enter');
+        await expect(
+            page.getByRole('heading', {
+                name: "Board not found or you don't have access",
+            }),
+        ).toBeVisible();
+        await expect(cardRow(page, 'Revoked edit')).toHaveCount(0);
+    } finally {
+        await owner.close();
+        await member.close();
     }
 });

@@ -1,3 +1,4 @@
+import { testAccess } from '#/test/access';
 import { authorizeBoard } from '#/server/authorize';
 import { Action } from '#/lib/permissions';
 import { readFileSync } from 'node:fs';
@@ -46,7 +47,7 @@ describe('lists.position backfill (migration 0011)', () => {
         const a = await seedUser();
         const first = await seedBoardByCreatedAt(a.id, 3);
         const second = await seedBoardByCreatedAt(a.id, 2);
-        await deleteList(a.id, first.ids[1]);
+        await deleteList(await testAccess(a.id, first.ids[1]), first.ids[1]);
 
         await runBackfill();
 

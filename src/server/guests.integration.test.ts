@@ -1,3 +1,4 @@
+import { testAccess } from '#/test/access';
 import { authorizeBoard } from '#/server/authorize';
 import { Action } from '#/lib/permissions';
 import { randomUUID } from 'node:crypto';
@@ -152,7 +153,13 @@ describe('guest sign-in', () => {
                     .flatMap((l) => l.cards)
                     .map(
                         async (c) =>
-                            [c.id, await getChecklist(guest.id, c.id)] as const,
+                            [
+                                c.id,
+                                await getChecklist(
+                                    await testAccess(guest.id, c.id),
+                                    c.id,
+                                ),
+                            ] as const,
                     ),
             ),
         );
@@ -372,8 +379,12 @@ describe('deleted guest with a cached session', () => {
             /^Unauthorized$/,
         );
         // Its boards went with it, so these find nothing to insert into.
-        expect(await addListAs(deleted, board.id, 'After delete')).toBeNull();
-        expect(await addCardAs(deleted, list.id, 'After delete')).toBeNull();
+        await expect(
+            addListAs(deleted, board.id, 'After delete'),
+        ).rejects.toThrow("Board not found or you don't have access");
+        await expect(
+            addCardAs(deleted, list.id, 'After delete'),
+        ).rejects.toThrow("Board not found or you don't have access");
         expect(
             await db.select().from(boards).where(eq(boards.ownerId, row.id)),
         ).toEqual([]);

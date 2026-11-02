@@ -1,3 +1,4 @@
+import { testAccess } from '#/test/access';
 import { authorizeBoard } from '#/server/authorize';
 import { Action, Role } from '#/lib/permissions';
 import { describe, expect, it } from 'vitest';
@@ -67,8 +68,8 @@ describe('listBoards', () => {
             .from(lists)
             .where(eq(lists.boardId, first.id))
             .orderBy(lists.createdAt);
-        await addCard(a.id, todo.id, 'one');
-        await addCard(a.id, todo.id, 'two');
+        await addCard(await testAccess(a.id, todo.id), todo.id, 'one');
+        await addCard(await testAccess(a.id, todo.id), todo.id, 'two');
 
         const result = await listBoards(a.id);
 
@@ -115,11 +116,19 @@ describe('listBoards', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        await addCard(a.id, todo.id, 'kept');
-        const deleted = await addCard(a.id, todo.id, 'deleted');
-        await addCard(a.id, done.id, 'in deleted list');
-        await deleteCard(a.id, deleted!.id);
-        await deleteList(a.id, done.id);
+        await addCard(await testAccess(a.id, todo.id), todo.id, 'kept');
+        const deleted = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'deleted',
+        );
+        await addCard(
+            await testAccess(a.id, done.id),
+            done.id,
+            'in deleted list',
+        );
+        await deleteCard(await testAccess(a.id, deleted!.id), deleted!.id);
+        await deleteList(await testAccess(a.id, done.id), done.id);
 
         expect(await listBoards(a.id)).toEqual([
             {
@@ -137,9 +146,9 @@ describe('listBoards', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        await addCard(a.id, todo.id, 'card');
-        await deleteList(a.id, todo.id);
-        await deleteList(a.id, done.id);
+        await addCard(await testAccess(a.id, todo.id), todo.id, 'card');
+        await deleteList(await testAccess(a.id, todo.id), todo.id);
+        await deleteList(await testAccess(a.id, done.id), done.id);
 
         expect(await listBoards(a.id)).toEqual([
             {
@@ -188,7 +197,11 @@ describe('renameBoard', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Old');
 
-        const rows = await renameBoard(a.id, board.id, 'New');
+        const rows = await renameBoard(
+            await testAccess(a.id, board.id),
+            board.id,
+            'New',
+        );
 
         expect(rows).toHaveLength(1);
         const [row] = await db
@@ -203,7 +216,11 @@ describe('renameBoard', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Old');
 
-        const rows = await renameBoard(b.id, board.id, 'Hacked');
+        const rows = await renameBoard(
+            await testAccess(b.id, board.id),
+            board.id,
+            'Hacked',
+        );
 
         expect(rows).toEqual([]);
         const [row] = await db
@@ -216,7 +233,13 @@ describe('renameBoard', () => {
     it('returns nothing for a non-existent board', async () => {
         const a = await seedUser();
 
-        expect(await renameBoard(a.id, MISSING_ID, 'x')).toEqual([]);
+        expect(
+            await renameBoard(
+                await testAccess(a.id, MISSING_ID),
+                MISSING_ID,
+                'x',
+            ),
+        ).toEqual([]);
     });
 });
 
@@ -229,9 +252,16 @@ describe('deleteBoard', () => {
             .from(lists)
             .where(eq(lists.boardId, board.id))
             .orderBy(lists.createdAt);
-        const card = await addCard(a.id, todo.id, 'card');
+        const card = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'card',
+        );
 
-        const rows = await deleteBoard(a.id, board.id);
+        const rows = await deleteBoard(
+            await testAccess(a.id, board.id),
+            board.id,
+        );
 
         expect(rows).toHaveLength(1);
         expect(
@@ -250,7 +280,10 @@ describe('deleteBoard', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Mine');
 
-        const rows = await deleteBoard(b.id, board.id);
+        const rows = await deleteBoard(
+            await testAccess(b.id, board.id),
+            board.id,
+        );
 
         expect(rows).toEqual([]);
         const remaining = await db
@@ -268,7 +301,9 @@ describe('deleteBoard', () => {
     it('returns nothing for a non-existent board', async () => {
         const a = await seedUser();
 
-        expect(await deleteBoard(a.id, MISSING_ID)).toEqual([]);
+        expect(
+            await deleteBoard(await testAccess(a.id, MISSING_ID), MISSING_ID),
+        ).toEqual([]);
     });
 });
 
@@ -279,8 +314,16 @@ describe('getBoard', () => {
         const boardLists = await listsOf(board.id);
         const [todoList] = boardLists;
 
-        const older = await addCard(a.id, todoList.id, 'older');
-        const newer = await addCard(a.id, todoList.id, 'newer');
+        const older = await addCard(
+            await testAccess(a.id, todoList.id),
+            todoList.id,
+            'older',
+        );
+        const newer = await addCard(
+            await testAccess(a.id, todoList.id),
+            todoList.id,
+            'newer',
+        );
 
         const result = await getBoard(
             await authorizeBoard({ id: a.id }, board.id, Action.BoardRead),
@@ -318,7 +361,11 @@ describe('addList', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
 
-        const row = await addList(a.id, board.id, 'In progress');
+        const row = await addList(
+            await testAccess(a.id, board.id),
+            board.id,
+            'In progress',
+        );
 
         expect(row?.title).toBe('In progress');
         expect(row?.boardId).toBe(board.id);
@@ -329,7 +376,11 @@ describe('addList', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
 
-        const row = await addList(b.id, board.id, 'hacked');
+        const row = await addList(
+            await testAccess(b.id, board.id),
+            board.id,
+            'hacked',
+        );
         expect(row).toBeNull();
     });
 });
@@ -344,7 +395,11 @@ describe('renameList', () => {
             .where(eq(lists.boardId, board.id))
             .limit(1);
 
-        const affected = await renameList(a.id, list.id, 'renamed');
+        const affected = await renameList(
+            await testAccess(a.id, list.id),
+            list.id,
+            'renamed',
+        );
         expect(affected).toHaveLength(1);
         expect(affected[0].title).toBe('renamed');
     });
@@ -359,7 +414,11 @@ describe('renameList', () => {
             .where(eq(lists.boardId, board.id))
             .limit(1);
 
-        const affected = await renameList(b.id, list.id, 'hacked');
+        const affected = await renameList(
+            await testAccess(b.id, list.id),
+            list.id,
+            'hacked',
+        );
         expect(affected).toHaveLength(0);
     });
 });
@@ -369,9 +428,16 @@ describe('deleteList', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const card = await addCard(a.id, list.id, 'card');
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
 
-        const affected = await deleteList(a.id, list.id);
+        const affected = await deleteList(
+            await testAccess(a.id, list.id),
+            list.id,
+        );
         expect(affected).toHaveLength(1);
         expect(affected[0].deletedAt).toBeInstanceOf(Date);
 
@@ -382,9 +448,9 @@ describe('deleteList', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        await addCard(a.id, todo.id, 'card');
+        await addCard(await testAccess(a.id, todo.id), todo.id, 'card');
 
-        await deleteList(a.id, todo.id);
+        await deleteList(await testAccess(a.id, todo.id), todo.id);
 
         const result = await getBoard(
             await authorizeBoard({ id: a.id }, board.id, Action.BoardRead),
@@ -398,7 +464,10 @@ describe('deleteList', () => {
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
 
-        const affected = await deleteList(b.id, list.id);
+        const affected = await deleteList(
+            await testAccess(b.id, list.id),
+            list.id,
+        );
         expect(affected).toHaveLength(0);
         expect((await listsOf(board.id))[0].deletedAt).toBeNull();
     });
@@ -409,10 +478,17 @@ describe('restoreList', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        const card = await addCard(a.id, todo.id, 'card');
-        await deleteList(a.id, todo.id);
+        const card = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'card',
+        );
+        await deleteList(await testAccess(a.id, todo.id), todo.id);
 
-        const affected = await restoreList(a.id, todo.id);
+        const affected = await restoreList(
+            await testAccess(a.id, todo.id),
+            todo.id,
+        );
         expect(affected).toHaveLength(1);
 
         const result = await getBoard(
@@ -427,9 +503,12 @@ describe('restoreList', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        await deleteList(a.id, list.id);
+        await deleteList(await testAccess(a.id, list.id), list.id);
 
-        const affected = await restoreList(b.id, list.id);
+        const affected = await restoreList(
+            await testAccess(b.id, list.id),
+            list.id,
+        );
         expect(affected).toHaveLength(0);
         expect((await listsOf(board.id))[0].deletedAt).toBeInstanceOf(Date);
     });
@@ -440,9 +519,15 @@ describe('mutations on a deleted list', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        await deleteList(a.id, list.id);
+        await deleteList(await testAccess(a.id, list.id), list.id);
 
-        expect(await renameList(a.id, list.id, 'renamed')).toHaveLength(0);
+        expect(
+            await renameList(
+                await testAccess(a.id, list.id),
+                list.id,
+                'renamed',
+            ),
+        ).toHaveLength(0);
         expect((await listsOf(board.id))[0].title).toBe('To do');
     });
 
@@ -450,9 +535,11 @@ describe('mutations on a deleted list', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        await deleteList(a.id, list.id);
+        await deleteList(await testAccess(a.id, list.id), list.id);
 
-        expect(await addCard(a.id, list.id, 'card')).toBeNull();
+        expect(
+            await addCard(await testAccess(a.id, list.id), list.id, 'card'),
+        ).toBeNull();
         expect(
             await db.select().from(cards).where(eq(cards.listId, list.id)),
         ).toHaveLength(0);
@@ -462,10 +549,22 @@ describe('mutations on a deleted list', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        const card = await addCard(a.id, todo.id, 'card');
-        await deleteList(a.id, done.id);
+        const card = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'card',
+        );
+        await deleteList(await testAccess(a.id, done.id), done.id);
 
-        expect(await moveCard(a.id, card!.id, done.id, null, null)).toBeNull();
+        expect(
+            await moveCard(
+                await testAccess(a.id, card!.id),
+                card!.id,
+                done.id,
+                null,
+                null,
+            ),
+        ).toBeNull();
         expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 
@@ -473,10 +572,22 @@ describe('mutations on a deleted list', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        const card = await addCard(a.id, todo.id, 'card');
-        await deleteList(a.id, todo.id);
+        const card = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'card',
+        );
+        await deleteList(await testAccess(a.id, todo.id), todo.id);
 
-        expect(await moveCard(a.id, card!.id, done.id, null, null)).toBeNull();
+        expect(
+            await moveCard(
+                await testAccess(a.id, card!.id),
+                card!.id,
+                done.id,
+                null,
+                null,
+            ),
+        ).toBeNull();
         expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 });
@@ -491,7 +602,11 @@ describe('addCard', () => {
             .where(eq(lists.boardId, board.id))
             .limit(1);
 
-        const row = await addCard(a.id, list.id, 'new card');
+        const row = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'new card',
+        );
         expect(row?.title).toBe('new card');
         expect(row?.listId).toBe(list.id);
     });
@@ -506,7 +621,11 @@ describe('addCard', () => {
             .where(eq(lists.boardId, board.id))
             .limit(1);
 
-        const row = await addCard(b.id, list.id, 'hacked');
+        const row = await addCard(
+            await testAccess(b.id, list.id),
+            list.id,
+            'hacked',
+        );
         expect(row).toBeNull();
     });
 });
@@ -520,12 +639,20 @@ describe('updateCard', () => {
             .from(lists)
             .where(eq(lists.boardId, board.id))
             .limit(1);
-        const card = await addCard(a.id, list.id, 'original');
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'original',
+        );
 
-        const affected = await updateCard(a.id, card!.id, {
-            title: 'renamed',
-            description: 'details',
-        });
+        const affected = await updateCard(
+            await testAccess(a.id, card!.id),
+            card!.id,
+            {
+                title: 'renamed',
+                description: 'details',
+            },
+        );
         expect(affected).toHaveLength(1);
         expect(affected[0].title).toBe('renamed');
         expect(affected[0].description).toBe('details');
@@ -540,9 +667,17 @@ describe('updateCard', () => {
             .from(lists)
             .where(eq(lists.boardId, board.id))
             .limit(1);
-        const card = await addCard(a.id, list.id, 'original');
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'original',
+        );
 
-        const affected = await updateCard(b.id, card!.id, { title: 'hacked' });
+        const affected = await updateCard(
+            await testAccess(b.id, card!.id),
+            card!.id,
+            { title: 'hacked' },
+        );
         expect(affected).toHaveLength(0);
     });
 });
@@ -557,9 +692,19 @@ describe('moveCard', () => {
             .where(eq(lists.boardId, board.id))
             .orderBy(lists.createdAt);
         const [fromList, toList] = boardLists;
-        const card = await addCard(a.id, fromList.id, 'card');
+        const card = await addCard(
+            await testAccess(a.id, fromList.id),
+            fromList.id,
+            'card',
+        );
 
-        const row = await moveCard(a.id, card!.id, toList.id, null, null);
+        const row = await moveCard(
+            await testAccess(a.id, card!.id),
+            card!.id,
+            toList.id,
+            null,
+            null,
+        );
         expect(row?.listId).toBe(toList.id);
     });
 
@@ -573,9 +718,19 @@ describe('moveCard', () => {
             .where(eq(lists.boardId, board.id))
             .orderBy(lists.createdAt);
         const [fromList, toList] = boardLists;
-        const card = await addCard(a.id, fromList.id, 'card');
+        const card = await addCard(
+            await testAccess(a.id, fromList.id),
+            fromList.id,
+            'card',
+        );
 
-        const row = await moveCard(b.id, card!.id, toList.id, null, null);
+        const row = await moveCard(
+            await testAccess(b.id, card!.id),
+            card!.id,
+            toList.id,
+            null,
+            null,
+        );
         expect(row).toBeNull();
         expect(
             (await db.select().from(cards).where(eq(cards.id, card!.id)))[0]
@@ -591,7 +746,11 @@ describe('moveCard', () => {
             .from(lists)
             .where(eq(lists.boardId, board.id))
             .limit(1);
-        const card = await addCard(a.id, list.id, 'card');
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
 
         const [otherBoard] = await db
             .insert(boards)
@@ -606,7 +765,13 @@ describe('moveCard', () => {
             })
             .returning();
 
-        const row = await moveCard(a.id, card!.id, otherList.id, null, null);
+        const row = await moveCard(
+            await testAccess(a.id, card!.id),
+            card!.id,
+            otherList.id,
+            null,
+            null,
+        );
         expect(row).toBeNull();
         expect(
             (await db.select().from(cards).where(eq(cards.id, card!.id)))[0]
@@ -620,10 +785,21 @@ describe('deleteCard', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const kept = await addCard(a.id, list.id, 'kept');
-        const card = await addCard(a.id, list.id, 'card');
+        const kept = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'kept',
+        );
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
 
-        const affected = await deleteCard(a.id, card!.id);
+        const affected = await deleteCard(
+            await testAccess(a.id, card!.id),
+            card!.id,
+        );
         expect(affected).toHaveLength(1);
         expect(affected[0].deletedAt).toBeInstanceOf(Date);
 
@@ -638,9 +814,16 @@ describe('deleteCard', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const card = await addCard(a.id, list.id, 'card');
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
 
-        const affected = await deleteCard(b.id, card!.id);
+        const affected = await deleteCard(
+            await testAccess(b.id, card!.id),
+            card!.id,
+        );
         expect(affected).toHaveLength(0);
         expect((await cardRow(card!.id)).deletedAt).toBeNull();
     });
@@ -651,10 +834,17 @@ describe('restoreCard', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const card = await addCard(a.id, list.id, 'card');
-        await deleteCard(a.id, card!.id);
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
+        await deleteCard(await testAccess(a.id, card!.id), card!.id);
 
-        const affected = await restoreCard(a.id, card!.id);
+        const affected = await restoreCard(
+            await testAccess(a.id, card!.id),
+            card!.id,
+        );
         expect(affected).toHaveLength(1);
 
         const result = await getBoard(
@@ -668,10 +858,17 @@ describe('restoreCard', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const card = await addCard(a.id, list.id, 'card');
-        await deleteCard(a.id, card!.id);
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
+        await deleteCard(await testAccess(a.id, card!.id), card!.id);
 
-        const affected = await restoreCard(b.id, card!.id);
+        const affected = await restoreCard(
+            await testAccess(b.id, card!.id),
+            card!.id,
+        );
         expect(affected).toHaveLength(0);
         expect((await cardRow(card!.id)).deletedAt).toBeInstanceOf(Date);
     });
@@ -680,22 +877,52 @@ describe('restoreCard', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const card = await addCard(a.id, list.id, 'card');
-        const label = await createLabel(a.id, board.id, {
-            title: 'Urgent',
-            color: 'green',
-        });
-        expect(await addCardLabel(a.id, card!.id, label!.id)).toBe(true);
-        await updateCard(a.id, card!.id, {
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'card',
+        );
+        const label = await createLabel(
+            await testAccess(a.id, board.id),
+            board.id,
+            {
+                title: 'Urgent',
+                color: 'green',
+            },
+        );
+        expect(
+            await addCardLabel(
+                await testAccess(a.id, card!.id),
+                card!.id,
+                label!.id,
+            ),
+        ).toBe(true);
+        await updateCard(await testAccess(a.id, card!.id), card!.id, {
             completed: true,
             due: { dueDate: '2030-01-15', dueAt: null },
         });
-        const checklist = await createChecklist(a.id, card!.id, 'Steps');
-        const first = await addChecklistItem(a.id, checklist!.id, 'First');
-        await addChecklistItem(a.id, checklist!.id, 'Second');
-        await updateChecklistItem(a.id, first!.id, { done: true });
+        const checklist = await createChecklist(
+            await testAccess(a.id, card!.id),
+            card!.id,
+            'Steps',
+        );
+        const first = await addChecklistItem(
+            await testAccess(a.id, checklist!.id),
+            checklist!.id,
+            'First',
+        );
+        await addChecklistItem(
+            await testAccess(a.id, checklist!.id),
+            checklist!.id,
+            'Second',
+        );
+        await updateChecklistItem(
+            await testAccess(a.id, first!.id),
+            first!.id,
+            { done: true },
+        );
 
-        await deleteCard(a.id, card!.id);
+        await deleteCard(await testAccess(a.id, card!.id), card!.id);
         expect(
             (
                 await getBoard(
@@ -707,7 +934,7 @@ describe('restoreCard', () => {
                 )
             )?.lists[0].cards,
         ).toEqual([]);
-        await restoreCard(a.id, card!.id);
+        await restoreCard(await testAccess(a.id, card!.id), card!.id);
 
         const [restored] = (await getBoard(
             await authorizeBoard({ id: a.id }, board.id, Action.BoardRead),
@@ -721,7 +948,10 @@ describe('restoreCard', () => {
             checklistTotal: 2,
         });
         expect(restored.completedAt).toBeInstanceOf(Date);
-        const restoredChecklist = await getChecklist(a.id, card!.id);
+        const restoredChecklist = await getChecklist(
+            await testAccess(a.id, card!.id),
+            card!.id,
+        );
         expect(restoredChecklist?.title).toBe('Steps');
         expect(restoredChecklist?.items.map((i) => [i.title, i.done])).toEqual([
             ['First', true],
@@ -735,11 +965,17 @@ describe('mutations on a deleted card', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [list] = await listsOf(board.id);
-        const card = await addCard(a.id, list.id, 'original');
-        await deleteCard(a.id, card!.id);
+        const card = await addCard(
+            await testAccess(a.id, list.id),
+            list.id,
+            'original',
+        );
+        await deleteCard(await testAccess(a.id, card!.id), card!.id);
 
         expect(
-            await updateCard(a.id, card!.id, { title: 'renamed' }),
+            await updateCard(await testAccess(a.id, card!.id), card!.id, {
+                title: 'renamed',
+            }),
         ).toHaveLength(0);
         expect((await cardRow(card!.id)).title).toBe('original');
     });
@@ -748,10 +984,22 @@ describe('mutations on a deleted card', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Board');
         const [todo, done] = await listsOf(board.id);
-        const card = await addCard(a.id, todo.id, 'card');
-        await deleteCard(a.id, card!.id);
+        const card = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'card',
+        );
+        await deleteCard(await testAccess(a.id, card!.id), card!.id);
 
-        expect(await moveCard(a.id, card!.id, done.id, null, null)).toBeNull();
+        expect(
+            await moveCard(
+                await testAccess(a.id, card!.id),
+                card!.id,
+                done.id,
+                null,
+                null,
+            ),
+        ).toBeNull();
         expect((await cardRow(card!.id)).listId).toBe(todo.id);
     });
 });
@@ -807,9 +1055,13 @@ describe('card order', () => {
     it('addCard puts the new card before the first live card', async () => {
         const a = await seedUser();
         const { board, todo, todoIds } = await seedOrder(a.id, ['a0', 'a1']);
-        await deleteCard(a.id, todoIds[0]);
+        await deleteCard(await testAccess(a.id, todoIds[0]), todoIds[0]);
 
-        const card = await addCard(a.id, todo.id, 'new');
+        const card = await addCard(
+            await testAccess(a.id, todo.id),
+            todo.id,
+            'new',
+        );
 
         expect(card?.position).toBe('a0');
         expect((await order(a.id, board.id))[0]).toEqual([
@@ -822,7 +1074,10 @@ describe('card order', () => {
         const a = await seedUser();
         const { todo } = await seedOrder(a.id, []);
 
-        expect((await addCard(a.id, todo.id, 'first'))?.position).toBe('a0');
+        expect(
+            (await addCard(await testAccess(a.id, todo.id), todo.id, 'first'))
+                ?.position,
+        ).toBe('a0');
     });
 
     it('moveCard puts a card between two neighbors in another list', async () => {
@@ -834,7 +1089,7 @@ describe('card order', () => {
         );
 
         const row = await moveCard(
-            a.id,
+            await testAccess(a.id, todoIds[0]),
             todoIds[0],
             done.id,
             doneIds[0],
@@ -856,14 +1111,26 @@ describe('card order', () => {
             'a2',
         ]);
 
-        await moveCard(a.id, todoIds[2], todo.id, null, todoIds[0]);
+        await moveCard(
+            await testAccess(a.id, todoIds[2]),
+            todoIds[2],
+            todo.id,
+            null,
+            todoIds[0],
+        );
         expect((await order(a.id, board.id))[0]).toEqual([
             todoIds[2],
             todoIds[0],
             todoIds[1],
         ]);
 
-        await moveCard(a.id, todoIds[2], todo.id, todoIds[1], null);
+        await moveCard(
+            await testAccess(a.id, todoIds[2]),
+            todoIds[2],
+            todo.id,
+            todoIds[1],
+            null,
+        );
         expect((await order(a.id, board.id))[0]).toEqual(todoIds);
     });
 
@@ -875,14 +1142,26 @@ describe('card order', () => {
             'a2',
         ]);
 
-        await moveCard(a.id, todoIds[0], todo.id, todoIds[1], todoIds[2]);
+        await moveCard(
+            await testAccess(a.id, todoIds[0]),
+            todoIds[0],
+            todo.id,
+            todoIds[1],
+            todoIds[2],
+        );
         expect((await order(a.id, board.id))[0]).toEqual([
             todoIds[1],
             todoIds[0],
             todoIds[2],
         ]);
 
-        await moveCard(a.id, todoIds[2], todo.id, null, todoIds[1]);
+        await moveCard(
+            await testAccess(a.id, todoIds[2]),
+            todoIds[2],
+            todo.id,
+            null,
+            todoIds[1],
+        );
         expect((await order(a.id, board.id))[0]).toEqual([
             todoIds[2],
             todoIds[1],
@@ -894,7 +1173,13 @@ describe('card order', () => {
         const a = await seedUser();
         const { board, done, todoIds } = await seedOrder(a.id, ['a0']);
 
-        const row = await moveCard(a.id, todoIds[0], done.id, null, null);
+        const row = await moveCard(
+            await testAccess(a.id, todoIds[0]),
+            todoIds[0],
+            done.id,
+            null,
+            null,
+        );
 
         expect(row?.position).toBe('a0');
         expect(await order(a.id, board.id)).toEqual([[], [todoIds[0]]]);
@@ -922,11 +1207,23 @@ describe('card order', () => {
                 ['a0'],
             );
 
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], done.id, todoIds[1], null),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    done.id,
+                    todoIds[1],
+                    null,
+                ),
             );
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], done.id, null, todoIds[1]),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    done.id,
+                    null,
+                    todoIds[1],
+                ),
             );
         });
 
@@ -936,18 +1233,18 @@ describe('card order', () => {
             const mine = await seedOrder(a.id, ['a0']);
             const foreign = await seedOrder(b.id, ['a0']);
 
-            await expectRefused(mine.todoIds[0], () =>
+            await expectRefused(mine.todoIds[0], async () =>
                 moveCard(
-                    a.id,
+                    await testAccess(a.id, mine.todoIds[0]),
                     mine.todoIds[0],
                     mine.done.id,
                     foreign.todoIds[0],
                     null,
                 ),
             );
-            await expectRefused(mine.todoIds[0], () =>
+            await expectRefused(mine.todoIds[0], async () =>
                 moveCard(
-                    a.id,
+                    await testAccess(a.id, mine.todoIds[0]),
                     mine.todoIds[0],
                     foreign.todo.id,
                     foreign.todoIds[0],
@@ -963,10 +1260,16 @@ describe('card order', () => {
                 ['a0'],
                 ['a0'],
             );
-            await deleteCard(a.id, doneIds[0]);
+            await deleteCard(await testAccess(a.id, doneIds[0]), doneIds[0]);
 
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], done.id, doneIds[0], null),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    done.id,
+                    doneIds[0],
+                    null,
+                ),
             );
         });
 
@@ -974,11 +1277,23 @@ describe('card order', () => {
             const a = await seedUser();
             const { todo, todoIds } = await seedOrder(a.id, ['a0', 'a1']);
 
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], todo.id, todoIds[0], todoIds[1]),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    todo.id,
+                    todoIds[0],
+                    todoIds[1],
+                ),
             );
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], todo.id, null, todoIds[0]),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    todo.id,
+                    null,
+                    todoIds[0],
+                ),
             );
         });
 
@@ -991,8 +1306,14 @@ describe('card order', () => {
             );
 
             // Renumbering keeps the order, so the keys stay reversed: refused.
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], done.id, doneIds[2], doneIds[0]),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    done.id,
+                    doneIds[2],
+                    doneIds[0],
+                ),
             );
             expect(await order(a.id, board.id)).toEqual([todoIds, doneIds]);
         });
@@ -1000,10 +1321,16 @@ describe('card order', () => {
         it('a deleted target list', async () => {
             const a = await seedUser();
             const { done, todoIds } = await seedOrder(a.id, ['a0']);
-            await deleteList(a.id, done.id);
+            await deleteList(await testAccess(a.id, done.id), done.id);
 
-            await expectRefused(todoIds[0], () =>
-                moveCard(a.id, todoIds[0], done.id, null, null),
+            await expectRefused(todoIds[0], async () =>
+                moveCard(
+                    await testAccess(a.id, todoIds[0]),
+                    todoIds[0],
+                    done.id,
+                    null,
+                    null,
+                ),
             );
         });
     });
@@ -1017,7 +1344,13 @@ describe('card order', () => {
         );
         const [, first, second] = (await order(a.id, board.id))[1];
 
-        const row = await moveCard(a.id, todoIds[0], done.id, first, second);
+        const row = await moveCard(
+            await testAccess(a.id, todoIds[0]),
+            todoIds[0],
+            done.id,
+            first,
+            second,
+        );
 
         expect(row).not.toBeNull();
         const doneOrder = (await order(a.id, board.id))[1];
@@ -1041,11 +1374,17 @@ describe('card order', () => {
             ['a0'],
             ['a0', 'a1', 'a1'],
         );
-        await deleteCard(a.id, doneIds[0]);
+        await deleteCard(await testAccess(a.id, doneIds[0]), doneIds[0]);
         const [first, second] = (await order(a.id, board.id))[1];
 
-        await moveCard(a.id, todoIds[0], done.id, first, second);
-        await restoreCard(a.id, doneIds[0]);
+        await moveCard(
+            await testAccess(a.id, todoIds[0]),
+            todoIds[0],
+            done.id,
+            first,
+            second,
+        );
+        await restoreCard(await testAccess(a.id, doneIds[0]), doneIds[0]);
 
         expect((await order(a.id, board.id))[1]).toEqual([
             doneIds[0],
@@ -1063,11 +1402,17 @@ describe('card order', () => {
             ['a0'],
         );
         const [first, middle, last] = todoIds;
-        await deleteCard(a.id, middle);
+        await deleteCard(await testAccess(a.id, middle), middle);
         // Without the deleted card, first and last are neighbors: the key lands
         // between them, so the deleted card may share it.
-        const moved = await moveCard(a.id, doneIds[0], todo.id, first, last);
-        await restoreCard(a.id, middle);
+        const moved = await moveCard(
+            await testAccess(a.id, doneIds[0]),
+            doneIds[0],
+            todo.id,
+            first,
+            last,
+        );
+        await restoreCard(await testAccess(a.id, middle), middle);
 
         expect(moved).not.toBeNull();
         const todoOrder = (await order(a.id, board.id))[0];
@@ -1079,7 +1424,13 @@ describe('card order', () => {
 
         // A move between cards that may share a key still lands exactly there.
         const [, upper, lower] = todoOrder;
-        await moveCard(a.id, last, todo.id, upper, lower);
+        await moveCard(
+            await testAccess(a.id, last),
+            last,
+            todo.id,
+            upper,
+            lower,
+        );
         expect((await order(a.id, board.id))[0]).toEqual([
             first,
             upper,

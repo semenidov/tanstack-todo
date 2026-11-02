@@ -111,12 +111,25 @@ const otherBoard: BoardData = {
 
 function setup(
     listId: string,
-    { isSyncing = false }: { isSyncing?: boolean } = {},
+    {
+        isSyncing = false,
+        role = Role.Owner,
+    }: { isSyncing?: boolean; role?: Role } = {},
 ) {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    queryClient.setQueryData(boardsListQueryOptions.queryKey, boards);
+    queryClient.setQueryData(boardsListQueryOptions.queryKey, [
+        ...boards.map((board) =>
+            board.id === current.id ? { ...board, myRole: role } : board,
+        ),
+        {
+            ...boards[1],
+            id: 'shared-target',
+            title: 'Shared target',
+            myRole: Role.Editor,
+        },
+    ]);
     queryClient.setQueryData(boardQueryOptions('board-2').queryKey, otherBoard);
     const onMove = vi.fn();
     const list = lists.find((l) => l.id === listId);
@@ -149,6 +162,16 @@ beforeEach(() => {
 });
 
 describe('MoveListForm', () => {
+    it('keeps the current shared board as the only choice for a member', () => {
+        const { boardSelect } = setup('a', { role: Role.Editor });
+        expect(
+            Array.from(
+                boardSelect.querySelectorAll('option'),
+                (o) => o.textContent,
+            ),
+        ).toEqual(['Current']);
+    });
+
     it('offers the user boards with the current one selected', () => {
         const { boardSelect } = setup('a');
 

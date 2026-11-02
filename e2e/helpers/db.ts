@@ -43,3 +43,7 @@ export async function seedBoardMember(boardId: string, email: string) {
     if (!member) throw new Error('E2E: member user not found');
     await db.insert(boardMembers).values({ boardId, userId: member.id });
 }
+
+export async function removeBoardMembers(boardId: string) {
+    await db.delete(boardMembers).where(eq(boardMembers.boardId, boardId));
+}
