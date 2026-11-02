@@ -28,7 +28,7 @@ const config = defineConfig({
         'import.meta.env.VITE_SITE_URL': JSON.stringify(siteUrl()),
     },
     plugins: [
-        devtools(),
+        devtools({ eventBusConfig: { port: 0 } }),
         nitro(),
         tailwindcss(),
         tanstackStart(),
