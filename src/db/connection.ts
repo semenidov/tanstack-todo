@@ -9,7 +9,7 @@ export function isLocalDatabaseUrl(url: string): boolean {
 
 export const LOCAL_DB_UNREACHABLE_HINT =
     'Local Postgres is unreachable. Start it with `docker compose up -d` ' +
-    '(and run migrations on a fresh volume, see CONTRIBUTING.md).';
+    '(and run migrations on a fresh volume, see README.md).';
 
 export async function assertDbReachable(
     db: { execute: (query: SQL) => Promise<unknown> },
