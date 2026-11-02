@@ -2,6 +2,7 @@ import { Role } from '#/lib/permissions';
 import { BoardTile } from '#/components/boards/board-tile';
 import {
     useDeleteBoard,
+    useLeaveBoard,
     useRenameBoard,
 } from '#/components/boards/board-mutations';
 import { CreateBoardTile } from '#/components/boards/create-board-tile';
@@ -28,6 +29,7 @@ export function BoardsView({ boards }: BoardsViewProps) {
     const sharedBoards = boards.filter((board) => board.myRole !== Role.Owner);
     const renameBoard = useRenameBoard();
     const deleteBoard = useDeleteBoard();
+    const leaveBoard = useLeaveBoard();
 
     return (
         <div className="flex min-h-screen flex-col bg-muted/30">
@@ -74,6 +76,7 @@ export function BoardsView({ boards }: BoardsViewProps) {
                                     })
                                 }
                                 onDelete={() => deleteBoard.mutate(board.id)}
+                                onLeave={() => leaveBoard.mutate(board.id)}
                             />
                         ))}
                         <CreateBoardTile />
@@ -93,6 +96,9 @@ export function BoardsView({ boards }: BoardsViewProps) {
                                                 boardId: board.id,
                                                 title,
                                             })
+                                        }
+                                        onLeave={() =>
+                                            leaveBoard.mutate(board.id)
                                         }
                                         onDelete={() =>
                                             deleteBoard.mutate(board.id)

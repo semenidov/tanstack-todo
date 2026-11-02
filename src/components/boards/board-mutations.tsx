@@ -1,6 +1,8 @@
 import { removeBoardFromList, renameBoardInList } from '#/lib/boards';
 import { boardQueryOptions, boardsListQueryOptions } from '#/lib/boards-query';
 import { deleteBoardServer, renameBoardServer } from '#/server/boards';
+import { leaveBoardServer } from '#/server/members';
+import { BOARD_ACCESS_DENIED, isBoardAccessDenied } from '#/lib/board-access';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -67,6 +69,37 @@ export function useDeleteBoard() {
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: key });
+        },
+    });
+}
+
+export function useLeaveBoard() {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (boardId: string) =>
+            leaveBoardServer({ data: { boardId } }),
+        onSuccess: (_data, boardId) => {
+            queryClient.setQueryData(key, (old) =>
+                old ? removeBoardFromList(old, boardId) : old,
+            );
+            queryClient.removeQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+                exact: true,
+            });
+        },
+        onError: (error) => {
+            toast.error(
+                isBoardAccessDenied(error)
+                    ? BOARD_ACCESS_DENIED
+                    : "Couldn't leave the board. Please try again.",
+            );
+        },
+        onSettled: (_data, _error, boardId) => {
+            queryClient.invalidateQueries({ queryKey: key });
+            queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
         },
     });
 }
