@@ -27,7 +27,15 @@ const boardKey = boardQueryOptions(board.id).queryKey;
 function setup() {
     const client = new QueryClient();
     client.setQueryData(listKey, [board]);
-    client.setQueryData(boardKey, { board, lists: [] });
+    client.setQueryData(boardKey, {
+        board: {
+            ...board,
+            ownerId: 'owner',
+            createdAt: new Date(0),
+            updatedAt: new Date(0),
+        },
+        lists: [],
+    });
     const wrapper = ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
