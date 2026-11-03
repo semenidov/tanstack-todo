@@ -2,13 +2,10 @@ import { db } from '#/db';
 import { cards, checklistItems, checklists } from '#/db/schema';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
-import {
-    findOwnedCard,
-    ownedCardIds,
-    ownedChecklistIds,
-} from '#/server/access';
+import { findOwnedCard, ownedChecklistIds, accessibleCardIds  } from '#/server/access';
 import { and, asc, count, eq, inArray, max } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
+import type { BoardAccess } from '#/server/authorize';
 
 function touchChecklistCard(checklistId: string) {
     return db
@@ -25,11 +22,14 @@ function touchChecklistCard(checklistId: string) {
         );
 }
 
-export async function getChecklist(userId: string, cardId: string) {
+export async function getChecklist(access: BoardAccess, cardId: string) {
     const checklist = await db.query.checklists.findFirst({
         where: and(
             eq(checklists.cardId, cardId),
-            inArray(checklists.cardId, ownedCardIds(userId)),
+            inArray(
+                checklists.cardId,
+                accessibleCardIds(access.userId, access.boardId),
+            ),
         ),
         with: {
             items: {

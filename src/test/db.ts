@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '#/db';
-import { user } from '#/db/schema';
+import { boardMembers, user } from '#/db/schema';
 
 export async function seedUser(
     overrides: Partial<typeof user.$inferInsert> = {},
@@ -16,4 +16,8 @@ export async function seedUser(
         })
         .returning();
     return row;
+}
+
+export async function seedBoardMember(boardId: string, userId: string) {
+    await db.insert(boardMembers).values({ boardId, userId });
 }

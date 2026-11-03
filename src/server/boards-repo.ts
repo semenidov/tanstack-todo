@@ -12,8 +12,15 @@ import {
     checklists,
     labels,
     lists,
+    user,
 } from '#/db/schema';
-import { ownedBoardIds, ownedListIds } from '#/server/access';
+import {
+    accessibleBoardIds,
+    ownedBoardIds,
+    ownedListIds,
+} from '#/server/access';
+import type { BoardAccess } from '#/server/authorize';
+import { Role } from '#/lib/permissions';
 import {
     and,
     asc,
@@ -38,8 +45,11 @@ export function listBoards(userId: string) {
             title: boards.title,
             listCount: countDistinct(lists.id),
             cardCount: count(cards.id),
+            ownerId: boards.ownerId,
+            ownerName: user.name,
         })
         .from(boards)
+        .innerJoin(user, eq(boards.ownerId, user.id))
         .leftJoin(
             lists,
             and(eq(lists.boardId, boards.id), isNull(lists.deletedAt)),
@@ -48,9 +58,15 @@ export function listBoards(userId: string) {
             cards,
             and(eq(cards.listId, lists.id), isNull(cards.deletedAt)),
         )
-        .where(eq(boards.ownerId, userId))
-        .groupBy(boards.id)
-        .orderBy(asc(boards.createdAt));
+        .where(inArray(boards.id, accessibleBoardIds(userId)))
+        .groupBy(boards.id, user.id)
+        .orderBy(asc(boards.createdAt))
+        .then((rows) =>
+            rows.map(({ ownerId, ...row }) => ({
+                ...row,
+                myRole: ownerId === userId ? Role.Owner : Role.Editor,
+            })),
+        );
 }
 
 async function assertBelowQuota(
@@ -229,10 +245,16 @@ function checklistItemCount(cardId: AnyColumn, done?: true) {
     return sql`(${items})`.mapWith(Number);
 }
 
-export async function getBoard(userId: string, boardId: string) {
+export async function getBoard(access: BoardAccess) {
     const board = await db.query.boards.findFirst({
-        where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
+        columns: { inviteToken: false },
+        where: (b) =>
+            and(
+                eq(b.id, access.boardId),
+                inArray(b.id, accessibleBoardIds(access.userId)),
+            ),
         with: {
+            owner: { columns: { name: true } },
             lists: {
                 columns: { deletedAt: false },
                 where: (l) => isNull(l.deletedAt),
@@ -258,9 +280,9 @@ export async function getBoard(userId: string, boardId: string) {
     });
     if (!board) return null;
 
-    const { lists: boardLists, ...boardFields } = board;
+    const { lists: boardLists, owner, ...boardFields } = board;
     return {
-        board: boardFields,
+        board: { ...boardFields, myRole: access.role, ownerName: owner.name },
         lists: boardLists.map((list) => ({
             ...list,
             cards: list.cards.map(({ cardLabels: links, ...card }) => ({

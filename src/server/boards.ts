@@ -5,6 +5,8 @@ import { moveCardOrThrow } from '#/server/move-card';
 import { moveListOrThrow } from '#/server/move-list';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
+import { Action } from '#/lib/permissions';
+import { authorizeBoard } from '#/server/authorize';
 
 const titleSchema = z.string().trim().min(1).max(200);
 const descriptionSchema = z.string().max(5000);
@@ -48,7 +50,9 @@ export const getBoardServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())
     .handler(async ({ data: boardId }) => {
         const { id: userId } = await requireUser();
-        return repo.getBoard(userId, boardId);
+        return repo.getBoard(
+            await authorizeBoard(userId, boardId, Action.BoardRead),
+        );
     });
 
 export const addListServer = createServerFn({ method: 'POST' })

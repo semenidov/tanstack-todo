@@ -1,3 +1,5 @@
+import { Role, Action  } from '#/lib/permissions';
+import { authorizeBoard, authorizeCard } from '#/server/authorize';
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
 import { boards, cards, lists } from '#/db/schema';
@@ -71,8 +73,22 @@ describe('listBoards', () => {
         const result = await listBoards(a.id);
 
         expect(result).toEqual([
-            { id: first.id, title: 'First', listCount: 2, cardCount: 2 },
-            { id: second.id, title: 'Second', listCount: 2, cardCount: 0 },
+            {
+                id: first.id,
+                title: 'First',
+                listCount: 2,
+                cardCount: 2,
+                myRole: Role.Owner,
+                ownerName: a.name,
+            },
+            {
+                id: second.id,
+                title: 'Second',
+                listCount: 2,
+                cardCount: 0,
+                myRole: Role.Owner,
+                ownerName: a.name,
+            },
         ]);
     });
 
@@ -84,7 +100,14 @@ describe('listBoards', () => {
             .returning();
 
         expect(await listBoards(a.id)).toEqual([
-            { id: board.id, title: 'Empty', listCount: 0, cardCount: 0 },
+            {
+                id: board.id,
+                title: 'Empty',
+                listCount: 0,
+                cardCount: 0,
+                myRole: Role.Owner,
+                ownerName: a.name,
+            },
         ]);
     });
 
@@ -99,7 +122,14 @@ describe('listBoards', () => {
         await deleteList(a.id, done.id);
 
         expect(await listBoards(a.id)).toEqual([
-            { id: board.id, title: 'Board', listCount: 1, cardCount: 1 },
+            {
+                id: board.id,
+                title: 'Board',
+                listCount: 1,
+                cardCount: 1,
+                myRole: Role.Owner,
+                ownerName: a.name,
+            },
         ]);
     });
 
@@ -112,7 +142,14 @@ describe('listBoards', () => {
         await deleteList(a.id, done.id);
 
         expect(await listBoards(a.id)).toEqual([
-            { id: board.id, title: 'Board', listCount: 0, cardCount: 0 },
+            {
+                id: board.id,
+                title: 'Board',
+                listCount: 0,
+                cardCount: 0,
+                myRole: Role.Owner,
+                ownerName: a.name,
+            },
         ]);
     });
 
@@ -245,7 +282,9 @@ describe('getBoard', () => {
         const older = await addCard(a.id, todoList.id, 'older');
         const newer = await addCard(a.id, todoList.id, 'newer');
 
-        const result = await getBoard(a.id, board.id);
+        const result = await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        );
 
         expect(result?.lists.map((l) => l.title)).toEqual(
             boardLists.map((l) => l.title),
@@ -261,12 +300,16 @@ describe('getBoard', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
 
-        expect(await getBoard(b.id, board.id)).toBeNull();
+        await expect(
+            authorizeBoard(b.id, board.id, Action.BoardRead),
+        ).rejects.toThrow("Board not found or you don't have access");
     });
 
     it('returns null for a non-existent board', async () => {
         const a = await seedUser();
-        expect(await getBoard(a.id, MISSING_ID)).toBeNull();
+        await expect(
+            authorizeBoard(a.id, MISSING_ID, Action.BoardRead),
+        ).rejects.toThrow("Board not found or you don't have access");
     });
 });
 
@@ -343,7 +386,9 @@ describe('deleteList', () => {
 
         await deleteList(a.id, todo.id);
 
-        const result = await getBoard(a.id, board.id);
+        const result = await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        );
         expect(result?.lists.map((l) => l.id)).toEqual([done.id]);
     });
 
@@ -370,7 +415,9 @@ describe('restoreList', () => {
         const affected = await restoreList(a.id, todo.id);
         expect(affected).toHaveLength(1);
 
-        const result = await getBoard(a.id, board.id);
+        const result = await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        );
         expect(result?.lists.map((l) => l.id)).toEqual([todo.id, done.id]);
         expect(result?.lists[0].cards.map((c) => c.id)).toEqual([card!.id]);
     });
@@ -580,7 +627,9 @@ describe('deleteCard', () => {
         expect(affected).toHaveLength(1);
         expect(affected[0].deletedAt).toBeInstanceOf(Date);
 
-        const result = await getBoard(a.id, board.id);
+        const result = await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        );
         expect(result?.lists[0].cards.map((c) => c.id)).toEqual([kept!.id]);
     });
 
@@ -608,7 +657,9 @@ describe('restoreCard', () => {
         const affected = await restoreCard(a.id, card!.id);
         expect(affected).toHaveLength(1);
 
-        const result = await getBoard(a.id, board.id);
+        const result = await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        );
         expect(result?.lists[0].cards.map((c) => c.id)).toEqual([card!.id]);
     });
 
@@ -645,10 +696,18 @@ describe('restoreCard', () => {
         await updateChecklistItem(a.id, first!.id, { done: true });
 
         await deleteCard(a.id, card!.id);
-        expect((await getBoard(a.id, board.id))?.lists[0].cards).toEqual([]);
+        expect(
+            (
+                await getBoard(
+                    await authorizeBoard(a.id, board.id, Action.BoardRead),
+                )
+            )?.lists[0].cards,
+        ).toEqual([]);
         await restoreCard(a.id, card!.id);
 
-        const [restored] = (await getBoard(a.id, board.id))!.lists[0].cards;
+        const [restored] = (await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        ))!.lists[0].cards;
         expect(restored).toMatchObject({
             id: card!.id,
             labelIds: [label!.id],
@@ -658,7 +717,10 @@ describe('restoreCard', () => {
             checklistTotal: 2,
         });
         expect(restored.completedAt).toBeInstanceOf(Date);
-        const restoredChecklist = await getChecklist(a.id, card!.id);
+        const restoredChecklist = await getChecklist(
+            await authorizeCard(a.id, card!.id, Action.BoardRead),
+            card!.id,
+        );
         expect(restoredChecklist?.title).toBe('Steps');
         expect(restoredChecklist?.items.map((i) => [i.title, i.done])).toEqual([
             ['First', true],
@@ -724,7 +786,9 @@ describe('card order', () => {
 
     /** Card ids per list in getBoard order: [todo, done]. */
     async function order(userId: string, boardId: string) {
-        const result = await getBoard(userId, boardId);
+        const result = await getBoard(
+            await authorizeBoard(userId, boardId, Action.BoardRead),
+        );
         return result?.lists.map((l) => l.cards.map((c) => c.id)) ?? [];
     }
 
