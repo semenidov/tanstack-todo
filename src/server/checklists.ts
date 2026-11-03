@@ -5,7 +5,12 @@ import * as repo from '#/server/checklists-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 import { Action } from '#/lib/permissions';
-import { authorizeCard } from '#/server/authorize';
+import {
+    authorizeCard,
+    authorizeChecklist,
+    authorizeChecklistItem,
+    requireChanged,
+} from '#/server/authorize';
 
 const textSchema = z.string().trim().min(1).max(MAX_CHECKLIST_TEXT_LENGTH);
 
@@ -23,12 +28,13 @@ export const createChecklistServer = createServerFn({ method: 'POST' })
     .validator(z.object({ cardId: z.uuid(), title: textSchema }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        const checklist = await repo.createChecklist(
-            userId,
-            data.cardId,
-            data.title,
+        const checklist = requireChanged(
+            await repo.createChecklist(
+                await authorizeCard(userId, data.cardId, Action.ContentEdit),
+                data.cardId,
+                data.title,
+            ),
         );
-        if (!checklist) throw new Error('Checklist was not created');
         return checklist;
     });
 
@@ -36,19 +42,33 @@ export const renameChecklistServer = createServerFn({ method: 'POST' })
     .validator(z.object({ checklistId: z.uuid(), title: textSchema }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        const checklist = await repo.renameChecklist(
-            userId,
-            data.checklistId,
-            data.title,
+        requireChanged(
+            await repo.renameChecklist(
+                await authorizeChecklist(
+                    userId,
+                    data.checklistId,
+                    Action.ContentEdit,
+                ),
+                data.checklistId,
+                data.title,
+            ),
         );
-        if (!checklist) throw new Error('Checklist was not saved');
     });
 
 export const deleteChecklistServer = createServerFn({ method: 'POST' })
     .validator(z.object({ checklistId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteChecklist(userId, data.checklistId);
+        requireChanged(
+            await repo.deleteChecklist(
+                await authorizeChecklist(
+                    userId,
+                    data.checklistId,
+                    Action.ContentEdit,
+                ),
+                data.checklistId,
+            ),
+        );
     });
 
 export const addChecklistItemServer = createServerFn({ method: 'POST' })
@@ -59,7 +79,6 @@ export const addChecklistItemServer = createServerFn({ method: 'POST' })
             data.checklistId,
             data.title,
         );
-        if (!item) throw new Error('Item was not added');
         return item;
     });
 
@@ -73,15 +92,33 @@ export const updateChecklistItemServer = createServerFn({ method: 'POST' })
     )
     .handler(async ({ data: { itemId, ...patch } }) => {
         const { id: userId } = await requireUser();
-        const item = await repo.updateChecklistItem(userId, itemId, patch);
-        if (!item) throw new Error('Item was not saved');
+        requireChanged(
+            await repo.updateChecklistItem(
+                await authorizeChecklistItem(
+                    userId,
+                    itemId,
+                    Action.ContentEdit,
+                ),
+                itemId,
+                patch,
+            ),
+        );
     });
 
 export const deleteChecklistItemServer = createServerFn({ method: 'POST' })
     .validator(z.object({ itemId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteChecklistItem(userId, data.itemId);
+        requireChanged(
+            await repo.deleteChecklistItem(
+                await authorizeChecklistItem(
+                    userId,
+                    data.itemId,
+                    Action.ContentEdit,
+                ),
+                data.itemId,
+            ),
+        );
     });
 
 export const moveChecklistItemServer = createServerFn({ method: 'POST' })
@@ -94,11 +131,16 @@ export const moveChecklistItemServer = createServerFn({ method: 'POST' })
     )
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        const item = await repo.moveChecklistItem(
-            userId,
-            data.itemId,
-            data.prevItemId,
-            data.nextItemId,
+        requireChanged(
+            await repo.moveChecklistItem(
+                await authorizeChecklistItem(
+                    userId,
+                    data.itemId,
+                    Action.ContentEdit,
+                ),
+                data.itemId,
+                data.prevItemId,
+                data.nextItemId,
+            ),
         );
-        if (!item) throw new Error('Item was not moved');
     });

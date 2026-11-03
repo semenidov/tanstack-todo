@@ -1,3 +1,4 @@
+import { repoAccess } from '#/test/access';
 import { describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { db } from '#/db';
@@ -30,14 +31,33 @@ async function sharedBoard() {
 describe('board read authorization', () => {
     it('owner and editor read all board content without token or member data', async () => {
         const { owner, editor, board } = await sharedBoard();
-        const list = await addList(owner.id, board.id, 'Tasks');
+        const list = await addList(
+            await repoAccess(owner.id, board.id),
+            board.id,
+            'Tasks',
+        );
         if (!list) throw new Error('Missing list');
-        const card = await addCard(owner.id, list.id, 'Task');
+        const card = await addCard(
+            await repoAccess(owner.id, list.id),
+            list.id,
+            'Task',
+        );
         if (!card) throw new Error('Missing card');
-        await createLabel(owner.id, board.id, { title: 'Label', color: 'red' });
-        const checklist = await createChecklist(owner.id, card.id, 'Checklist');
+        await createLabel(await repoAccess(owner.id, board.id), board.id, {
+            title: 'Label',
+            color: 'red',
+        });
+        const checklist = await createChecklist(
+            await repoAccess(owner.id, card.id),
+            card.id,
+            'Checklist',
+        );
         if (!checklist) throw new Error('Missing checklist');
-        await addChecklistItem(owner.id, checklist.id, 'Item');
+        await addChecklistItem(
+            await repoAccess(owner.id, checklist.id),
+            checklist.id,
+            'Item',
+        );
         await db
             .update(boards)
             .set({ inviteToken: 'secret-token' })

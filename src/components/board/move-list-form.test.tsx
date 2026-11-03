@@ -112,12 +112,15 @@ const otherBoard: BoardData = {
 
 function setup(
     listId: string,
-    { isSyncing = false }: { isSyncing?: boolean } = {},
+    {
+        isSyncing = false,
+        availableBoards = boards,
+    }: { isSyncing?: boolean; availableBoards?: Array<BoardSummary> } = {},
 ) {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    queryClient.setQueryData(boardsListQueryOptions.queryKey, boards);
+    queryClient.setQueryData(boardsListQueryOptions.queryKey, availableBoards);
     queryClient.setQueryData(boardQueryOptions('board-2').queryKey, otherBoard);
     const onMove = vi.fn();
     const list = lists.find((l) => l.id === listId);
@@ -160,6 +163,33 @@ describe('MoveListForm', () => {
                 (o) => o.textContent,
             ),
         ).toEqual(['Current', 'Other', 'Slow']);
+    });
+
+    it('only offers the current board when the source belongs to another owner', () => {
+        const { boardSelect } = setup('a', {
+            availableBoards: boards.map((b) =>
+                b.id === current.id ? { ...b, myRole: Role.Editor } : b,
+            ),
+        });
+        expect(
+            Array.from(
+                boardSelect.querySelectorAll('option'),
+                (o) => o.textContent,
+            ),
+        ).toEqual(['Current']);
+    });
+    it('omits editor boards from an owner’s move targets', () => {
+        const { boardSelect } = setup('a', {
+            availableBoards: boards.map((b) =>
+                b.id === 'board-2' ? { ...b, myRole: Role.Editor } : b,
+            ),
+        });
+        expect(
+            Array.from(
+                boardSelect.querySelectorAll('option'),
+                (o) => o.textContent,
+            ),
+        ).toEqual(['Current', 'Slow']);
     });
 
     it('offers positions 1..N on the current board, Move off for the current spot', async () => {

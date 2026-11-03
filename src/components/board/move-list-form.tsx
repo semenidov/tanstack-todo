@@ -1,3 +1,4 @@
+import { Action, can } from '#/lib/permissions';
 import { useQuery } from '@tanstack/react-query';
 import { useId, useState } from 'react';
 import { TriangleAlertIcon } from 'lucide-react';
@@ -41,7 +42,13 @@ export function MoveListForm({
     const isOtherBoard = boardId !== board.id;
 
     const boardsQuery = useQuery(boardsListQueryOptions);
-    const boards = boardsQuery.data ?? [board];
+    const source = boardsQuery.data?.find((b) => b.id === board.id);
+    const boards =
+        source && can(source.myRole, Action.ListMoveToBoard)
+            ? (boardsQuery.data?.filter((b) =>
+                  can(b.myRole, Action.ListMoveToBoard),
+              ) ?? [board])
+            : [board];
     const target = boards.find((b) => b.id === boardId) ?? board;
 
     const targetQuery = useQuery({

@@ -14,11 +14,7 @@ import {
     lists,
     user,
 } from '#/db/schema';
-import {
-    accessibleBoardIds,
-    ownedBoardIds,
-    ownedListIds,
-} from '#/server/access';
+import { accessibleBoardIds, accessibleListIds } from '#/server/access';
 import type { BoardAccess } from '#/server/authorize';
 import { Role } from '#/lib/permissions';
 import {
@@ -27,6 +23,7 @@ import {
     count,
     countDistinct,
     eq,
+    exists,
     inArray,
     isNull,
     max,
@@ -215,18 +212,34 @@ export async function seedDemoBoard(
     return board;
 }
 
-export function renameBoard(userId: string, boardId: string, title: string) {
+export function renameBoard(
+    access: BoardAccess,
+    boardId: string,
+    title: string,
+) {
     return db
         .update(boards)
         .set({ title })
-        .where(and(eq(boards.id, boardId), eq(boards.ownerId, userId)))
+        .where(
+            and(
+                eq(boards.id, boardId),
+                eq(boards.id, access.boardId),
+                eq(boards.ownerId, access.userId),
+            ),
+        )
         .returning();
 }
 
-export function deleteBoard(userId: string, boardId: string) {
+export function deleteBoard(access: BoardAccess, boardId: string) {
     return db
         .delete(boards)
-        .where(and(eq(boards.id, boardId), eq(boards.ownerId, userId)))
+        .where(
+            and(
+                eq(boards.id, boardId),
+                eq(boards.id, access.boardId),
+                eq(boards.ownerId, access.userId),
+            ),
+        )
         .returning();
 }
 
@@ -303,13 +316,17 @@ async function lastListPositionKey(boardId: string) {
 }
 
 export async function addList(
-    userId: string,
+    access: BoardAccess,
     boardId: string,
     title: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
     const board = await db.query.boards.findFirst({
-        where: (b) => and(eq(b.id, boardId), eq(b.ownerId, userId)),
+        where: (b) =>
+            and(
+                eq(b.id, access.boardId),
+                inArray(b.id, accessibleBoardIds(access.userId)),
+            ),
     });
     if (!board) return null;
     await assertBelowQuota(QuotaKind.Lists, quotas, () =>
@@ -317,35 +334,60 @@ export async function addList(
     );
 
     const position = await lastListPositionKey(boardId);
-    const [row] = await db
+    const rows = await db
         .insert(lists)
-        .values({ boardId, title, position })
+        .select(
+            db
+                .select({
+                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    boardId: boards.id,
+                    title: sql<string>`${title}`.as('title'),
+                    position: sql<string>`${position}`.as('position'),
+                    createdAt: sql<Date>`now()`.as('createdAt'),
+                    updatedAt: sql<Date>`now()`.as('updatedAt'),
+                    deletedAt: sql<Date | null>`null`.as('deletedAt'),
+                })
+                .from(boards)
+                .where(
+                    and(
+                        eq(boards.id, access.boardId),
+                        eq(boards.id, boardId),
+                        inArray(boards.id, accessibleBoardIds(access.userId)),
+                    ),
+                ),
+        )
         .returning();
-    return row;
+    return rows.at(0) ?? null;
 }
 
-export function renameList(userId: string, listId: string, title: string) {
+export function renameList(access: BoardAccess, listId: string, title: string) {
     return db
         .update(lists)
         .set({ title })
         .where(
             and(
                 eq(lists.id, listId),
-                inArray(lists.boardId, ownedBoardIds(userId)),
+                and(
+                    eq(lists.boardId, access.boardId),
+                    inArray(lists.boardId, accessibleBoardIds(access.userId)),
+                ),
                 isNull(lists.deletedAt),
             ),
         )
         .returning();
 }
 
-export function deleteList(userId: string, listId: string) {
+export function deleteList(access: BoardAccess, listId: string) {
     return db
         .update(lists)
         .set({ deletedAt: new Date() })
         .where(
             and(
                 eq(lists.id, listId),
-                inArray(lists.boardId, ownedBoardIds(userId)),
+                and(
+                    eq(lists.boardId, access.boardId),
+                    inArray(lists.boardId, accessibleBoardIds(access.userId)),
+                ),
                 isNull(lists.deletedAt),
             ),
         )
@@ -353,7 +395,7 @@ export function deleteList(userId: string, listId: string) {
 }
 
 export async function restoreList(
-    userId: string,
+    access: BoardAccess,
     listId: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
@@ -361,7 +403,7 @@ export async function restoreList(
         where: (l) => eq(l.id, listId),
         with: { board: true },
     });
-    if (list?.deletedAt && list.board.ownerId === userId) {
+    if (list?.deletedAt && list.boardId === access.boardId) {
         await assertBelowQuota(QuotaKind.Lists, quotas, () =>
             countLiveLists(list.boardId),
         );
@@ -372,7 +414,10 @@ export async function restoreList(
         .where(
             and(
                 eq(lists.id, listId),
-                inArray(lists.boardId, ownedBoardIds(userId)),
+                and(
+                    eq(lists.boardId, access.boardId),
+                    inArray(lists.boardId, accessibleBoardIds(access.userId)),
+                ),
             ),
         )
         .returning();
@@ -397,7 +442,7 @@ async function readListNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-async function renumberLists(boardId: string) {
+async function renumberLists(access: BoardAccess, boardId: string) {
     const rows = await db
         .select({ id: lists.id })
         .from(lists)
@@ -408,18 +453,25 @@ async function renumberLists(boardId: string) {
         await db
             .update(lists)
             .set({ position: keys[i] })
-            .where(eq(lists.id, row.id));
+            .where(
+                and(
+                    eq(lists.id, row.id),
+                    eq(lists.boardId, access.boardId),
+                    inArray(lists.boardId, accessibleBoardIds(access.userId)),
+                ),
+            );
     }
 }
 
 export async function moveList(
-    userId: string,
+    access: BoardAccess,
     listId: string,
-    toBoardId: string,
+    targetAccess: BoardAccess,
     prevListId: string | null,
     nextListId: string | null,
     quotas: Quotas = USER_QUOTAS,
 ) {
+    const toBoardId = targetAccess.boardId;
     if (prevListId === listId || nextListId === listId) return null;
     if (prevListId !== null && prevListId === nextListId) return null;
 
@@ -427,12 +479,21 @@ export async function moveList(
         where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
         with: { board: true },
     });
-    if (!list || list.board.ownerId !== userId) return null;
+    if (!list || list.boardId !== access.boardId) return null;
 
     const targetBoard = await db.query.boards.findFirst({
-        where: (b) => and(eq(b.id, toBoardId), eq(b.ownerId, userId)),
+        where: (b) =>
+            and(
+                eq(b.id, toBoardId),
+                inArray(b.id, accessibleBoardIds(access.userId)),
+            ),
     });
-    if (!targetBoard) return null;
+    if (
+        !targetBoard ||
+        targetAccess.userId !== access.userId ||
+        (toBoardId !== access.boardId && access.role !== Role.Owner)
+    )
+        return null;
     if (toBoardId !== list.boardId) {
         await assertBelowQuota(QuotaKind.Lists, quotas, () =>
             countLiveLists(toBoardId),
@@ -450,7 +511,7 @@ export async function moveList(
         positionOf(neighbors, nextListId),
     );
     if (position === undefined) {
-        await renumberLists(toBoardId);
+        await renumberLists(targetAccess, toBoardId);
         neighbors = await readListNeighbors(toBoardId, neighborIds);
         if (!neighbors) return null;
         position = keyBetween(
@@ -463,25 +524,57 @@ export async function moveList(
     const rows = await db
         .update(lists)
         .set({ boardId: toBoardId, position })
-        .where(and(eq(lists.id, listId), isNull(lists.deletedAt)))
+        .where(
+            and(
+                eq(lists.id, listId),
+                eq(lists.boardId, access.boardId),
+                inArray(lists.boardId, accessibleBoardIds(access.userId)),
+                exists(
+                    db
+                        .select({ id: boards.id })
+                        .from(boards)
+                        .where(
+                            and(
+                                eq(boards.id, targetAccess.boardId),
+                                toBoardId !== access.boardId
+                                    ? eq(boards.ownerId, targetAccess.userId)
+                                    : inArray(
+                                          boards.id,
+                                          accessibleBoardIds(access.userId),
+                                      ),
+                            ),
+                        ),
+                ),
+                isNull(lists.deletedAt),
+            ),
+        )
         .returning();
     const row = rows.at(0) ?? null;
     if (row && toBoardId !== list.boardId) {
         // After the move, so a refused move keeps the labels. Deleted cards too, so
         // their Undo doesn't bring back labels of the old board.
-        await db
-            .delete(cardLabels)
-            .where(
-                inArray(
-                    cardLabels.cardId,
-                    db
-                        .select({ id: cards.id })
-                        .from(cards)
-                        .where(eq(cards.listId, listId)),
-                ),
-            );
+        await db.delete(cardLabels).where(
+            inArray(
+                cardLabels.cardId,
+                db
+                    .select({ id: cards.id })
+                    .from(cards)
+                    .where(
+                        and(
+                            eq(cards.listId, listId),
+                            inArray(
+                                cards.listId,
+                                accessibleListIds(
+                                    targetAccess.userId,
+                                    targetAccess.boardId,
+                                ),
+                            ),
+                        ),
+                    ),
+            ),
+        );
     }
-    return row;
+    return row ?? null;
 }
 
 async function firstPositionKey(listId: string) {
@@ -493,7 +586,7 @@ async function firstPositionKey(listId: string) {
 }
 
 export async function addCard(
-    userId: string,
+    access: BoardAccess,
     listId: string,
     title: string,
     quotas: Quotas = USER_QUOTAS,
@@ -502,21 +595,46 @@ export async function addCard(
         where: (l) => and(eq(l.id, listId), isNull(l.deletedAt)),
         with: { board: true },
     });
-    if (!list || list.board.ownerId !== userId) return null;
+    if (!list || list.boardId !== access.boardId) return null;
     await assertBelowQuota(QuotaKind.Cards, quotas, () =>
         countLiveCards(listId),
     );
 
     const position = await firstPositionKey(listId);
-    const [row] = await db
+    const rows = await db
         .insert(cards)
-        .values({ listId, title, position })
+        .select(
+            db
+                .select({
+                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    listId: lists.id,
+                    title: sql<string>`${title}`.as('title'),
+                    description: sql<string | null>`null`.as('description'),
+                    position: sql<string>`${position}`.as('position'),
+                    createdAt: sql<Date>`now()`.as('createdAt'),
+                    updatedAt: sql<Date>`now()`.as('updatedAt'),
+                    deletedAt: sql<Date | null>`null`.as('deletedAt'),
+                    completedAt: sql<Date | null>`null`.as('completedAt'),
+                    dueDate: sql<string | null>`null`.as('dueDate'),
+                    dueAt: sql<Date | null>`null`.as('dueAt'),
+                })
+                .from(lists)
+                .where(
+                    and(
+                        eq(lists.id, listId),
+                        inArray(
+                            lists.id,
+                            accessibleListIds(access.userId, access.boardId),
+                        ),
+                    ),
+                ),
+        )
         .returning();
-    return row;
+    return rows.at(0) ?? null;
 }
 
 export function updateCard(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     data: {
         title?: string;
@@ -538,7 +656,10 @@ export function updateCard(
         .where(
             and(
                 eq(cards.id, cardId),
-                inArray(cards.listId, ownedListIds(userId)),
+                inArray(
+                    cards.listId,
+                    accessibleListIds(access.userId, access.boardId),
+                ),
                 isNull(cards.deletedAt),
             ),
         )
@@ -564,7 +685,7 @@ async function readNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-async function renumberList(listId: string) {
+async function renumberList(access: BoardAccess, listId: string) {
     const rows = await db
         .select({ id: cards.id })
         .from(cards)
@@ -575,7 +696,15 @@ async function renumberList(listId: string) {
         await db
             .update(cards)
             .set({ position: keys[i] })
-            .where(eq(cards.id, row.id));
+            .where(
+                and(
+                    eq(cards.id, row.id),
+                    inArray(
+                        cards.listId,
+                        accessibleListIds(access.userId, access.boardId),
+                    ),
+                ),
+            );
     }
 }
 
@@ -588,7 +717,7 @@ function keyBetween(
 }
 
 export async function moveCard(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     toListId: string,
     prevCardId: string | null,
@@ -602,14 +731,14 @@ export async function moveCard(
         where: (c) => and(eq(c.id, cardId), isNull(c.deletedAt)),
         with: { list: { with: { board: true } } },
     });
-    if (!card || card.list.deletedAt || card.list.board.ownerId !== userId)
+    if (!card || card.list.deletedAt || card.list.boardId !== access.boardId)
         return null;
 
     const targetList = await db.query.lists.findFirst({
         where: (l) => and(eq(l.id, toListId), isNull(l.deletedAt)),
         with: { board: true },
     });
-    if (!targetList || targetList.board.ownerId !== userId) return null;
+    if (!targetList || targetList.boardId !== access.boardId) return null;
     if (targetList.boardId !== card.list.boardId) return null;
     if (toListId !== card.listId) {
         await assertBelowQuota(QuotaKind.Cards, quotas, () =>
@@ -628,7 +757,7 @@ export async function moveCard(
         positionOf(neighbors, nextCardId),
     );
     if (position === undefined) {
-        await renumberList(toListId);
+        await renumberList(access, toListId);
         neighbors = await readNeighbors(toListId, neighborIds);
         if (!neighbors) return null;
         position = keyBetween(
@@ -641,19 +770,48 @@ export async function moveCard(
     const rows = await db
         .update(cards)
         .set({ listId: toListId, position })
-        .where(and(eq(cards.id, cardId), isNull(cards.deletedAt)))
+        .where(
+            and(
+                eq(cards.id, cardId),
+                inArray(
+                    cards.listId,
+                    accessibleListIds(access.userId, access.boardId),
+                ),
+                exists(
+                    db
+                        .select({ id: lists.id })
+                        .from(lists)
+                        .where(
+                            and(
+                                eq(lists.id, toListId),
+                                inArray(
+                                    lists.id,
+                                    accessibleListIds(
+                                        access.userId,
+                                        access.boardId,
+                                    ),
+                                ),
+                            ),
+                        ),
+                ),
+                isNull(cards.deletedAt),
+            ),
+        )
         .returning();
     return rows.at(0) ?? null;
 }
 
-export function deleteCard(userId: string, cardId: string) {
+export function deleteCard(access: BoardAccess, cardId: string) {
     return db
         .update(cards)
         .set({ deletedAt: new Date() })
         .where(
             and(
                 eq(cards.id, cardId),
-                inArray(cards.listId, ownedListIds(userId)),
+                inArray(
+                    cards.listId,
+                    accessibleListIds(access.userId, access.boardId),
+                ),
                 isNull(cards.deletedAt),
             ),
         )
@@ -661,7 +819,7 @@ export function deleteCard(userId: string, cardId: string) {
 }
 
 export async function restoreCard(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
@@ -672,7 +830,7 @@ export async function restoreCard(
     if (
         card?.deletedAt &&
         !card.list.deletedAt &&
-        card.list.board.ownerId === userId
+        card.list.boardId === access.boardId
     ) {
         await assertBelowQuota(QuotaKind.Cards, quotas, () =>
             countLiveCards(card.listId),
@@ -684,7 +842,10 @@ export async function restoreCard(
         .where(
             and(
                 eq(cards.id, cardId),
-                inArray(cards.listId, ownedListIds(userId)),
+                inArray(
+                    cards.listId,
+                    accessibleListIds(access.userId, access.boardId),
+                ),
             ),
         )
         .returning();
