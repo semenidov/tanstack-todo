@@ -83,9 +83,10 @@ function BoardError(props: ErrorComponentProps) {
 
 function BoardPage() {
     const { boardId } = Route.useParams();
-    const { data } = useSuspenseQuery(boardQueryOptions(boardId));
+    const { data, error } = useSuspenseQuery(boardQueryOptions(boardId));
 
-    if (!data) return <BoardNotFound />;
+    if (error?.message === BOARD_ACCESS_DENIED || !data)
+        return <BoardNotFound />;
 
     return (
         <>

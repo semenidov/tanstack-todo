@@ -5,8 +5,13 @@ import * as writes from '#/server/board-writes';
 import * as repo from '#/server/labels-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
-import { Action } from '#/lib/permissions';
-import { authorizeBoard } from '#/server/authorize';
+import { Action, BOARD_ACCESS_DENIED } from '#/lib/permissions';
+import {
+    authorizeBoard,
+    authorizeCard,
+    authorizeLabel,
+    requireChanged,
+} from '#/server/authorize';
 
 const labelInputSchema = z.object({
     title: z
@@ -34,7 +39,6 @@ export const createLabelServer = createServerFn({ method: 'POST' })
             boardId,
             input,
         );
-        if (!label) throw new Error('Label was not created');
         return label;
     });
 
@@ -42,8 +46,13 @@ export const updateLabelServer = createServerFn({ method: 'POST' })
     .validator(labelInputSchema.extend({ labelId: z.uuid() }))
     .handler(async ({ data: { labelId, ...input } }) => {
         const { id: userId } = await requireUser();
-        const label = await repo.updateLabel(userId, labelId, input);
-        if (!label) throw new Error('Label was not saved');
+        const label = requireChanged(
+            await repo.updateLabel(
+                await authorizeLabel(userId, labelId, Action.ContentEdit),
+                labelId,
+                input,
+            ),
+        );
         return label;
     });
 
@@ -51,7 +60,12 @@ export const deleteLabelServer = createServerFn({ method: 'POST' })
     .validator(z.object({ labelId: z.uuid() }))
     .handler(async ({ data }) => {
         const { id: userId } = await requireUser();
-        await repo.deleteLabel(userId, data.labelId);
+        requireChanged(
+            await repo.deleteLabel(
+                await authorizeLabel(userId, data.labelId, Action.ContentEdit),
+                data.labelId,
+            ),
+        );
     });
 
 export const setCardLabelServer = createServerFn({ method: 'POST' })
@@ -65,7 +79,17 @@ export const setCardLabelServer = createServerFn({ method: 'POST' })
     .handler(async ({ data }) => {
         const user = await requireUser();
         if (!data.on) {
-            await repo.removeCardLabel(user.id, data.cardId, data.labelId);
+            requireChanged(
+                await repo.removeCardLabel(
+                    await authorizeCard(
+                        user.id,
+                        data.cardId,
+                        Action.ContentEdit,
+                    ),
+                    data.cardId,
+                    data.labelId,
+                ),
+            );
             return;
         }
         const added = await writes.addCardLabelAs(
@@ -73,5 +97,5 @@ export const setCardLabelServer = createServerFn({ method: 'POST' })
             data.cardId,
             data.labelId,
         );
-        if (!added) throw new Error('Label was not added');
+        if (!added) throw new Error(BOARD_ACCESS_DENIED);
     });
