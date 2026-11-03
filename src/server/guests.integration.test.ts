@@ -1,3 +1,5 @@
+import { authorizeBoard, authorizeCard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '#/db';
@@ -123,11 +125,15 @@ describe('guest sign-in', () => {
             .from(boards)
             .where(eq(boards.ownerId, guest.id));
         expect(owned).toHaveLength(1);
-        const demo = await getBoard(guest.id, owned[0].id);
+        const demo = await getBoard(
+            await authorizeBoard(guest.id, owned[0].id, Action.BoardRead),
+        );
         // No time zone cookie in the request: due dates count from today in UTC.
         const today = Date.parse(localDateKey(new Date(), 'UTC'));
         expect(demo?.board.title).toBe('Todo app roadmap');
-        const demoLabels = await listLabels(guest.id, owned[0].id);
+        const demoLabels = await listLabels(
+            await authorizeBoard(guest.id, owned[0].id, Action.BoardRead),
+        );
         expect(
             demoLabels.map((l) => ({ title: l.title, color: l.color })),
         ).toEqual(DEMO_BOARD.labels);
@@ -139,7 +145,17 @@ describe('guest sign-in', () => {
                     .flatMap((l) => l.cards)
                     .map(
                         async (c) =>
-                            [c.id, await getChecklist(guest.id, c.id)] as const,
+                            [
+                                c.id,
+                                await getChecklist(
+                                    await authorizeCard(
+                                        guest.id,
+                                        c.id,
+                                        Action.BoardRead,
+                                    ),
+                                    c.id,
+                                ),
+                            ] as const,
                     ),
             ),
         );
@@ -186,7 +202,9 @@ describe('guest sign-in', () => {
             .select()
             .from(boards)
             .where(eq(boards.ownerId, guest.id));
-        const before = await getBoard(guest.id, demoBoard.id);
+        const before = await getBoard(
+            await authorizeBoard(guest.id, demoBoard.id, Action.BoardRead),
+        );
         const [first, ...rest] = before?.lists.map((l) => l.id) ?? [];
 
         await moveListOrThrow(guest, {
@@ -196,7 +214,9 @@ describe('guest sign-in', () => {
             nextListId: rest[1] ?? null,
         });
 
-        const after = await getBoard(guest.id, demoBoard.id);
+        const after = await getBoard(
+            await authorizeBoard(guest.id, demoBoard.id, Action.BoardRead),
+        );
         expect(after?.lists.map((l) => l.id)).toEqual([
             rest[0],
             first,

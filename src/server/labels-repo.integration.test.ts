@@ -1,3 +1,5 @@
+import { authorizeBoard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '#/db';
 import { cardLabels, cards, checklists, lists } from '#/db/schema';
@@ -69,7 +71,9 @@ describe('labels of a board', () => {
         const untitled = await newLabel(null);
         await newLabel('Elsewhere', other.boardId);
 
-        const shown = await listLabels(ownerId, boardId);
+        const shown = await listLabels(
+            await authorizeBoard(ownerId, boardId, Action.BoardRead),
+        );
         expect(shown.map((l) => l.id)).toEqual([first.id, untitled.id]);
     });
 
@@ -99,7 +103,9 @@ describe('isolation', () => {
         const stranger = await seedUser();
         const label = await newLabel('Mine');
 
-        expect(await listLabels(stranger.id, boardId)).toEqual([]);
+        await expect(
+            authorizeBoard(stranger.id, boardId, Action.BoardRead),
+        ).rejects.toThrow("Board not found or you don't have access");
         expect(
             await createLabel(stranger.id, boardId, {
                 title: 'Theirs',
@@ -113,7 +119,13 @@ describe('isolation', () => {
             }),
         ).toBeNull();
         expect(await deleteLabel(stranger.id, label.id)).toBeNull();
-        expect((await listLabels(ownerId, boardId))[0].title).toBe('Mine');
+        expect(
+            (
+                await listLabels(
+                    await authorizeBoard(ownerId, boardId, Action.BoardRead),
+                )
+            )[0].title,
+        ).toBe('Mine');
     });
 
     it("another user can't put a label on or take it off the owner's card", async () => {
@@ -147,7 +159,9 @@ describe('labels on a card', () => {
         expect((await cardRow(cardId)).updatedAt.getTime()).toBeGreaterThan(
             before.getTime(),
         );
-        const board = await getBoard(ownerId, boardId);
+        const board = await getBoard(
+            await authorizeBoard(ownerId, boardId, Action.BoardRead),
+        );
         expect(board?.lists[0].cards[0].labelIds).toEqual([label.id]);
 
         const afterAdd = (await cardRow(cardId)).updatedAt;
@@ -180,7 +194,11 @@ describe('cascades', () => {
 
         await deleteBoard(ownerId, boardId);
         const other = await seedBoardWithCard(ownerId, 'Other');
-        expect(await listLabels(ownerId, other.boardId)).toEqual([]);
+        expect(
+            await listLabels(
+                await authorizeBoard(ownerId, other.boardId, Action.BoardRead),
+            ),
+        ).toEqual([]);
         expect(await labelIdsOf(cardId)).toEqual([]);
     });
 });
@@ -200,7 +218,11 @@ describe('moving a list', () => {
 
         expect(await labelIdsOf(cardId)).toEqual([]);
         // The label stays on its board.
-        expect(await listLabels(ownerId, boardId)).toHaveLength(1);
+        expect(
+            await listLabels(
+                await authorizeBoard(ownerId, boardId, Action.BoardRead),
+            ),
+        ).toHaveLength(1);
         const moved = await cardRow(cardId);
         expect(moved.dueDate).toBe(due.dueDate);
         expect(moved.completedAt).not.toBeNull();

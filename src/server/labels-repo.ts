@@ -3,8 +3,9 @@ import { boards, cardLabels, cards, labels } from '#/db/schema';
 import { LABEL_EXISTS_MESSAGE } from '#/lib/labels';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
-import { findOwnedCard, ownedBoardIds, ownedCardIds } from '#/server/access';
+import { findOwnedCard, ownedBoardIds, ownedCardIds, accessibleBoardIds  } from '#/server/access';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import type { BoardAccess } from '#/server/authorize';
 
 export interface LabelInput {
     title: string | null;
@@ -32,14 +33,14 @@ async function withTitleCheck<T>(write: () => Promise<T>): Promise<T> {
     }
 }
 
-export function listLabels(userId: string, boardId: string) {
+export function listLabels(access: BoardAccess) {
     return db
         .select()
         .from(labels)
         .where(
             and(
-                eq(labels.boardId, boardId),
-                inArray(labels.boardId, ownedBoardIds(userId)),
+                eq(labels.boardId, access.boardId),
+                inArray(labels.boardId, accessibleBoardIds(access.userId)),
             ),
         )
         .orderBy(asc(labels.createdAt), asc(labels.id));

@@ -4,6 +4,8 @@ import * as writes from '#/server/board-writes';
 import * as repo from '#/server/checklists-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
+import { Action } from '#/lib/permissions';
+import { authorizeCard } from '#/server/authorize';
 
 const textSchema = z.string().trim().min(1).max(MAX_CHECKLIST_TEXT_LENGTH);
 
@@ -11,7 +13,10 @@ export const getChecklistServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())
     .handler(async ({ data: cardId }) => {
         const { id: userId } = await requireUser();
-        return repo.getChecklist(userId, cardId);
+        return repo.getChecklist(
+            await authorizeCard(userId, cardId, Action.BoardRead),
+            cardId,
+        );
     });
 
 export const createChecklistServer = createServerFn({ method: 'POST' })

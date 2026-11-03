@@ -1,3 +1,5 @@
+import { authorizeBoard, authorizeCard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '#/db';
 import { cards, checklistItems, lists } from '#/db/schema';
@@ -47,7 +49,10 @@ async function newItem(checklistId: string, title: string) {
 }
 
 async function itemTitles() {
-    const checklist = await getChecklist(ownerId, cardId);
+    const checklist = await getChecklist(
+        await authorizeCard(ownerId, cardId, Action.BoardRead),
+        cardId,
+    );
     return checklist?.items.map((i) => i.title);
 }
 
@@ -57,7 +62,9 @@ async function updatedAt() {
 }
 
 async function boardCard() {
-    const board = await getBoard(ownerId, boardId);
+    const board = await getBoard(
+        await authorizeBoard(ownerId, boardId, Action.BoardRead),
+    );
     return board?.lists[0].cards[0];
 }
 
@@ -100,7 +107,10 @@ describe('checklist items order', () => {
             .where(eq(checklistItems.id, b.id));
 
         // Equal keys are ordered by id: take the order the client would see.
-        const before = await getChecklist(ownerId, cardId);
+        const before = await getChecklist(
+            await authorizeCard(ownerId, cardId, Action.BoardRead),
+            cardId,
+        );
         const [first, second] = before?.items ?? [];
 
         expect(
@@ -163,7 +173,12 @@ describe('checklist on the board', () => {
         expect(await itemTitles()).toEqual(['B2', 'C']);
 
         await deleteChecklist(ownerId, checklist.id);
-        expect(await getChecklist(ownerId, cardId)).toBeNull();
+        expect(
+            await getChecklist(
+                await authorizeCard(ownerId, cardId, Action.BoardRead),
+                cardId,
+            ),
+        ).toBeNull();
         expect(await boardCard()).toMatchObject({
             checklistDone: 0,
             checklistTotal: 0,
@@ -202,7 +217,9 @@ describe('checklist access', () => {
         const item = await newItem(checklist.id, 'A');
         const strangerId = (await seedUser()).id;
 
-        expect(await getChecklist(strangerId, cardId)).toBeNull();
+        await expect(
+            authorizeCard(strangerId, cardId, Action.BoardRead),
+        ).rejects.toThrow("Board not found or you don't have access");
         expect(await createChecklist(strangerId, cardId, 'X')).toBeNull();
         expect(
             await addChecklistItem(strangerId, checklist.id, 'X'),
@@ -217,7 +234,10 @@ describe('checklist access', () => {
         expect(await deleteChecklistItem(strangerId, item.id)).toBeNull();
         expect(await deleteChecklist(strangerId, checklist.id)).toBeNull();
 
-        const own = await getChecklist(ownerId, cardId);
+        const own = await getChecklist(
+            await authorizeCard(ownerId, cardId, Action.BoardRead),
+            cardId,
+        );
         expect(own).toMatchObject({ title: 'Steps' });
         expect(own?.items).toMatchObject([{ title: 'A', done: false }]);
     });

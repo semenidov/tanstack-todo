@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -17,7 +18,14 @@ vi.mock('@tanstack/react-router', () => ({
     ),
 }));
 
-const board = { id: 'b1', title: 'Roadmap', listCount: 2, cardCount: 5 };
+const board = {
+    id: 'b1',
+    title: 'Roadmap',
+    listCount: 2,
+    cardCount: 5,
+    myRole: Role.Owner,
+    ownerName: 'Owner',
+};
 
 function renderTile(onRename = vi.fn()) {
     render(<BoardTile board={board} onRename={onRename} onDelete={vi.fn()} />);

@@ -5,6 +5,8 @@ import * as writes from '#/server/board-writes';
 import * as repo from '#/server/labels-repo';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
+import { Action } from '#/lib/permissions';
+import { authorizeBoard } from '#/server/authorize';
 
 const labelInputSchema = z.object({
     title: z
@@ -19,7 +21,9 @@ export const getLabelsServer = createServerFn({ method: 'GET' })
     .validator(z.uuid())
     .handler(async ({ data: boardId }) => {
         const { id: userId } = await requireUser();
-        return repo.listLabels(userId, boardId);
+        return repo.listLabels(
+            await authorizeBoard(userId, boardId, Action.BoardRead),
+        );
     });
 
 export const createLabelServer = createServerFn({ method: 'POST' })
