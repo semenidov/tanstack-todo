@@ -1,6 +1,6 @@
 import { db } from '#/db';
 import { boardMembers, boards, cards, lists } from '#/db/schema';
-import type { Action} from '#/lib/permissions';
+import type { Action } from '#/lib/permissions';
 import { BOARD_ACCESS_DENIED, can, Role } from '#/lib/permissions';
 import { and, eq, isNull } from 'drizzle-orm';
 

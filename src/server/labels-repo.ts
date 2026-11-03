@@ -3,7 +3,12 @@ import { boards, cardLabels, cards, labels } from '#/db/schema';
 import { LABEL_EXISTS_MESSAGE } from '#/lib/labels';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
-import { findOwnedCard, ownedBoardIds, ownedCardIds, accessibleBoardIds  } from '#/server/access';
+import {
+    findOwnedCard,
+    ownedBoardIds,
+    ownedCardIds,
+    accessibleBoardIds,
+} from '#/server/access';
 import { and, asc, count, eq, inArray } from 'drizzle-orm';
 import type { BoardAccess } from '#/server/authorize';
 

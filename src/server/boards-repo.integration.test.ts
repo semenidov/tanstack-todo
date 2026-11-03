@@ -1,4 +1,4 @@
-import { Role, Action  } from '#/lib/permissions';
+import { Role, Action } from '#/lib/permissions';
 import { authorizeBoard, authorizeCard } from '#/server/authorize';
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
