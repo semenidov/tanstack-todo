@@ -1,5 +1,5 @@
 import { authorizeBoard, authorizeCard } from '#/server/authorize';
-import { Action } from '#/lib/permissions';
+import { Action, BOARD_ACCESS_DENIED } from '#/lib/permissions';
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '#/db';
@@ -364,11 +364,17 @@ describe('deleted guest with a cached session', () => {
         await expect(createBoardAs(deleted, 'After delete')).rejects.toThrow(
             /^Unauthorized$/,
         );
-        // Its boards went with it, so these find nothing to insert into.
-        expect(await addListAs(deleted, board.id, 'After delete')).toBeNull();
-        expect(await addCardAs(deleted, list.id, 'After delete')).toBeNull();
+        // Its boards went with it, so content writes fail at the access gate.
+        await expect(
+            addListAs(deleted, board.id, 'After delete'),
+        ).rejects.toThrow(BOARD_ACCESS_DENIED);
+        await expect(
+            addCardAs(deleted, list.id, 'After delete'),
+        ).rejects.toThrow(BOARD_ACCESS_DENIED);
         expect(
             await db.select().from(boards).where(eq(boards.ownerId, row.id)),
         ).toEqual([]);
+        expect(await db.select().from(lists)).toEqual([]);
+        expect(await db.select().from(cards)).toEqual([]);
     });
 });
