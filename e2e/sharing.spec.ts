@@ -216,7 +216,7 @@ test('editor saves columns and cards, cannot move across boards, then loses acce
     await expect
         .poll(() => listTitles(page))
         .toEqual(['Renamed', 'To do', 'Done']);
-    await page.reload();
+    await gotoHydrated(page, page.url());
     await expect(cardRow(page, 'Edited task')).toBeVisible();
     await cardRow(page, 'Edited task')
         .getByRole('button', { name: 'Card actions' })
