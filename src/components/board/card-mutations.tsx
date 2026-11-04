@@ -51,11 +51,8 @@ export function useAddCard(boardId: string, listId: string) {
 
     return useMutation({
         ...boardOrderMutationOptions(boardId),
-        mutationFn: async (title: string) => {
-            const card = await addCardServer({ data: { listId, title } });
-            if (!card) throw new Error('Card was not created');
-            return card;
-        },
+        mutationFn: (title: string) =>
+            addCardServer({ data: { listId, title } }),
         onSuccess: async (card) => {
             await queryClient.cancelQueries({ queryKey: key });
             queryClient.setQueryData(key, (old) =>
