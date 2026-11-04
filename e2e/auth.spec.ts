@@ -11,7 +11,9 @@ test('a new user can sign up and lands on an empty boards list', async ({
     page,
 }) => {
     await signup(page, uniqueEmail());
-    await expect(page.getByRole('heading', { name: 'Boards' })).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Boards', exact: true }),
+    ).toBeVisible();
     // No board is created lazily.
     await expect(page.getByRole('listitem')).toHaveCount(0);
 });
@@ -26,6 +28,8 @@ test('a user can sign out and log back in', async ({ page }) => {
     await expect(page).toHaveURL(/\/login$/);
 
     await login(page, email);
-    await expect(page.getByRole('heading', { name: 'Boards' })).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Boards', exact: true }),
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: 'My tasks' })).toBeVisible();
 });

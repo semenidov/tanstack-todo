@@ -1,3 +1,6 @@
+import { repoAccess } from '#/test/access';
+import { authorizeBoard, authorizeCard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '#/db';
 import { cards, checklistItems, lists } from '#/db/schema';
@@ -35,19 +38,30 @@ beforeEach(async () => {
 });
 
 async function newChecklist() {
-    const checklist = await createChecklist(ownerId, cardId, 'Steps');
+    const checklist = await createChecklist(
+        await repoAccess(ownerId, cardId),
+        cardId,
+        'Steps',
+    );
     if (!checklist) throw new Error('Checklist was not created');
     return checklist;
 }
 
 async function newItem(checklistId: string, title: string) {
-    const item = await addChecklistItem(ownerId, checklistId, title);
+    const item = await addChecklistItem(
+        await repoAccess(ownerId, checklistId),
+        checklistId,
+        title,
+    );
     if (!item) throw new Error('Item was not added');
     return item;
 }
 
 async function itemTitles() {
-    const checklist = await getChecklist(ownerId, cardId);
+    const checklist = await getChecklist(
+        await authorizeCard(ownerId, cardId, Action.BoardRead),
+        cardId,
+    );
     return checklist?.items.map((i) => i.title);
 }
 
@@ -57,7 +71,9 @@ async function updatedAt() {
 }
 
 async function boardCard() {
-    const board = await getBoard(ownerId, boardId);
+    const board = await getBoard(
+        await authorizeBoard(ownerId, boardId, Action.BoardRead),
+    );
     return board?.lists[0].cards[0];
 }
 
@@ -78,13 +94,34 @@ describe('checklist items order', () => {
             await newItem(checklist.id, 'C'),
         ];
 
-        expect(await moveChecklistItem(ownerId, a.id, b.id, c.id)).toBeTruthy();
+        expect(
+            await moveChecklistItem(
+                await repoAccess(ownerId, a.id),
+                a.id,
+                b.id,
+                c.id,
+            ),
+        ).toBeTruthy();
         expect(await itemTitles()).toEqual(['B', 'A', 'C']);
 
-        expect(await moveChecklistItem(ownerId, c.id, null, b.id)).toBeTruthy();
+        expect(
+            await moveChecklistItem(
+                await repoAccess(ownerId, c.id),
+                c.id,
+                null,
+                b.id,
+            ),
+        ).toBeTruthy();
         expect(await itemTitles()).toEqual(['C', 'B', 'A']);
 
-        expect(await moveChecklistItem(ownerId, c.id, a.id, null)).toBeTruthy();
+        expect(
+            await moveChecklistItem(
+                await repoAccess(ownerId, c.id),
+                c.id,
+                a.id,
+                null,
+            ),
+        ).toBeTruthy();
         expect(await itemTitles()).toEqual(['B', 'A', 'C']);
     });
 
@@ -100,11 +137,19 @@ describe('checklist items order', () => {
             .where(eq(checklistItems.id, b.id));
 
         // Equal keys are ordered by id: take the order the client would see.
-        const before = await getChecklist(ownerId, cardId);
+        const before = await getChecklist(
+            await authorizeCard(ownerId, cardId, Action.BoardRead),
+            cardId,
+        );
         const [first, second] = before?.items ?? [];
 
         expect(
-            await moveChecklistItem(ownerId, c.id, first.id, second.id),
+            await moveChecklistItem(
+                await repoAccess(ownerId, c.id),
+                c.id,
+                first.id,
+                second.id,
+            ),
         ).toBeTruthy();
         expect(await itemTitles()).toEqual([first.title, 'C', second.title]);
     });
@@ -122,15 +167,31 @@ describe('checklist items order', () => {
             .insert(cards)
             .values({ listId: otherList.id, title: 'Other', position: 'a0' })
             .returning();
-        const other = await createChecklist(ownerId, otherCard.id, 'Other');
+        const other = await createChecklist(
+            await repoAccess(ownerId, otherCard.id),
+            otherCard.id,
+            'Other',
+        );
         if (!other) throw new Error('Checklist was not created');
         const foreign = await newItem(other.id, 'Foreign');
 
         expect(
-            await moveChecklistItem(ownerId, a.id, foreign.id, null),
+            await moveChecklistItem(
+                await repoAccess(ownerId, a.id),
+                a.id,
+                foreign.id,
+                null,
+            ),
         ).toBeNull();
         // C before B: the client saw another order.
-        expect(await moveChecklistItem(ownerId, a.id, c.id, b.id)).toBeNull();
+        expect(
+            await moveChecklistItem(
+                await repoAccess(ownerId, a.id),
+                a.id,
+                c.id,
+                b.id,
+            ),
+        ).toBeNull();
         expect(await itemTitles()).toEqual(['A', 'B', 'C']);
     });
 });
@@ -147,23 +208,46 @@ describe('checklist on the board', () => {
             await newItem(checklist.id, 'B'),
             await newItem(checklist.id, 'C'),
         ];
-        await updateChecklistItem(ownerId, items[0].id, { done: true });
-        await updateChecklistItem(ownerId, items[2].id, { done: true });
+        await updateChecklistItem(
+            await repoAccess(ownerId, items[0].id),
+            items[0].id,
+            { done: true },
+        );
+        await updateChecklistItem(
+            await repoAccess(ownerId, items[2].id),
+            items[2].id,
+            { done: true },
+        );
         expect(await boardCard()).toMatchObject({
             checklistDone: 2,
             checklistTotal: 3,
         });
 
-        await deleteChecklistItem(ownerId, items[0].id);
-        await updateChecklistItem(ownerId, items[1].id, { title: 'B2' });
+        await deleteChecklistItem(
+            await repoAccess(ownerId, items[0].id),
+            items[0].id,
+        );
+        await updateChecklistItem(
+            await repoAccess(ownerId, items[1].id),
+            items[1].id,
+            { title: 'B2' },
+        );
         expect(await boardCard()).toMatchObject({
             checklistDone: 1,
             checklistTotal: 2,
         });
         expect(await itemTitles()).toEqual(['B2', 'C']);
 
-        await deleteChecklist(ownerId, checklist.id);
-        expect(await getChecklist(ownerId, cardId)).toBeNull();
+        await deleteChecklist(
+            await repoAccess(ownerId, checklist.id),
+            checklist.id,
+        );
+        expect(
+            await getChecklist(
+                await authorizeCard(ownerId, cardId, Action.BoardRead),
+                cardId,
+            ),
+        ).toBeNull();
         expect(await boardCard()).toMatchObject({
             checklistDone: 0,
             checklistTotal: 0,
@@ -172,7 +256,13 @@ describe('checklist on the board', () => {
 
     it('one checklist per card', async () => {
         await newChecklist();
-        expect(await createChecklist(ownerId, cardId, 'Second')).toBeNull();
+        expect(
+            await createChecklist(
+                await repoAccess(ownerId, cardId),
+                cardId,
+                'Second',
+            ),
+        ).toBeNull();
     });
 
     it('every edit bumps the card updated_at', async () => {
@@ -181,12 +271,36 @@ describe('checklist on the board', () => {
         const item = await newItem(checklist.id, 'A');
         const last = await newItem(checklist.id, 'B');
         edits.push(
-            () => renameChecklist(ownerId, checklist.id, 'Renamed'),
+            async () =>
+                renameChecklist(
+                    await repoAccess(ownerId, checklist.id),
+                    checklist.id,
+                    'Renamed',
+                ),
             () => newItem(checklist.id, 'C'),
-            () => updateChecklistItem(ownerId, item.id, { done: true }),
-            () => moveChecklistItem(ownerId, item.id, last.id, null),
-            () => deleteChecklistItem(ownerId, item.id),
-            () => deleteChecklist(ownerId, checklist.id),
+            async () =>
+                updateChecklistItem(
+                    await repoAccess(ownerId, item.id),
+                    item.id,
+                    { done: true },
+                ),
+            async () =>
+                moveChecklistItem(
+                    await repoAccess(ownerId, item.id),
+                    item.id,
+                    last.id,
+                    null,
+                ),
+            async () =>
+                deleteChecklistItem(
+                    await repoAccess(ownerId, item.id),
+                    item.id,
+                ),
+            async () =>
+                deleteChecklist(
+                    await repoAccess(ownerId, checklist.id),
+                    checklist.id,
+                ),
         );
         for (const edit of edits) {
             const before = await updatedAt();
@@ -202,22 +316,62 @@ describe('checklist access', () => {
         const item = await newItem(checklist.id, 'A');
         const strangerId = (await seedUser()).id;
 
-        expect(await getChecklist(strangerId, cardId)).toBeNull();
-        expect(await createChecklist(strangerId, cardId, 'X')).toBeNull();
+        await expect(
+            authorizeCard(strangerId, cardId, Action.BoardRead),
+        ).rejects.toThrow("Board not found or you don't have access");
         expect(
-            await addChecklistItem(strangerId, checklist.id, 'X'),
+            await createChecklist(
+                await repoAccess(strangerId, cardId),
+                cardId,
+                'X',
+            ),
         ).toBeNull();
-        expect(await renameChecklist(strangerId, checklist.id, 'X')).toBeNull();
         expect(
-            await updateChecklistItem(strangerId, item.id, { done: true }),
+            await addChecklistItem(
+                await repoAccess(strangerId, checklist.id),
+                checklist.id,
+                'X',
+            ),
         ).toBeNull();
         expect(
-            await moveChecklistItem(strangerId, item.id, null, null),
+            await renameChecklist(
+                await repoAccess(strangerId, checklist.id),
+                checklist.id,
+                'X',
+            ),
         ).toBeNull();
-        expect(await deleteChecklistItem(strangerId, item.id)).toBeNull();
-        expect(await deleteChecklist(strangerId, checklist.id)).toBeNull();
+        expect(
+            await updateChecklistItem(
+                await repoAccess(strangerId, item.id),
+                item.id,
+                { done: true },
+            ),
+        ).toBeNull();
+        expect(
+            await moveChecklistItem(
+                await repoAccess(strangerId, item.id),
+                item.id,
+                null,
+                null,
+            ),
+        ).toBeNull();
+        expect(
+            await deleteChecklistItem(
+                await repoAccess(strangerId, item.id),
+                item.id,
+            ),
+        ).toBeNull();
+        expect(
+            await deleteChecklist(
+                await repoAccess(strangerId, checklist.id),
+                checklist.id,
+            ),
+        ).toBeNull();
 
-        const own = await getChecklist(ownerId, cardId);
+        const own = await getChecklist(
+            await authorizeCard(ownerId, cardId, Action.BoardRead),
+            cardId,
+        );
         expect(own).toMatchObject({ title: 'Steps' });
         expect(own?.items).toMatchObject([{ title: 'A', done: false }]);
     });

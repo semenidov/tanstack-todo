@@ -9,6 +9,7 @@ import {
     DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu';
 import type { BoardSummary } from '#/lib/boards-query';
+import { Role } from '#/lib/permissions';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon } from 'lucide-react';
 
@@ -59,8 +60,19 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
                     >
                         {board.title}
                     </span>
-                    <span className="text-xs text-muted-foreground">
-                        {listsLabel}
+                    <span
+                        className="truncate text-xs text-muted-foreground"
+                        title={
+                            board.myRole === Role.Editor
+                                ? board.ownerName
+                                : undefined
+                        }
+                    >
+                        {board.myRole === Role.Editor ? (
+                            <>by {board.ownerName}</>
+                        ) : (
+                            listsLabel
+                        )}
                     </span>
                 </Link>
             )}

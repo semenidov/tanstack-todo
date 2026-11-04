@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
@@ -70,15 +71,38 @@ const current = { id: 'board-1', title: 'Current' };
 const lists = [makeList('a'), makeList('b'), makeList('c')];
 
 const boards: Array<BoardSummary> = [
-    { id: 'board-1', title: 'Current', listCount: 3, cardCount: 0 },
-    { id: 'board-2', title: 'Other', listCount: 2, cardCount: 0 },
-    { id: 'board-3', title: 'Slow', listCount: 1, cardCount: 0 },
+    {
+        id: 'board-1',
+        title: 'Current',
+        listCount: 3,
+        cardCount: 0,
+        myRole: Role.Owner,
+        ownerName: 'Owner',
+    },
+    {
+        id: 'board-2',
+        title: 'Other',
+        listCount: 2,
+        cardCount: 0,
+        myRole: Role.Owner,
+        ownerName: 'Owner',
+    },
+    {
+        id: 'board-3',
+        title: 'Slow',
+        listCount: 1,
+        cardCount: 0,
+        myRole: Role.Owner,
+        ownerName: 'Owner',
+    },
 ];
 
 const otherBoard: BoardData = {
     board: {
         id: 'board-2',
         ownerId: 'user-1',
+        myRole: Role.Owner,
+        ownerName: 'Owner',
         title: 'Other',
         createdAt: new Date(0),
         updatedAt: new Date(0),
@@ -88,12 +112,15 @@ const otherBoard: BoardData = {
 
 function setup(
     listId: string,
-    { isSyncing = false }: { isSyncing?: boolean } = {},
+    {
+        isSyncing = false,
+        availableBoards = boards,
+    }: { isSyncing?: boolean; availableBoards?: Array<BoardSummary> } = {},
 ) {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false, staleTime: Infinity } },
     });
-    queryClient.setQueryData(boardsListQueryOptions.queryKey, boards);
+    queryClient.setQueryData(boardsListQueryOptions.queryKey, availableBoards);
     queryClient.setQueryData(boardQueryOptions('board-2').queryKey, otherBoard);
     const onMove = vi.fn();
     const list = lists.find((l) => l.id === listId);
@@ -136,6 +163,33 @@ describe('MoveListForm', () => {
                 (o) => o.textContent,
             ),
         ).toEqual(['Current', 'Other', 'Slow']);
+    });
+
+    it('only offers the current board when the source belongs to another owner', () => {
+        const { boardSelect } = setup('a', {
+            availableBoards: boards.map((b) =>
+                b.id === current.id ? { ...b, myRole: Role.Editor } : b,
+            ),
+        });
+        expect(
+            Array.from(
+                boardSelect.querySelectorAll('option'),
+                (o) => o.textContent,
+            ),
+        ).toEqual(['Current']);
+    });
+    it('omits editor boards from an owner’s move targets', () => {
+        const { boardSelect } = setup('a', {
+            availableBoards: boards.map((b) =>
+                b.id === 'board-2' ? { ...b, myRole: Role.Editor } : b,
+            ),
+        });
+        expect(
+            Array.from(
+                boardSelect.querySelectorAll('option'),
+                (o) => o.textContent,
+            ),
+        ).toEqual(['Current', 'Slow']);
     });
 
     it('offers positions 1..N on the current board, Move off for the current spot', async () => {

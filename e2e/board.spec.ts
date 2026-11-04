@@ -31,7 +31,9 @@ test('shows a board with its lists', async ({ page }) => {
 test('links back to the boards list', async ({ page }) => {
     await page.getByRole('link', { name: 'Back to boards' }).click();
     await page.waitForURL(/\/boards$/);
-    await expect(page.getByRole('heading', { name: 'Boards' })).toBeVisible();
+    await expect(
+        page.getByRole('heading', { name: 'Boards', exact: true }),
+    ).toBeVisible();
 });
 
 test('renames the board in the header and the tile shows it', async ({

@@ -3,33 +3,43 @@ import { cards, checklistItems, checklists } from '#/db/schema';
 import { QuotaExceededError, QuotaKind, USER_QUOTAS } from '#/lib/quotas';
 import type { Quotas } from '#/lib/quotas';
 import {
-    findOwnedCard,
-    ownedCardIds,
-    ownedChecklistIds,
+    findAccessibleCard,
+    accessibleChecklistIds,
+    accessibleCardIds,
 } from '#/server/access';
-import { and, asc, count, eq, inArray, max } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, max, sql } from 'drizzle-orm';
 import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
+import type { BoardAccess } from '#/server/authorize';
 
-function touchChecklistCard(checklistId: string) {
+function touchChecklistCard(access: BoardAccess, checklistId: string) {
     return db
         .update(cards)
         .set({ updatedAt: new Date() })
         .where(
-            inArray(
-                cards.id,
-                db
-                    .select({ id: checklists.cardId })
-                    .from(checklists)
-                    .where(eq(checklists.id, checklistId)),
+            and(
+                inArray(
+                    cards.id,
+                    accessibleCardIds(access.userId, access.boardId),
+                ),
+                inArray(
+                    cards.id,
+                    db
+                        .select({ id: checklists.cardId })
+                        .from(checklists)
+                        .where(eq(checklists.id, checklistId)),
+                ),
             ),
         );
 }
 
-export async function getChecklist(userId: string, cardId: string) {
+export async function getChecklist(access: BoardAccess, cardId: string) {
     const checklist = await db.query.checklists.findFirst({
         where: and(
             eq(checklists.cardId, cardId),
-            inArray(checklists.cardId, ownedCardIds(userId)),
+            inArray(
+                checklists.cardId,
+                accessibleCardIds(access.userId, access.boardId),
+            ),
         ),
         with: {
             items: {
@@ -41,25 +51,47 @@ export async function getChecklist(userId: string, cardId: string) {
 }
 
 export async function createChecklist(
-    userId: string,
+    access: BoardAccess,
     cardId: string,
     title: string,
 ) {
-    const card = await findOwnedCard(userId, cardId);
+    const card = await findAccessibleCard(
+        access.userId,
+        access.boardId,
+        cardId,
+    );
     if (!card) return null;
     const rows = await db
         .insert(checklists)
-        .values({ cardId, title })
+        .select(
+            db
+                .select({
+                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    cardId: cards.id,
+                    title: sql<string>`${title}`.as('title'),
+                    createdAt: sql<Date>`now()`.as('createdAt'),
+                })
+                .from(cards)
+                .where(
+                    and(
+                        eq(cards.id, cardId),
+                        inArray(
+                            cards.id,
+                            accessibleCardIds(access.userId, access.boardId),
+                        ),
+                    ),
+                ),
+        )
         .onConflictDoNothing({ target: checklists.cardId })
         .returning();
     const checklist = rows.at(0);
     if (!checklist) return null;
-    await touchChecklistCard(checklist.id);
+    await touchChecklistCard(access, checklist.id);
     return { ...checklist, items: [] };
 }
 
 export async function renameChecklist(
-    userId: string,
+    access: BoardAccess,
     checklistId: string,
     title: string,
 ) {
@@ -69,23 +101,32 @@ export async function renameChecklist(
         .where(
             and(
                 eq(checklists.id, checklistId),
-                inArray(checklists.id, ownedChecklistIds(userId)),
+                inArray(
+                    checklists.id,
+                    accessibleChecklistIds(access.userId, access.boardId),
+                ),
             ),
         )
         .returning();
     const checklist = rows.at(0);
     if (!checklist) return null;
-    await touchChecklistCard(checklist.id);
+    await touchChecklistCard(access, checklist.id);
     return checklist;
 }
 
-export async function deleteChecklist(userId: string, checklistId: string) {
+export async function deleteChecklist(
+    access: BoardAccess,
+    checklistId: string,
+) {
     const rows = await db
         .delete(checklists)
         .where(
             and(
                 eq(checklists.id, checklistId),
-                inArray(checklists.id, ownedChecklistIds(userId)),
+                inArray(
+                    checklists.id,
+                    accessibleChecklistIds(access.userId, access.boardId),
+                ),
             ),
         )
         .returning();
@@ -94,26 +135,37 @@ export async function deleteChecklist(userId: string, checklistId: string) {
     await db
         .update(cards)
         .set({ updatedAt: new Date() })
-        .where(eq(cards.id, checklist.cardId));
+        .where(
+            and(
+                eq(cards.id, checklist.cardId),
+                inArray(
+                    cards.id,
+                    accessibleCardIds(access.userId, access.boardId),
+                ),
+            ),
+        );
     return checklist;
 }
 
 export async function addChecklistItem(
-    userId: string,
+    access: BoardAccess,
     checklistId: string,
     title: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
-    const owned = await db
+    const accessible = await db
         .select({ id: checklists.id })
         .from(checklists)
         .where(
             and(
                 eq(checklists.id, checklistId),
-                inArray(checklists.id, ownedChecklistIds(userId)),
+                inArray(
+                    checklists.id,
+                    accessibleChecklistIds(access.userId, access.boardId),
+                ),
             ),
         );
-    if (owned.length === 0) return null;
+    if (accessible.length === 0) return null;
     const [stats] = await db
         .select({ n: count(), last: max(checklistItems.position) })
         .from(checklistItems)
@@ -124,47 +176,72 @@ export async function addChecklistItem(
     }
     const [item] = await db
         .insert(checklistItems)
-        .values({
-            checklistId,
-            title,
-            position: generateKeyBetween(stats.last, null),
-        })
+        .select(
+            db
+                .select({
+                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    checklistId: checklists.id,
+                    title: sql<string>`${title}`.as('title'),
+                    done: sql<boolean>`false`.as('done'),
+                    position:
+                        sql<string>`${generateKeyBetween(stats.last, null)}`.as(
+                            'position',
+                        ),
+                    createdAt: sql<Date>`now()`.as('createdAt'),
+                })
+                .from(checklists)
+                .where(
+                    and(
+                        eq(checklists.id, checklistId),
+                        inArray(
+                            checklists.id,
+                            accessibleChecklistIds(
+                                access.userId,
+                                access.boardId,
+                            ),
+                        ),
+                    ),
+                ),
+        )
         .returning();
-    await touchChecklistCard(checklistId);
+    await touchChecklistCard(access, checklistId);
     return item;
 }
 
-function ownedItem(userId: string, itemId: string) {
+function accessibleItem(access: BoardAccess, itemId: string) {
     return and(
         eq(checklistItems.id, itemId),
-        inArray(checklistItems.checklistId, ownedChecklistIds(userId)),
+        inArray(
+            checklistItems.checklistId,
+            accessibleChecklistIds(access.userId, access.boardId),
+        ),
     );
 }
 
 export async function updateChecklistItem(
-    userId: string,
+    access: BoardAccess,
     itemId: string,
     patch: { title?: string; done?: boolean },
 ) {
     const rows = await db
         .update(checklistItems)
         .set(patch)
-        .where(ownedItem(userId, itemId))
+        .where(accessibleItem(access, itemId))
         .returning();
     const item = rows.at(0);
     if (!item) return null;
-    await touchChecklistCard(item.checklistId);
+    await touchChecklistCard(access, item.checklistId);
     return item;
 }
 
-export async function deleteChecklistItem(userId: string, itemId: string) {
+export async function deleteChecklistItem(access: BoardAccess, itemId: string) {
     const rows = await db
         .delete(checklistItems)
-        .where(ownedItem(userId, itemId))
+        .where(accessibleItem(access, itemId))
         .returning();
     const item = rows.at(0);
     if (!item) return null;
-    await touchChecklistCard(item.checklistId);
+    await touchChecklistCard(access, item.checklistId);
     return item;
 }
 
@@ -183,7 +260,7 @@ async function readNeighbors(checklistId: string, neighborIds: string[]) {
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-async function renumberChecklist(checklistId: string) {
+async function renumberChecklist(access: BoardAccess, checklistId: string) {
     const rows = await db
         .select({ id: checklistItems.id })
         .from(checklistItems)
@@ -194,7 +271,7 @@ async function renumberChecklist(checklistId: string) {
         await db
             .update(checklistItems)
             .set({ position: keys[i] })
-            .where(eq(checklistItems.id, row.id));
+            .where(accessibleItem(access, row.id));
     }
 }
 
@@ -207,18 +284,18 @@ function keyBetween(
 }
 
 export async function moveChecklistItem(
-    userId: string,
+    access: BoardAccess,
     itemId: string,
     prevItemId: string | null,
     nextItemId: string | null,
 ) {
     if (prevItemId === itemId || nextItemId === itemId) return null;
     if (prevItemId !== null && prevItemId === nextItemId) return null;
-    const owned = await db
+    const accessible = await db
         .select({ checklistId: checklistItems.checklistId })
         .from(checklistItems)
-        .where(ownedItem(userId, itemId));
-    const checklistId = owned.at(0)?.checklistId;
+        .where(accessibleItem(access, itemId));
+    const checklistId = accessible.at(0)?.checklistId;
     if (!checklistId) return null;
 
     const neighborIds = [prevItemId, nextItemId].filter((id) => id !== null);
@@ -232,7 +309,7 @@ export async function moveChecklistItem(
 
     let position = await findKey();
     if (position === undefined) {
-        await renumberChecklist(checklistId);
+        await renumberChecklist(access, checklistId);
         position = await findKey();
     }
     if (position === null || position === undefined) return null;
@@ -240,8 +317,8 @@ export async function moveChecklistItem(
     const rows = await db
         .update(checklistItems)
         .set({ position })
-        .where(eq(checklistItems.id, itemId))
+        .where(accessibleItem(access, itemId))
         .returning();
-    await touchChecklistCard(checklistId);
+    await touchChecklistCard(access, checklistId);
     return rows.at(0) ?? null;
 }
