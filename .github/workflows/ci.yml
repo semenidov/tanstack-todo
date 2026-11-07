@@ -117,7 +117,7 @@ jobs:
 
     migrate:
         if: github.ref == 'refs/heads/master'
-        needs: [quality, unit, integration]
+        needs: [quality, unit, integration, e2e]
         runs-on: ubuntu-latest
         env:
             DATABASE_URL: ${{ secrets.NEON_MAIN_DATABASE_URL }}
