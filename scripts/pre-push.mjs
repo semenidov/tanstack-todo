@@ -54,24 +54,33 @@ export function checkPush(input, git, run) {
         .split('\0')
         .filter(Boolean);
     const { integration, e2e } = selectTests(files);
+    checkTypes(run);
+    runUnitTests(run);
+    runIntegrationTests(integration, run);
+    runE2eTests(e2e, run);
+}
+
+function checkTypes(run) {
     run('typescript/bin/tsc', ['--noEmit']);
+}
+
+function runUnitTests(run) {
     run('vitest/vitest.mjs', ['run', '--project', 'unit']);
-    if (integration.length) {
-        console.log('Pre-push integration:', integration.join(', '));
-        run('vitest/vitest.mjs', [
-            'run',
-            '--project',
-            'integration',
-            ...integration,
-        ]);
-    }
-    if (e2e.length) {
-        console.log('Pre-push e2e:', e2e.join(', '));
-        const filters = e2e.map(
-            (file) => `${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-        );
-        run('@playwright/test/cli.js', ['test', '--reporter=line', ...filters]);
-    }
+}
+
+function runIntegrationTests(files, run) {
+    if (!files.length) return;
+    console.log('Pre-push integration:', files.join(', '));
+    run('vitest/vitest.mjs', ['run', '--project', 'integration', ...files]);
+}
+
+function runE2eTests(files, run) {
+    if (!files.length) return;
+    console.log('Pre-push e2e:', files.join(', '));
+    const filters = files.map(
+        (file) => `${file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    );
+    run('@playwright/test/cli.js', ['test', '--reporter=line', ...filters]);
 }
 
 if (
