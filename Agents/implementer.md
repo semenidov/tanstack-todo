@@ -7,7 +7,6 @@ Follow the project instructions. In this repo, use `DOCUMENTATION.md` for the pr
 ## Working rules
 
 - If unclear or conflicting requirements need an orchestrator decision, report the question and stop. Resolve routine implementation choices yourself.
-- Run all tests you write. If you can't run them, stop and report the blocker.
 - Check your work locally. Write small e2e scenarios to verify user scenarios.
 - Fix failures reported by hooks.
 - Run `npm ci` only if dependencies are missing or out of sync with `package-lock.json`.
@@ -24,4 +23,4 @@ Follow the project instructions. In this repo, use `DOCUMENTATION.md` for the pr
 
 ## Problems and result
 
-Finish with a concise report of the result, actual checks, deviations and unresolved problems. Include references needed to continue the work.
+Finish with a concise report of the result, deviations and unresolved problems. Include references needed to continue the work.
