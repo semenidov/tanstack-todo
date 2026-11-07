@@ -1,7 +1,3 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { expect, it } from 'vitest';
 import { checkPush, pushRange } from '../../scripts/pre-push.mjs';
 
@@ -65,99 +61,25 @@ it('runs mandatory checks and selected groups in order, skips empty groups, and 
     expect(calls).toHaveLength(3);
 });
 
-it('selects only this push using a real Git history', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'pre-push-'));
-    const realGit = (...args: string[]) =>
-        execFileSync('git', args, {
-            cwd: dir,
-            encoding: 'utf8',
-            env: Object.fromEntries(
-                Object.entries(process.env).filter(
-                    ([key]) => !key.startsWith('GIT_'),
-                ),
-            ),
-        });
-    const commit = () => {
-        realGit('add', '.');
-        realGit(
-            '-c',
-            'user.name=Test',
-            '-c',
-            'user.email=test@example.com',
-            '-c',
-            'core.hooksPath=/dev/null',
-            'commit',
-            '-m',
-            'test',
-        );
-        return realGit('rev-parse', 'HEAD').trim();
+it('compares the pushed commit with the remote SHA or the first-push merge base', () => {
+    const calls: string[][] = [];
+    const recordingGit = (...args: string[]) => {
+        calls.push(args);
+        return git(args[0]);
     };
-    const selected = (remote: string) => {
-        const calls: string[][] = [];
-        const head = realGit('rev-parse', 'HEAD').trim();
-        checkPush(
-            `refs/heads/task ${head} refs/heads/task ${remote}`,
-            realGit,
-            (cli: string, args: string[]) => calls.push([cli, ...args]),
-        );
-        return calls.slice(2);
-    };
-    try {
-        realGit('init');
-        writeFileSync(join(dir, 'README.md'), 'base');
-        const base = commit();
-        realGit('update-ref', 'refs/remotes/origin/master', base);
-        mkdirSync(join(dir, 'e2e'));
-        mkdirSync(join(dir, 'src'));
-        writeFileSync(join(dir, 'src/a.integration.test.ts'), 'first');
-        writeFileSync(join(dir, 'e2e/auth.setup.ts'), 'setup');
-        writeFileSync(join(dir, 'e2e/first.spec.ts'), 'first');
-        commit();
-        writeFileSync(join(dir, 'e2e/second.spec.ts'), 'second');
-        const firstPush = commit();
-        expect(selected('0'.repeat(40))).toEqual([
-            [
-                'vitest/vitest.mjs',
-                'run',
-                '--project',
-                'integration',
-                'src/a.integration.test.ts',
-            ],
-            [
-                '@playwright/test/cli.js',
-                'test',
-                '--reporter=line',
-                'e2e/auth\\.setup\\.ts$',
-                'e2e/first\\.spec\\.ts$',
-                'e2e/second\\.spec\\.ts$',
-            ],
-        ]);
-        realGit('mv', 'e2e/first.spec.ts', 'e2e/renamed.spec.ts');
-        realGit('rm', 'e2e/second.spec.ts');
-        writeFileSync(join(dir, 'src/a.integration.test.ts'), 'modified');
-        writeFileSync(join(dir, 'e2e/auth.setup.ts'), 'modified setup');
-        commit();
-        expect(selected(firstPush)).toEqual([
-            [
-                'vitest/vitest.mjs',
-                'run',
-                '--project',
-                'integration',
-                'src/a.integration.test.ts',
-            ],
-            [
-                '@playwright/test/cli.js',
-                'test',
-                '--reporter=line',
-                'e2e/auth\\.setup\\.ts$',
-                'e2e/renamed\\.spec\\.ts$',
-            ],
-        ]);
-        const secondPush = realGit('rev-parse', 'HEAD').trim();
-        writeFileSync(join(dir, 'README.md'), 'docs only');
-        commit();
-        expect(selected(secondPush)).toEqual([]);
-    } finally {
-        rmSync(dir, { recursive: true, force: true });
-    }
-}, 30_000);
+    expect(pushRange(update, recordingGit)).toEqual(['def', 'abc']);
+    expect(calls).toEqual([
+        ['rev-parse', 'HEAD'],
+        ['status', '--porcelain'],
+    ]);
+
+    calls.length = 0;
+    expect(
+        pushRange(update.replace('def', '0'.repeat(40)), recordingGit),
+    ).toEqual(['base', 'abc']);
+    expect(calls).toEqual([
+        ['rev-parse', 'HEAD'],
+        ['status', '--porcelain'],
+        ['merge-base', 'origin/master', 'abc'],
+    ]);
+});
