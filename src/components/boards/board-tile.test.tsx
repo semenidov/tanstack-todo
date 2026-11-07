@@ -83,3 +83,37 @@ describe('BoardTile', () => {
         expect(screen.getByRole('link')).toHaveTextContent('Roadmap');
     });
 });
+
+it('editor has only Leave and must confirm it', async () => {
+    const user = userEvent.setup();
+    const onLeave = vi.fn();
+    render(
+        <BoardTile
+            board={{ ...board, myRole: Role.Editor }}
+            onRename={vi.fn()}
+            onDelete={vi.fn()}
+            onLeave={onLeave}
+        />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Board actions' }));
+    expect(
+        await screen.findByRole('menuitem', { name: 'Leave' }),
+    ).toBeInTheDocument();
+    expect(
+        screen.queryByRole('menuitem', { name: 'Rename' }),
+    ).not.toBeInTheDocument();
+    expect(
+        screen.queryByRole('menuitem', { name: 'Delete…' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Leave' }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+        'Leave board "Roadmap"?',
+    );
+    expect(onLeave).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onLeave).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Board actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Leave' }));
+    await user.click(screen.getByRole('button', { name: 'Leave' }));
+    expect(onLeave).toHaveBeenCalledOnce();
+});

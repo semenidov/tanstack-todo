@@ -1,3 +1,4 @@
+import { LeaveBoardDialog } from '#/components/boards/leave-board-dialog';
 import { useState } from 'react';
 import { EditableTitle } from '#/components/editable-title';
 import { DeleteBoardDialog } from '#/components/boards/delete-board-dialog';
@@ -9,7 +10,7 @@ import {
     DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu';
 import type { BoardSummary } from '#/lib/boards-query';
-import { Role } from '#/lib/permissions';
+import { Action, can, Role } from '#/lib/permissions';
 import { Link } from '@tanstack/react-router';
 import { EllipsisIcon } from 'lucide-react';
 
@@ -17,14 +18,21 @@ interface BoardTileProps {
     board: BoardSummary;
     onRename: (title: string) => void;
     onDelete: () => void;
+    onLeave?: () => void;
 }
 
 const TILE_CLASS =
     'flex h-24 flex-col justify-between rounded-lg border bg-card p-3 shadow-xs transition-colors';
 const TITLE_BOX_CLASS = 'h-10 pr-7 text-sm leading-5 font-medium';
 
-export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
+export function BoardTile({
+    board,
+    onRename,
+    onDelete,
+    onLeave,
+}: BoardTileProps) {
     const [isEditing, setIsEditing] = useState(false);
+    const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const listsLabel = `${board.listCount} ${board.listCount === 1 ? 'list' : 'lists'}`;
@@ -89,18 +97,37 @@ export function BoardTile({ board, onRename, onDelete }: BoardTileProps) {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setIsEditing(true)}>
-                            Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={() => setIsDeleteDialogOpen(true)}
-                        >
-                            Delete…
-                        </DropdownMenuItem>
+                        {can(board.myRole, Action.BoardRename) && (
+                            <DropdownMenuItem
+                                onSelect={() => setIsEditing(true)}
+                            >
+                                Rename
+                            </DropdownMenuItem>
+                        )}
+                        {can(board.myRole, Action.BoardDelete) && (
+                            <DropdownMenuItem
+                                variant="destructive"
+                                onSelect={() => setIsDeleteDialogOpen(true)}
+                            >
+                                Delete…
+                            </DropdownMenuItem>
+                        )}
+                        {can(board.myRole, Action.BoardLeave) && (
+                            <DropdownMenuItem
+                                onSelect={() => setIsLeaveDialogOpen(true)}
+                            >
+                                Leave
+                            </DropdownMenuItem>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             )}
+            <LeaveBoardDialog
+                open={isLeaveDialogOpen}
+                onOpenChange={setIsLeaveDialogOpen}
+                boardTitle={board.title}
+                onConfirm={() => onLeave?.()}
+            />
             <DeleteBoardDialog
                 open={isDeleteDialogOpen}
                 onOpenChange={setIsDeleteDialogOpen}

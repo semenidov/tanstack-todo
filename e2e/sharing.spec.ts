@@ -251,3 +251,70 @@ test('editor saves columns and cards, cannot move across boards, then loses acce
         await db.query.cards.findFirst({ where: eq(cards.title, 'Must fail') }),
     ).toBeUndefined();
 });
+
+test('editor has a read-only board title and leaves with confirmation', async ({
+    browser,
+}) => {
+    test.slow();
+    const ownerContext = await browser.newContext();
+    const editorContext = await browser.newContext();
+    try {
+        const ownerPage = await ownerContext.newPage();
+        const editorPage = await editorContext.newPage();
+        const ownerEmail = uniqueEmail('role-owner');
+        const editorEmail = uniqueEmail('role-editor');
+        await signup(ownerPage, ownerEmail);
+        await signup(editorPage, editorEmail);
+        const boardId = await seedBoard(ownerEmail, 'Team roadmap');
+        await seedBoardMember(boardId, editorEmail);
+        await gotoHydrated(editorPage, `/b/${boardId}`);
+        await expect(
+            editorPage.getByRole('heading', { name: 'Team roadmap' }),
+        ).toBeVisible();
+        await expect(
+            editorPage.getByRole('button', {
+                name: 'Team roadmap',
+                exact: true,
+            }),
+        ).toHaveCount(0);
+        await expect(editorPage.getByLabel('Board title')).toHaveCount(0);
+        await editorPage.getByRole('link', { name: 'Back to boards' }).click();
+        await editorPage.waitForURL('/boards');
+        const shared = editorPage
+            .getByRole('heading', { name: 'Shared with me' })
+            .locator('..');
+        await shared.getByRole('button', { name: 'Board actions' }).click();
+        await expect(editorPage.getByRole('menuitem')).toHaveCount(1);
+        await editorPage.getByRole('menuitem', { name: 'Leave' }).click();
+        const dialog = editorPage.getByRole('alertdialog');
+        await expect(dialog).toContainText('Leave board "Team roadmap"?');
+        await dialog.getByRole('button', { name: 'Cancel' }).click();
+        await expect(
+            shared.getByRole('link', { name: /Team roadmap/ }),
+        ).toBeVisible();
+        await shared.getByRole('button', { name: 'Board actions' }).click();
+        await editorPage.getByRole('menuitem', { name: 'Leave' }).click();
+        await editorPage
+            .getByRole('alertdialog')
+            .getByRole('button', { name: 'Leave' })
+            .click();
+        await expect(
+            editorPage.getByRole('heading', { name: 'Shared with me' }),
+        ).toHaveCount(0);
+        await editorPage.reload();
+        await expect(
+            editorPage.getByRole('link', { name: /Team roadmap/ }),
+        ).toHaveCount(0);
+        await gotoHydrated(editorPage, `/b/${boardId}`);
+        await expect(
+            editorPage.getByText("Board not found or you don't have access"),
+        ).toBeVisible();
+        await gotoHydrated(ownerPage, `/b/${boardId}`);
+        await expect(
+            ownerPage.getByRole('heading', { name: 'Team roadmap' }),
+        ).toBeVisible();
+    } finally {
+        await ownerContext.close();
+        await editorContext.close();
+    }
+});
