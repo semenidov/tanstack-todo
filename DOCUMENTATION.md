@@ -45,7 +45,7 @@
 ## Проверки по пути кода
 
 - Коммит: prettier + eslint по изменённым файлам. Пуш: typecheck + unit. Хуки ставятся сами при `npm install`.
-- CI на PR и push в `master`: линт и типы, unit, integration, затем e2e. Integration и e2e идут на временных Neon-ветках.
+- CI на PR и push в `master`: линт и типы идут параллельно с unit; после их успеха integration и e2e запускаются параллельно, каждый на своей временной Neon-ветке.
 - После мержа в `master` CI накатывает миграции на прод, Vercel деплоит сам.
 
 ## Структура
