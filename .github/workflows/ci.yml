@@ -34,6 +34,7 @@ jobs:
             - run: npm run test:unit
 
     integration:
+        needs: [quality, unit]
         runs-on: ubuntu-latest
         env:
             NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -70,7 +71,7 @@ jobs:
                   api_key: ${{ secrets.NEON_API_KEY }}
 
     e2e:
-        needs: [quality, unit, integration]
+        needs: [quality, unit]
         runs-on: ubuntu-latest
         env:
             NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -116,7 +117,7 @@ jobs:
 
     migrate:
         if: github.ref == 'refs/heads/master'
-        needs: [quality, unit, integration]
+        needs: [quality, unit, integration, e2e]
         runs-on: ubuntu-latest
         env:
             DATABASE_URL: ${{ secrets.NEON_MAIN_DATABASE_URL }}
