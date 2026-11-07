@@ -8,8 +8,10 @@ export function selectTests(files) {
         integration: files.filter((file) =>
             /^src\/.*\.integration\.(test|spec)\.tsx?$/.test(file),
         ),
-        e2e: files.filter((file) =>
-            /^e2e\/.*\.(test|spec)\.[cm]?[jt]sx?$/.test(file),
+        e2e: files.filter(
+            (file) =>
+                file === 'e2e/auth.setup.ts' ||
+                /^e2e\/.*\.(test|spec)\.[cm]?[jt]sx?$/.test(file),
         ),
     };
 }
