@@ -1,10 +1,7 @@
+import { membersQueryOptions } from '#/lib/members-query';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-    getSharingServer,
-    shareBoardServer,
-    removeMemberServer,
-} from '#/server/members';
+import { shareBoardServer, removeMemberServer } from '#/server/members';
 import { Button } from '#/components/ui/button';
 import { Input } from '#/components/ui/input';
 import {
@@ -44,11 +41,9 @@ export function ShareDialog({
         name: string;
     } | null>(null);
     const client = useQueryClient();
-    const key = ['members', boardId];
-    const sharing = useQuery({
-        queryKey: key,
-        queryFn: () => getSharingServer({ data: { boardId } }),
-    });
+    const options = membersQueryOptions(boardId);
+    const key = options.queryKey;
+    const sharing = useQuery(options);
     const change = useMutation({
         mutationFn: (data: { reset: boolean }) =>
             shareBoardServer({ data: { boardId, ...data } }),
@@ -69,7 +64,10 @@ export function ShareDialog({
         onError: (error) => toast.error(error.message),
     });
     const token = sharing.data?.token;
-    const link = token ? `${window.location.origin}/invite/${token}` : '';
+    const link =
+        token && typeof window !== 'undefined'
+            ? `${window.location.origin}/invite/${token}`
+            : '';
     return (
         <>
             <Button
