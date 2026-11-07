@@ -298,6 +298,7 @@ test('editor has a read-only board title and leaves with confirmation', async ({
             .getByRole('alertdialog')
             .getByRole('button', { name: 'Leave' })
             .click();
+        await expect(editorPage.getByRole('alertdialog')).toHaveCount(0);
         await expect(
             editorPage.getByRole('heading', { name: 'Shared with me' }),
         ).toHaveCount(0);
