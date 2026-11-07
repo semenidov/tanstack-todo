@@ -1,3 +1,4 @@
+import { ShareDialog } from '#/components/board/share/share-dialog';
 import { Action, can } from '#/lib/permissions';
 import { AddList } from '#/components/board/add-list';
 import { BoardDnd } from '#/components/board/board-dnd';
@@ -102,6 +103,9 @@ export function BoardView({ board, lists }: BoardData) {
                     </h1>
                 </div>
                 <div className="flex items-center gap-2">
+                    {can(board.myRole, Action.MembersManage) && (
+                        <ShareDialog boardId={board.id} title={board.title} />
+                    )}
                     <ThemeToggle />
                     <SignOutButton />
                 </div>

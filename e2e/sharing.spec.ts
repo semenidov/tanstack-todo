@@ -319,3 +319,59 @@ test('editor has a read-only board title and leaves with confirmation', async ({
         await editorContext.close();
     }
 });
+
+test('owner shares, resets the link and removes a member', async ({
+    browser,
+}) => {
+    test.slow();
+    const ownerContext = await browser.newContext();
+    const memberContext = await browser.newContext();
+    try {
+        const owner = await ownerContext.newPage();
+        const member = await memberContext.newPage();
+        const email = uniqueEmail('share-owner');
+        const editorEmail = uniqueEmail('share-editor');
+        await signup(owner, email);
+        await signup(member, editorEmail);
+        const boardId = await seedBoard(email, 'Share management');
+        await seedBoardMember(boardId, editorEmail);
+        await gotoHydrated(owner, `/b/${boardId}`);
+        await owner.getByRole('button', { name: 'Share', exact: true }).click();
+        const confirm = owner.getByRole('alertdialog');
+        await expect(confirm).toContainText(
+            "A shared board can't be made private again.",
+        );
+        await confirm
+            .getByRole('button', { name: 'Share', exact: true })
+            .click();
+        const dialog = owner.getByRole('dialog');
+        const link = dialog.getByLabel('Invite link');
+        await expect(link).toHaveValue(/\/invite\/[a-f0-9]{64}$/);
+        const first = await link.inputValue();
+        await dialog
+            .getByRole('button', { name: 'Close', exact: true })
+            .click();
+        await owner.getByRole('button', { name: 'Share', exact: true }).click();
+        await expect(link).toHaveValue(first);
+        await dialog.getByRole('button', { name: 'Reset link' }).click();
+        await expect(link).not.toHaveValue(first);
+        await dialog
+            .getByRole('button', { name: 'Remove', exact: true })
+            .click();
+        await expect(confirm).toContainText('Reset the link to prevent this.');
+        await confirm
+            .getByRole('button', { name: 'Remove', exact: true })
+            .click();
+        await expect(confirm).toBeHidden();
+        await expect(dialog.getByText('No members yet.')).toBeVisible();
+        await gotoHydrated(member, `/b/${boardId}`);
+        await expect(
+            member.getByText("Board not found or you don't have access", {
+                exact: true,
+            }),
+        ).toBeVisible();
+    } finally {
+        await ownerContext.close();
+        await memberContext.close();
+    }
+});

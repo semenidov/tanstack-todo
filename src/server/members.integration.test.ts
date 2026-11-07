@@ -7,8 +7,12 @@ import { Action, BOARD_ACCESS_DENIED } from '#/lib/permissions';
 import { authorizeBoard, requireChanged } from './authorize';
 import { createBoard, getBoard, listBoards } from './boards-repo';
 import { leaveBoard } from './members-repo';
-import { leaveBoardServer } from './members';
+import { leaveBoardServer,
+    getSharingServer,
+    shareBoardServer,
+    removeMemberServer } from './members';
 import { renameBoardServer, deleteBoardServer } from './boards';
+
 
 const auth = vi.hoisted(() => ({ userId: '' }));
 vi.mock('#/lib/auth-server', () => ({
@@ -98,5 +102,72 @@ describe('board management and leaving', () => {
         expect(() => requireChanged([])).toThrow(BOARD_ACCESS_DENIED);
         expect(await leaveBoard(pass)).toEqual([]);
         expect(await listBoards(stranger.id)).toHaveLength(1);
+    });
+});
+
+describe('owner sharing management', () => {
+    it('creates a stable link, resets it and removes a member with immediate access revocation', async () => {
+        const { owner, editor, board } = await fixture();
+        auth.userId = owner.id;
+        expect(
+            (await getSharingServer({ data: { boardId: board.id } })).token,
+        ).toBeNull();
+        const first = await shareBoardServer({
+            data: { boardId: board.id, reset: false },
+        });
+        expect(first.token).toMatch(/^[a-f0-9]{64}$/);
+        expect(
+            (
+                await shareBoardServer({
+                    data: { boardId: board.id, reset: false },
+                })
+            ).token,
+        ).toBe(first.token);
+        expect(
+            (
+                await shareBoardServer({
+                    data: { boardId: board.id, reset: true },
+                })
+            ).token,
+        ).not.toBe(first.token);
+        expect(
+            (
+                await getSharingServer({ data: { boardId: board.id } })
+            ).members.map((m) => m.id),
+        ).toEqual([editor.id]);
+        await expect(
+            removeMemberServer({
+                data: { boardId: board.id, memberId: owner.id },
+            }),
+        ).rejects.toThrow(BOARD_ACCESS_DENIED);
+        await removeMemberServer({
+            data: { boardId: board.id, memberId: editor.id },
+        });
+        await expect(
+            authorizeBoard(editor.id, board.id, Action.BoardRead),
+        ).rejects.toThrow(BOARD_ACCESS_DENIED);
+        expect(
+            (await getSharingServer({ data: { boardId: board.id } })).members,
+        ).toEqual([]);
+    });
+    it('rejects editors and strangers for all management handlers', async () => {
+        const { editor, stranger, board } = await fixture();
+        for (const person of [editor, stranger]) {
+            auth.userId = person.id;
+            await expect(
+                getSharingServer({ data: { boardId: board.id } }),
+            ).rejects.toThrow(BOARD_ACCESS_DENIED);
+            await expect(
+                shareBoardServer({ data: { boardId: board.id, reset: false } }),
+            ).rejects.toThrow(BOARD_ACCESS_DENIED);
+            await expect(
+                shareBoardServer({ data: { boardId: board.id, reset: true } }),
+            ).rejects.toThrow(BOARD_ACCESS_DENIED);
+            await expect(
+                removeMemberServer({
+                    data: { boardId: board.id, memberId: editor.id },
+                }),
+            ).rejects.toThrow(BOARD_ACCESS_DENIED);
+        }
     });
 });
