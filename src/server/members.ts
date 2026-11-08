@@ -1,8 +1,20 @@
 import { randomBytes } from 'node:crypto';
-import { BOARD_ACCESS_DENIED, Action  } from '#/lib/permissions';
-import { getSharing, shareBoard, removeMember, leaveBoard  } from './members-repo';
+import { BOARD_ACCESS_DENIED, Action } from '#/lib/permissions';
+import {
+    getSharing,
+    shareBoard,
+    removeMember,
+    leaveBoard,
+    getInvite,
+    joinBoard,
+} from './members-repo';
 import { requireUser } from '#/lib/auth-server';
-import { authorizeBoard, requireChanged } from './authorize';
+import {
+    authorizeBoard,
+    requireChanged,
+    authorizeInvite,
+    INVITE_INVALID,
+} from './authorize';
 import { createServerFn } from '@tanstack/react-start';
 import z from 'zod';
 
@@ -54,4 +66,25 @@ export const removeMemberServer = createServerFn({ method: 'POST' })
                 data.memberId,
             ),
         );
+    });
+
+const inviteInput = z.object({ token: z.string().min(1).max(256) });
+export const getInviteServer = createServerFn({ method: 'GET' })
+    .validator(inviteInput)
+    .handler(async ({ data }) => {
+        const { id } = await requireUser();
+        const invite = await getInvite(await authorizeInvite(id, data.token));
+        if (!invite) throw new Error(INVITE_INVALID);
+        return invite;
+    });
+
+export const joinBoardServer = createServerFn({ method: 'POST' })
+    .validator(inviteInput)
+    .handler(async ({ data }) => {
+        const { id } = await requireUser();
+        const access = await authorizeInvite(id, data.token);
+        await joinBoard(access);
+        const invite = await getInvite(access);
+        if (!invite?.joined) throw new Error(INVITE_INVALID);
+        return { boardId: invite.boardId };
     });

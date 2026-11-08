@@ -118,3 +118,24 @@ export function requireChanged<T>(result: T): NonNullable<T> {
         throw new Error(BOARD_ACCESS_DENIED);
     return result;
 }
+
+export const INVITE_INVALID = 'Invite link is invalid';
+declare const inviteAccess: unique symbol;
+export type InviteAccess = {
+    readonly userId: string;
+    readonly boardId: string;
+    readonly token: string;
+    readonly [inviteAccess]: true;
+};
+
+export async function authorizeInvite(
+    userId: string,
+    token: string,
+): Promise<InviteAccess> {
+    const board = await db.query.boards.findFirst({
+        where: eq(boards.inviteToken, token),
+        columns: { id: true },
+    });
+    if (!board) throw new Error(INVITE_INVALID);
+    return { userId, boardId: board.id, token } as InviteAccess;
+}

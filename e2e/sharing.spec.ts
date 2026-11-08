@@ -8,7 +8,7 @@ import {
     gotoSharedBoard,
 } from './helpers/board';
 import { expect, test } from '@playwright/test';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '../src/db';
 import {
     boardMembers,
@@ -231,13 +231,28 @@ test('editor saves columns and cards, cannot move across boards, then loses acce
     await expect(listColumn(page, 'Renamed')).toHaveCount(0);
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(listColumn(page, 'Renamed')).toBeVisible();
-    await db.delete(boardMembers).where(eq(boardMembers.boardId, boardId));
+    // Undo renders optimistically. Confirm persistence, then reload before revoking access.
+    await expect
+        .poll(
+            async () =>
+                (
+                    await db.query.lists.findFirst({
+                        where: and(
+                            eq(lists.boardId, boardId),
+                            eq(lists.title, 'Renamed'),
+                        ),
+                    })
+                )?.deletedAt,
+        )
+        .toBeNull();
+    await gotoHydrated(page, page.url());
     await listColumn(page, 'To do')
         .getByRole('button', { name: 'Add card' })
         .click();
     await listColumn(page, 'To do')
         .getByLabel('New card title')
         .fill('Must fail');
+    await db.delete(boardMembers).where(eq(boardMembers.boardId, boardId));
     await listColumn(page, 'To do').getByLabel('New card title').press('Enter');
     await expect(
         page.locator('[data-sonner-toast]').filter({ hasText: "Couldn't" }),
@@ -373,5 +388,91 @@ test('owner shares, resets the link and removes a member', async ({
     } finally {
         await ownerContext.close();
         await memberContext.close();
+    }
+});
+
+test('invitation joins a user and guest, redirects existing members and rejects reset links', async ({
+    browser,
+}) => {
+    test.slow();
+    const ownerContext = await browser.newContext();
+    const memberContext = await browser.newContext();
+    const guestContext = await browser.newContext();
+    const anonymousContext = await browser.newContext();
+    try {
+        const owner = await ownerContext.newPage();
+        const member = await memberContext.newPage();
+        const guest = await guestContext.newPage();
+        const anonymous = await anonymousContext.newPage();
+        const ownerEmail = uniqueEmail('invite-owner');
+        const memberEmail = uniqueEmail('invite-member');
+        await signup(owner, ownerEmail);
+        await signup(member, memberEmail);
+        const boardId = await seedBoard(ownerEmail, 'Invitation board');
+        await gotoHydrated(owner, `/b/${boardId}`);
+        await owner.getByRole('button', { name: 'Share', exact: true }).click();
+        await owner
+            .getByRole('alertdialog')
+            .getByRole('button', { name: 'Share', exact: true })
+            .click();
+        const dialog = owner.getByRole('dialog');
+        const link = dialog.getByLabel('Invite link');
+        await expect(link).toHaveValue(/\/invite\/[a-f0-9]{64}$/);
+        const invite = await link.inputValue();
+        await gotoHydrated(anonymous, invite);
+        await anonymous.waitForURL('**/login');
+        const response = await member.goto(invite);
+        expect(response?.headers()['referrer-policy']).toBe('no-referrer');
+        expect(response?.headers()['cache-control']).toBe('no-store');
+        await gotoHydrated(member, invite);
+        await expect(
+            member.getByRole('heading', { name: 'Invitation board' }),
+        ).toBeVisible();
+        const person = await db.query.user.findFirst({
+            where: eq(user.email, ownerEmail),
+        });
+        await expect(
+            member.getByText(`by ${person?.name}`, { exact: true }),
+        ).toBeVisible();
+        expect(
+            await db
+                .select()
+                .from(boardMembers)
+                .where(eq(boardMembers.boardId, boardId)),
+        ).toHaveLength(0);
+        await member.getByRole('button', { name: 'Join board' }).click();
+        await member.waitForURL(`**/b/${boardId}`);
+        await member.reload();
+        await expect(
+            member.getByRole('heading', { name: 'Invitation board' }),
+        ).toBeVisible();
+        await gotoHydrated(member, invite);
+        await member.waitForURL(`**/b/${boardId}`);
+        await gotoHydrated(owner, invite);
+        await owner.waitForURL(`**/b/${boardId}`);
+        await gotoHydrated(guest, '/login');
+        await guest.getByRole('button', { name: 'Try as guest' }).click();
+        await guest.waitForURL(/\/b\//);
+        await gotoHydrated(guest, invite);
+        await guest.getByRole('button', { name: 'Join board' }).click();
+        await guest.waitForURL(`**/b/${boardId}`);
+        expect(
+            await db
+                .select()
+                .from(boardMembers)
+                .where(eq(boardMembers.boardId, boardId)),
+        ).toHaveLength(2);
+        await owner.getByRole('button', { name: 'Share', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Reset link' }).click();
+        await expect(link).not.toHaveValue(invite);
+        await gotoHydrated(member, invite);
+        await expect(
+            member.getByRole('heading', { name: 'Invite link is invalid' }),
+        ).toBeVisible();
+    } finally {
+        await ownerContext.close();
+        await memberContext.close();
+        await guestContext.close();
+        await anonymousContext.close();
     }
 });

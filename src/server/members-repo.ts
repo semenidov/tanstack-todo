@@ -1,7 +1,8 @@
 import { db } from '#/db';
-import { boardMembers, boards, user  } from '#/db/schema';
-import type { BoardAccess } from './authorize';
-import { and, eq, inArray, ne, sql  } from 'drizzle-orm';
+import { Role } from '#/lib/permissions';
+import { boardMembers, boards, user } from '#/db/schema';
+import type { BoardAccess, InviteAccess } from './authorize';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 
 export function leaveBoard(access: BoardAccess) {
     return db
@@ -88,5 +89,55 @@ export function removeMember(access: BoardAccess, memberId: string) {
                 inArray(boardMembers.boardId, ownerBoardIds(access)),
             ),
         )
+        .returning();
+}
+
+export async function getInvite(access: InviteAccess) {
+    const invites = await db
+        .select({
+            boardId: boards.id,
+            title: boards.title,
+            ownerName: user.name,
+            joined: sql<boolean>`${boards.ownerId} = ${access.userId} or ${boardMembers.userId} is not null`,
+        })
+        .from(boards)
+        .innerJoin(user, eq(user.id, boards.ownerId))
+        .leftJoin(
+            boardMembers,
+            and(
+                eq(boardMembers.boardId, boards.id),
+                eq(boardMembers.userId, access.userId),
+            ),
+        )
+        .where(
+            and(
+                eq(boards.id, access.boardId),
+                eq(boards.inviteToken, access.token),
+            ),
+        );
+    return invites.at(0);
+}
+
+export function joinBoard(access: InviteAccess) {
+    // Insert from the board so a reset/deletion after authorization rejects the stale token.
+    return db
+        .insert(boardMembers)
+        .select(
+            db
+                .select({
+                    boardId: boards.id,
+                    userId: sql<string>`${access.userId}`.as('user_id'),
+                    role: sql<Role.Editor>`${Role.Editor}`.as('role'),
+                })
+                .from(boards)
+                .where(
+                    and(
+                        eq(boards.id, access.boardId),
+                        eq(boards.inviteToken, access.token),
+                        ne(boards.ownerId, access.userId),
+                    ),
+                ),
+        )
+        .onConflictDoNothing()
         .returning();
 }
