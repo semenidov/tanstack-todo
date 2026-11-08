@@ -2,6 +2,7 @@ import { db } from '#/db';
 import { Role } from '#/lib/permissions';
 import { boardMembers, boards, user } from '#/db/schema';
 import type { BoardAccess, InviteAccess } from './authorize';
+import { accessibleBoardIds } from './access';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 
 export function leaveBoard(access: BoardAccess) {
@@ -23,14 +24,14 @@ export function leaveBoard(access: BoardAccess) {
         .returning();
 }
 
-function ownerBoardIds(access: BoardAccess) {
+function accessibleBoardFor(access: BoardAccess) {
     return db
         .select({ id: boards.id })
         .from(boards)
         .where(
             and(
                 eq(boards.id, access.boardId),
-                eq(boards.ownerId, access.userId),
+                inArray(boards.id, accessibleBoardIds(access.userId)),
             ),
         );
 }
@@ -39,7 +40,7 @@ export async function getSharing(access: BoardAccess) {
     const board = await db
         .select({ token: boards.inviteToken })
         .from(boards)
-        .where(inArray(boards.id, ownerBoardIds(access)));
+        .where(inArray(boards.id, accessibleBoardFor(access)));
     if (!board[0]) return undefined;
     const members = await db
         .select({
@@ -53,7 +54,7 @@ export async function getSharing(access: BoardAccess) {
         .where(
             and(
                 eq(boardMembers.boardId, access.boardId),
-                inArray(boardMembers.boardId, ownerBoardIds(access)),
+                inArray(boardMembers.boardId, accessibleBoardFor(access)),
             ),
         );
     return {
@@ -74,7 +75,7 @@ export function shareBoard(access: BoardAccess, token: string, reset: boolean) {
                 ? token
                 : sql`coalesce(${boards.inviteToken}, ${token})`,
         })
-        .where(inArray(boards.id, ownerBoardIds(access)))
+        .where(inArray(boards.id, accessibleBoardFor(access)))
         .returning({ token: boards.inviteToken });
 }
 
@@ -86,7 +87,7 @@ export function removeMember(access: BoardAccess, memberId: string) {
                 eq(boardMembers.boardId, access.boardId),
                 eq(boardMembers.userId, memberId),
                 ne(boardMembers.userId, access.userId),
-                inArray(boardMembers.boardId, ownerBoardIds(access)),
+                inArray(boardMembers.boardId, accessibleBoardFor(access)),
             ),
         )
         .returning();

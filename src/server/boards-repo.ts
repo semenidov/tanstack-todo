@@ -224,7 +224,7 @@ export function renameBoard(
             and(
                 eq(boards.id, boardId),
                 eq(boards.id, access.boardId),
-                eq(boards.ownerId, access.userId),
+                inArray(boards.id, accessibleBoardIds(access.userId)),
             ),
         )
         .returning();
@@ -237,7 +237,7 @@ export function deleteBoard(access: BoardAccess, boardId: string) {
             and(
                 eq(boards.id, boardId),
                 eq(boards.id, access.boardId),
-                eq(boards.ownerId, access.userId),
+                inArray(boards.id, accessibleBoardIds(access.userId)),
             ),
         )
         .returning();
@@ -488,12 +488,7 @@ export async function moveList(
                 inArray(b.id, accessibleBoardIds(access.userId)),
             ),
     });
-    if (
-        !targetBoard ||
-        targetAccess.userId !== access.userId ||
-        (toBoardId !== access.boardId && access.role !== Role.Owner)
-    )
-        return null;
+    if (!targetBoard || targetAccess.userId !== access.userId) return null;
     if (toBoardId !== list.boardId) {
         await assertBelowQuota(QuotaKind.Lists, quotas, () =>
             countLiveLists(toBoardId),
@@ -536,12 +531,10 @@ export async function moveList(
                         .where(
                             and(
                                 eq(boards.id, targetAccess.boardId),
-                                toBoardId !== access.boardId
-                                    ? eq(boards.ownerId, targetAccess.userId)
-                                    : inArray(
-                                          boards.id,
-                                          accessibleBoardIds(access.userId),
-                                      ),
+                                inArray(
+                                    boards.id,
+                                    accessibleBoardIds(targetAccess.userId),
+                                ),
                             ),
                         ),
                 ),

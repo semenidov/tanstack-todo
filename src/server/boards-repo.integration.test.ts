@@ -3,7 +3,7 @@ import { Role, Action } from '#/lib/permissions';
 import { authorizeBoard, authorizeCard } from '#/server/authorize';
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
-import { boards, cards, lists } from '#/db/schema';
+import { boardMembers, boards, cards, lists } from '#/db/schema';
 import {
     addCard,
     addList,
@@ -27,7 +27,7 @@ import {
     updateChecklistItem,
 } from '#/server/checklists-repo';
 import { addCardLabel, createLabel } from '#/server/labels-repo';
-import { seedUser } from '#/test/db';
+import { seedBoardMember, seedUser } from '#/test/db';
 import { asc, eq } from 'drizzle-orm';
 
 const MISSING_ID = '00000000-0000-0000-0000-000000000000';
@@ -193,6 +193,30 @@ describe('createBoard', () => {
 });
 
 describe('renameBoard', () => {
+    it('repository checks membership after the role gate, including a stale pass', async () => {
+        const owner = await seedUser();
+        const editor = await seedUser();
+        const board = await seedBoard(owner.id, 'Old');
+        await seedBoardMember(board.id, editor.id);
+        const pass = await authorizeBoard(
+            editor.id,
+            board.id,
+            Action.BoardRead,
+        );
+
+        expect(await renameBoard(pass, board.id, 'New')).toHaveLength(1);
+        await db.delete(boardMembers).where(eq(boardMembers.userId, editor.id));
+        expect(await renameBoard(pass, board.id, 'Stale')).toEqual([]);
+        expect(await deleteBoard(pass, board.id)).toEqual([]);
+        expect(
+            (
+                await db.query.boards.findFirst({
+                    where: eq(boards.id, board.id),
+                })
+            )?.title,
+        ).toBe('New');
+    });
+
     it('renames the own board', async () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Old');

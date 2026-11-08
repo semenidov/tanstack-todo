@@ -6,13 +6,19 @@ import { seedUser, seedBoardMember } from '#/test/db';
 import { Action, BOARD_ACCESS_DENIED } from '#/lib/permissions';
 import { authorizeBoard, requireChanged } from './authorize';
 import { createBoard, getBoard, listBoards } from './boards-repo';
-import { leaveBoard } from './members-repo';
-import { leaveBoardServer,
+import {
+    getSharing,
+    leaveBoard,
+    removeMember,
+    shareBoard,
+} from './members-repo';
+import {
+    leaveBoardServer,
     getSharingServer,
     shareBoardServer,
-    removeMemberServer } from './members';
+    removeMemberServer,
+} from './members';
 import { renameBoardServer, deleteBoardServer } from './boards';
-
 
 const auth = vi.hoisted(() => ({ userId: '' }));
 vi.mock('#/lib/auth-server', () => ({
@@ -106,6 +112,23 @@ describe('board management and leaving', () => {
 });
 
 describe('owner sharing management', () => {
+    it('repository checks membership after the role gate, including stale passes', async () => {
+        const { editor, stranger, board } = await fixture();
+        await seedBoardMember(board.id, stranger.id);
+        const pass = await authorizeBoard(
+            editor.id,
+            board.id,
+            Action.BoardRead,
+        );
+        expect((await getSharing(pass))?.members).toHaveLength(2);
+        expect(await shareBoard(pass, 'token', false)).toHaveLength(1);
+        expect(await removeMember(pass, stranger.id)).toHaveLength(1);
+
+        await db.delete(boardMembers).where(eq(boardMembers.userId, editor.id));
+        expect(await getSharing(pass)).toBeUndefined();
+        expect(await shareBoard(pass, 'new-token', true)).toEqual([]);
+    });
+
     it('creates a stable link, resets it and removes a member with immediate access revocation', async () => {
         const { owner, editor, board } = await fixture();
         auth.userId = owner.id;

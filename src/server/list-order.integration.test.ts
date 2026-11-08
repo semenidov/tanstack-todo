@@ -3,7 +3,7 @@ import { authorizeBoard } from '#/server/authorize';
 import { Action } from '#/lib/permissions';
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
-import { cards, lists } from '#/db/schema';
+import { boardMembers, cards, lists } from '#/db/schema';
 import {
     addCard,
     addList,
@@ -15,7 +15,7 @@ import {
     moveList,
     restoreList,
 } from '#/server/boards-repo';
-import { seedUser } from '#/test/db';
+import { seedBoardMember, seedUser } from '#/test/db';
 import { asc, eq } from 'drizzle-orm';
 
 const MISSING_ID = '00000000-0000-0000-0000-000000000000';
@@ -100,6 +100,42 @@ describe('list order', () => {
 });
 
 describe('moveList', () => {
+    it('repository checks membership at both ends, including a stale target pass', async () => {
+        const owner = await seedUser();
+        const editor = await seedUser();
+        const source = await seedLists(owner.id, ['a0', 'a1']);
+        const target = await seedLists(owner.id, ['a0']);
+        await seedBoardMember(source.board.id, editor.id);
+        await seedBoardMember(target.board.id, editor.id);
+        const sourcePass = await authorizeBoard(
+            editor.id,
+            source.board.id,
+            Action.ContentEdit,
+        );
+        const targetPass = await authorizeBoard(
+            editor.id,
+            target.board.id,
+            Action.BoardRead,
+        );
+
+        expect(
+            await moveList(
+                sourcePass,
+                source.ids[0],
+                targetPass,
+                null,
+                target.ids[0],
+            ),
+        ).not.toBeNull();
+        await db
+            .delete(boardMembers)
+            .where(eq(boardMembers.boardId, target.board.id));
+        expect(
+            await moveList(sourcePass, source.ids[1], targetPass, null, null),
+        ).toBeNull();
+        expect((await listRow(source.ids[1])).boardId).toBe(source.board.id);
+    });
+
     it('moves a list to the end, to the start and between two lists', async () => {
         const a = await seedUser();
         const { board, ids } = await seedLists(a.id, ['a0', 'a1', 'a2']);
