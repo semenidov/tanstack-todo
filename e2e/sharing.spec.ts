@@ -419,8 +419,31 @@ test('invitation joins a user and guest, redirects existing members and rejects 
         const link = dialog.getByLabel('Invite link');
         await expect(link).toHaveValue(/\/invite\/[a-f0-9]{64}$/);
         const invite = await link.inputValue();
+        const invitePath = new URL(invite).pathname;
         await gotoHydrated(anonymous, invite);
-        await anonymous.waitForURL('**/login');
+        await anonymous.waitForURL(
+            `**/login?redirect=${encodeURIComponent(invitePath)}`,
+        );
+        await anonymous.getByRole('link', { name: 'Sign up' }).click();
+        await anonymous.waitForURL(
+            `**/signup?redirect=${encodeURIComponent(invitePath)}`,
+        );
+        await anonymous.getByLabel('Email').fill(uniqueEmail('invite-new'));
+        await anonymous.getByLabel('Password').fill('password123');
+        await anonymous.getByRole('button', { name: 'Sign up' }).click();
+        await anonymous.waitForURL(`**${invitePath}`);
+        await expect(
+            anonymous.getByRole('button', { name: 'Join board' }),
+        ).toBeVisible();
+        await memberContext.clearCookies();
+        await gotoHydrated(member, invite);
+        await member.waitForURL(
+            `**/login?redirect=${encodeURIComponent(invitePath)}`,
+        );
+        await member.getByLabel('Email').fill(memberEmail);
+        await member.getByLabel('Password').fill('password123');
+        await member.getByRole('button', { name: 'Sign in' }).click();
+        await member.waitForURL(`**${invitePath}`);
         const response = await member.goto(invite);
         expect(response?.headers()['referrer-policy']).toBe('no-referrer');
         expect(response?.headers()['cache-control']).toBe('no-store');
@@ -450,10 +473,12 @@ test('invitation joins a user and guest, redirects existing members and rejects 
         await member.waitForURL(`**/b/${boardId}`);
         await gotoHydrated(owner, invite);
         await owner.waitForURL(`**/b/${boardId}`);
-        await gotoHydrated(guest, '/login');
-        await guest.getByRole('button', { name: 'Try as guest' }).click();
-        await guest.waitForURL(/\/b\//);
         await gotoHydrated(guest, invite);
+        await guest.waitForURL(
+            `**/login?redirect=${encodeURIComponent(invitePath)}`,
+        );
+        await guest.getByRole('button', { name: 'Try as guest' }).click();
+        await guest.waitForURL(`**${invitePath}`);
         await guest.getByRole('button', { name: 'Join board' }).click();
         await guest.waitForURL(`**/b/${boardId}`);
         expect(

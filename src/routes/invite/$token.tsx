@@ -14,8 +14,14 @@ import { LinkIcon } from 'lucide-react';
 
 const INVALID = 'Invite link is invalid';
 export const Route = createFileRoute('/invite/$token')({
-    beforeLoad: ({ context }) => {
-        if (!context.session) throw redirect({ to: '/login' });
+    beforeLoad: ({ context, params }) => {
+        if (!context.session)
+            throw redirect({
+                to: '/login',
+                search: {
+                    redirect: `/invite/${encodeURIComponent(params.token)}`,
+                },
+            });
     },
     loader: async ({ context, params }) => {
         const invite = await context.queryClient.fetchQuery(

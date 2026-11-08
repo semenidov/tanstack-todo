@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, signup, uniqueEmail } from './helpers/auth';
+import { gotoHydrated, login, signup, uniqueEmail } from './helpers/auth';
 import { gotoBoard } from './helpers/board';
 
 test('redirects an unauthenticated visitor to login', async ({ page }) => {
@@ -32,4 +32,17 @@ test('a user can sign out and log back in', async ({ page }) => {
         page.getByRole('heading', { name: 'Boards', exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('link', { name: 'My tasks' })).toBeVisible();
+});
+
+test('an external redirect after sign in falls back to boards', async ({
+    page,
+}) => {
+    const email = uniqueEmail();
+    await signup(page, email);
+    await page.context().clearCookies();
+    await gotoHydrated(page, '/login?redirect=https%3A%2F%2Fexample.com');
+    await page.getByLabel('Email').fill(email);
+    await page.getByLabel('Password').fill('password123');
+    await page.getByRole('button', { name: 'Sign in' }).click();
+    await page.waitForURL(/\/boards$/);
 });

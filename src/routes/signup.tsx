@@ -2,6 +2,7 @@ import { AuthForm } from '#/components/auth-form';
 import { authClient } from '#/lib/auth-client';
 import { SIGN_UP_LIMIT, authErrorMessage } from '#/lib/auth-rate-limit';
 import { pageMeta } from '#/lib/seo';
+import { safeRedirect } from '#/lib/safe-redirect';
 import { useQueryClient } from '@tanstack/react-query';
 import {
     createFileRoute,
@@ -14,16 +15,24 @@ import { toast } from 'sonner';
 
 export const Route = createFileRoute('/signup')({
     head: () => ({ meta: pageMeta('Sign up') }),
+    validateSearch: (search): { redirect?: string } => ({
+        redirect: safeRedirect(search.redirect),
+    }),
     component: SignupPage,
-    beforeLoad: ({ context }) => {
+    beforeLoad: ({ context, search }) => {
         if (context.session && !context.session.user.isAnonymous) {
-            throw redirect({ to: '/' });
+            throw redirect(
+                search.redirect
+                    ? { to: '/', href: search.redirect }
+                    : { to: '/' },
+            );
         }
     },
 });
 
 function SignupPage() {
     const router = useRouter();
+    const { redirect: returnPath } = Route.useSearch();
     const queryClient = useQueryClient();
 
     async function handleSubmit(values: { email: string; password: string }) {
@@ -57,6 +66,7 @@ function SignupPage() {
                     Already have an account?{' '}
                     <Link
                         to="/login"
+                        search={{ redirect: returnPath }}
                         onMouseDown={(e) => e.preventDefault()}
                         className="text-foreground underline"
                     >
