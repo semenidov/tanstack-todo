@@ -335,21 +335,23 @@ test('editor has a read-only board title and leaves with confirmation', async ({
     }
 });
 
-test('owner shares, resets the link and removes a member', async ({
+test('owner shares, member edits, is removed, rejoins and leaves', async ({
     browser,
 }) => {
     test.slow();
     const ownerContext = await browser.newContext();
     const memberContext = await browser.newContext();
+    const strangerContext = await browser.newContext();
     try {
         const owner = await ownerContext.newPage();
         const member = await memberContext.newPage();
+        const stranger = await strangerContext.newPage();
         const email = uniqueEmail('share-owner');
         const editorEmail = uniqueEmail('share-editor');
         await signup(owner, email);
         await signup(member, editorEmail);
+        await signup(stranger, uniqueEmail('share-stranger'));
         const boardId = await seedBoard(email, 'Share management');
-        await seedBoardMember(boardId, editorEmail);
         await gotoHydrated(owner, `/b/${boardId}`);
         await owner.getByRole('button', { name: 'Share', exact: true }).click();
         const confirm = owner.getByRole('alertdialog');
@@ -370,6 +372,52 @@ test('owner shares, resets the link and removes a member', async ({
         await expect(link).toHaveValue(first);
         await dialog.getByRole('button', { name: 'Reset link' }).click();
         await expect(link).not.toHaveValue(first);
+        const currentInvite = await link.inputValue();
+        await gotoHydrated(stranger, `/b/${boardId}`);
+        await expect(
+            stranger.getByRole('heading', {
+                name: "Board not found or you don't have access",
+            }),
+        ).toBeVisible();
+
+        await gotoHydrated(member, currentInvite);
+        await expect(
+            member.getByRole('button', { name: 'Join board' }),
+        ).toBeVisible();
+        await member.getByRole('button', { name: 'Join board' }).click();
+        await member.waitForURL(`**/b/${boardId}`);
+        const saved = member.waitForResponse(
+            (response) =>
+                response.request().method() === 'POST' &&
+                response.url().includes('_serverFn') &&
+                response.request().postData()?.includes('Shared work') === true,
+        );
+        await addList(member, 'Shared work');
+        const request = (await saved).request();
+        const body = request.postData();
+        if (!body) throw new Error('Missing create list request');
+        await addCard(member, 'Shared work', 'Member task');
+        await gotoHydrated(owner, `/b/${boardId}`);
+        await expect(cardRow(owner, 'Member task')).toBeVisible();
+
+        const headers = await request.allHeaders();
+        delete headers.cookie;
+        delete headers['content-length'];
+        const denied = await stranger.request.post(request.url(), {
+            headers,
+            data: body.replace('Shared work', 'Unauthorized work'),
+        });
+        expect(await denied.text()).toContain(
+            "Board not found or you don't have access",
+        );
+        await expect(listColumn(owner, 'Unauthorized work')).toHaveCount(0);
+
+        // The owner loaded the board before the join; reload its members list.
+        await gotoHydrated(owner, `/b/${boardId}`);
+        await owner.getByRole('button', { name: 'Share', exact: true }).click();
+        await expect(
+            dialog.getByRole('button', { name: 'Remove' }),
+        ).toBeVisible();
         await dialog
             .getByRole('button', { name: 'Remove', exact: true })
             .click();
@@ -385,9 +433,45 @@ test('owner shares, resets the link and removes a member', async ({
                 exact: true,
             }),
         ).toBeVisible();
+        const removedWrite = await member.request.post(request.url(), {
+            headers,
+            data: body.replace('Shared work', 'Removed work'),
+        });
+        expect(await removedWrite.text()).toContain(
+            "Board not found or you don't have access",
+        );
+        await gotoHydrated(owner, `/b/${boardId}`);
+        await expect(cardRow(owner, 'Member task')).toBeVisible();
+        await expect(listColumn(owner, 'Removed work')).toHaveCount(0);
+
+        await gotoHydrated(member, currentInvite);
+        await member.getByRole('button', { name: 'Join board' }).click();
+        await member.waitForURL(`**/b/${boardId}`);
+        await expect(cardRow(member, 'Member task')).toBeVisible();
+        await member.getByRole('link', { name: 'Back to boards' }).click();
+        await member.waitForURL('**/boards');
+        const shared = member
+            .getByRole('heading', { name: 'Shared with me' })
+            .locator('..');
+        await shared.getByRole('button', { name: 'Board actions' }).click();
+        await member.getByRole('menuitem', { name: 'Leave' }).click();
+        await member
+            .getByRole('alertdialog')
+            .getByRole('button', { name: 'Leave' })
+            .click();
+        await expect(shared).toHaveCount(0);
+        await gotoHydrated(member, `/b/${boardId}`);
+        await expect(
+            member.getByRole('heading', {
+                name: "Board not found or you don't have access",
+            }),
+        ).toBeVisible();
+        await gotoHydrated(owner, `/b/${boardId}`);
+        await expect(cardRow(owner, 'Member task')).toBeVisible();
     } finally {
         await ownerContext.close();
         await memberContext.close();
+        await strangerContext.close();
     }
 });
 
