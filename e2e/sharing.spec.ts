@@ -455,10 +455,17 @@ test('owner shares, member edits, is removed, rejoins and leaves', async ({
             .locator('..');
         await shared.getByRole('button', { name: 'Board actions' }).click();
         await member.getByRole('menuitem', { name: 'Leave' }).click();
+        const left = member.waitForResponse(
+            (response) =>
+                response.request().method() === 'POST' &&
+                response.url().includes('_serverFn'),
+        );
         await member
             .getByRole('alertdialog')
             .getByRole('button', { name: 'Leave' })
             .click();
+        expect((await left).ok()).toBe(true);
+        await expect(member.getByRole('alertdialog')).toHaveCount(0);
         await expect(shared).toHaveCount(0);
         await gotoHydrated(member, `/b/${boardId}`);
         await expect(
