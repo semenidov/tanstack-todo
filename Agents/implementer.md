@@ -23,4 +23,6 @@ Follow the project instructions. In this repo, use `DOCUMENTATION.md` for the pr
 
 ## Problems and result
 
-Finish with a concise report of the result, deviations and unresolved problems. Include references needed to continue the work.
+Finish with a short report: result in one sentence, deviations from the task and their reasons, unresolved problems and their impact. Explicitly state if there are no deviations or problems.
+
+Omit successful checks and routine work details. Mention missing verification only when it leaves a material uncertainty.
