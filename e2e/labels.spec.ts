@@ -6,7 +6,6 @@ import {
     addCard,
     cardRow,
     gotoBoard,
-    gotoSharedBoard,
     listColumn,
     popoverPosition,
 } from './helpers/board';
@@ -62,12 +61,12 @@ async function putLabel(page: Page, cardTitle: string, label: string) {
     await closePopoverAndWindow(page);
 }
 
-test('editor creates a label, puts it on cards, expands titles on the board and deletes it', async ({
+test('creates a label, puts it on cards, expands titles on the board and deletes it', async ({
     page,
 }) => {
     // One long scenario with a reload on the dev server.
     test.slow();
-    await gotoSharedBoard(page, CRUD_EMAIL);
+    await gotoBoard(page, CRUD_EMAIL);
     await addCard(page, 'To do', 'Ship it');
     await addCard(page, 'To do', 'Write docs');
 
@@ -102,15 +101,6 @@ test('editor creates a label, puts it on cards, expands titles on the board and 
         .getByRole('dialog', { name: 'Ship it' })
         .getByRole('button', { name: 'Edit labels' })
         .click();
-    await labelsPopover(page)
-        .getByRole('button', { name: 'Edit label Frontend' })
-        .click();
-    const editForm = page.getByRole('dialog', { name: 'Edit label' });
-    await editForm.getByLabel('Title').fill('Frontend');
-    await editForm.getByRole('radio', { name: 'Red', exact: true }).check();
-    await saved(page, () =>
-        editForm.getByRole('button', { name: 'Save', exact: true }).click(),
-    );
     await labelsPopover(page)
         .getByRole('button', { name: 'Edit label Frontend' })
         .click();

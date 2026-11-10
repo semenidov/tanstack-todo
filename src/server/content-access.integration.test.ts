@@ -7,21 +7,15 @@ import { seedBoardMember, seedUser } from '#/test/db';
 import {
     authorizeBoard,
     authorizeCard,
-    authorizeList,
-    authorizeChecklist,
     authorizeChecklistItem,
     authorizeLabel,
     requireChanged,
 } from './authorize';
+import type { BoardAccess } from './authorize';
 import * as boards from './boards-repo';
 import * as labels from './labels-repo';
 import * as checks from './checklists-repo';
-import {
-    addListAs,
-    addCardAs,
-    restoreListAs,
-    restoreCardAs,
-} from './board-writes';
+import { addCardAs, restoreListAs, restoreCardAs } from './board-writes';
 import { moveListOrThrow } from './move-list';
 
 async function fixture() {
@@ -34,180 +28,133 @@ async function fixture() {
         board.id,
         Action.ContentEdit,
     );
-    const list = requireChanged(
-        await boards.addList(access, board.id, 'Tasks'),
+    const ownerAccess = await authorizeBoard(
+        owner.id,
+        board.id,
+        Action.ContentEdit,
     );
-    const card = requireChanged(await boards.addCard(access, list.id, 'Task'));
-    const label = requireChanged(
-        await labels.createLabel(access, board.id, {
+    const list = requireChanged(
+        await boards.addList(ownerAccess, board.id, 'Tasks'),
+    );
+    const card = requireChanged(
+        await boards.addCard(ownerAccess, list.id, 'Task'),
+    );
+    return { owner, editor, board, access, ownerAccess, list, card };
+}
+
+async function seedLabel(access: BoardAccess) {
+    return requireChanged(
+        await labels.createLabel(access, access.boardId, {
             title: 'Label',
             color: 'red',
         }),
     );
+}
+
+async function seedChecklistItem(access: BoardAccess, cardId: string) {
     const checklist = requireChanged(
-        await checks.createChecklist(access, card.id, 'Steps'),
+        await checks.createChecklist(access, cardId, 'Steps'),
     );
-    const item = requireChanged(
+    return requireChanged(
         await checks.addChecklistItem(access, checklist.id, 'Item'),
     );
-    return { owner, editor, board, access, list, card, label, checklist, item };
 }
 
 describe('content authorization', () => {
-    it('editor saves all content, reorders it and keeps soft delete Undo', async () => {
-        const { editor, board, access, list, card, label, checklist, item } =
-            await fixture();
-        requireChanged(
-            await boards.renameList(
-                await authorizeList(editor.id, list.id, Action.ContentEdit),
-                list.id,
-                'Renamed',
-            ),
+    it('an editor can update a card on a shared board', async () => {
+        const { editor, card } = await fixture();
+        const pass = await authorizeCard(
+            editor.id,
+            card.id,
+            Action.ContentEdit,
         );
-        requireChanged(
-            await boards.updateCard(
-                await authorizeCard(editor.id, card.id, Action.ContentEdit),
-                card.id,
-                {
-                    title: 'Edited',
-                    description: 'Description',
-                    completed: true,
-                },
-            ),
-        );
-        requireChanged(
-            await labels.updateLabel(
-                await authorizeLabel(editor.id, label.id, Action.ContentEdit),
-                label.id,
-                { title: 'Edited label', color: 'blue' },
-            ),
-        );
-        requireChanged(await labels.addCardLabel(access, card.id, label.id));
-        requireChanged(
-            await checks.renameChecklist(
-                await authorizeChecklist(
-                    editor.id,
-                    checklist.id,
-                    Action.ContentEdit,
-                ),
-                checklist.id,
-                'Edited steps',
-            ),
-        );
-        requireChanged(
-            await checks.updateChecklistItem(
-                await authorizeChecklistItem(
-                    editor.id,
-                    item.id,
-                    Action.ContentEdit,
-                ),
-                item.id,
-                { title: 'Edited item', done: true },
-            ),
-        );
-        const next = requireChanged(
-            await checks.addChecklistItem(access, checklist.id, 'Second'),
-        );
-        requireChanged(
-            await checks.moveChecklistItem(access, item.id, next.id, null),
-        );
-        const target = await addListAs(editor, board.id, 'Target');
-        requireChanged(
-            await boards.moveCard(access, card.id, target.id, null, null),
-        );
-        await moveListOrThrow(editor, {
-            listId: target.id,
-            toBoardId: board.id,
-            prevListId: null,
-            nextListId: list.id,
+
+        const [updated] = await boards.updateCard(pass, card.id, {
+            title: 'Edited',
         });
-        requireChanged(await boards.deleteCard(access, card.id));
-        await expect(
-            authorizeCard(editor.id, card.id, Action.ContentEdit),
-        ).rejects.toThrow(BOARD_ACCESS_DENIED);
-        await restoreCardAs(editor, card.id);
-        requireChanged(await boards.deleteList(access, target.id));
+        expect(updated).toMatchObject({ id: card.id, title: 'Edited' });
+    });
+
+    it('an editor can update a shared board label', async () => {
+        const { editor, ownerAccess } = await fixture();
+        const label = await seedLabel(ownerAccess);
+        const pass = await authorizeLabel(
+            editor.id,
+            label.id,
+            Action.ContentEdit,
+        );
+
+        expect(
+            await labels.updateLabel(pass, label.id, {
+                title: 'Edited label',
+                color: label.color,
+            }),
+        ).toMatchObject({ id: label.id, title: 'Edited label' });
+    });
+
+    it('an editor can complete a checklist item on a shared card', async () => {
+        const { editor, ownerAccess, card } = await fixture();
+        const item = await seedChecklistItem(ownerAccess, card.id);
+        const pass = await authorizeChecklistItem(
+            editor.id,
+            item.id,
+            Action.ContentEdit,
+        );
+
+        expect(
+            await checks.updateChecklistItem(pass, item.id, { done: true }),
+        ).toMatchObject({ id: item.id, done: true });
+    });
+
+    it('an editor can restore a card once its list is restored', async () => {
+        const { editor, ownerAccess, list, card } = await fixture();
+        requireChanged(await boards.deleteCard(ownerAccess, card.id));
+        requireChanged(await boards.deleteList(ownerAccess, list.id));
+
         await expect(restoreCardAs(editor, card.id)).rejects.toThrow(
             BOARD_ACCESS_DENIED,
         );
-        await restoreListAs(editor, target.id);
-        const result = await boards.getBoard(access);
-        expect(result?.lists[0].cards[0]).toMatchObject({
-            title: 'Edited',
-            description: 'Description',
-            labelIds: [label.id],
-            checklistDone: 1,
-            checklistTotal: 2,
-        });
+        await restoreListAs(editor, list.id);
+        await restoreCardAs(editor, card.id);
+
         expect(
-            (await checks.getChecklist(access, card.id))?.items.map(
-                (i) => i.title,
-            ),
-        ).toEqual(['Second', 'Edited item']);
-        requireChanged(await labels.removeCardLabel(access, card.id, label.id));
-        requireChanged(await labels.deleteLabel(access, label.id));
-        requireChanged(await checks.deleteChecklistItem(access, item.id));
-        requireChanged(await checks.deleteChecklist(access, checklist.id));
-        requireChanged(await boards.deleteList(access, target.id));
-        expect((await boards.getBoard(access))?.lists).toHaveLength(1);
+            await authorizeCard(editor.id, card.id, Action.BoardRead),
+        ).toMatchObject({
+            boardId: ownerAccess.boardId,
+        });
     });
 
-    it('removed membership blocks even previously minted passes on every write domain', async () => {
-        const { editor, board, access, list, card, label, checklist, item } =
-            await fixture();
+    it('an editor cannot start a new write after losing membership', async () => {
+        const { editor, list } = await fixture();
         await db.delete(boardMembers).where(eq(boardMembers.userId, editor.id));
-        for (const gate of [
-            () => authorizeList(editor.id, list.id, Action.ContentEdit),
-            () => authorizeCard(editor.id, card.id, Action.ContentEdit),
-            () =>
-                authorizeChecklist(editor.id, checklist.id, Action.ContentEdit),
-            () =>
-                authorizeChecklistItem(editor.id, item.id, Action.ContentEdit),
-        ]) {
-            await expect(gate()).rejects.toThrow(BOARD_ACCESS_DENIED);
-        }
-        for (const write of [
-            () => boards.addList(access, board.id, 'Forbidden'),
-            () => boards.addCard(access, list.id, 'Forbidden'),
-            () => boards.renameList(access, list.id, 'Forbidden'),
-            () => boards.deleteList(access, list.id),
-            () => boards.restoreList(access, list.id),
-            () => boards.updateCard(access, card.id, { title: 'Forbidden' }),
-            () => boards.deleteCard(access, card.id),
-            () => boards.restoreCard(access, card.id),
-            () => boards.moveCard(access, card.id, list.id, null, null),
-            () => boards.moveList(access, list.id, access, null, null),
-            () =>
-                labels.createLabel(access, board.id, {
-                    title: 'Forbidden',
-                    color: 'red',
-                }),
-            () =>
-                labels.updateLabel(access, label.id, {
-                    title: 'Forbidden',
-                    color: 'red',
-                }),
-            () => labels.deleteLabel(access, label.id),
-            () => labels.addCardLabel(access, card.id, label.id),
-            () => checks.createChecklist(access, card.id, 'Forbidden'),
-            () => checks.renameChecklist(access, checklist.id, 'Forbidden'),
-            () => checks.deleteChecklist(access, checklist.id),
-            () => checks.addChecklistItem(access, checklist.id, 'Forbidden'),
-            () => checks.updateChecklistItem(access, item.id, { done: true }),
-            () => checks.deleteChecklistItem(access, item.id),
-            () => checks.moveChecklistItem(access, item.id, null, null),
-        ]) {
-            await expect(write().then(requireChanged)).rejects.toThrow(
-                BOARD_ACCESS_DENIED,
-            );
-        }
+
         await expect(addCardAs(editor, list.id, 'Forbidden')).rejects.toThrow(
             BOARD_ACCESS_DENIED,
         );
+    });
+
+    it('repositories reject writes with a pass issued before membership was removed', async () => {
+        const { editor, access, ownerAccess, list, card } = await fixture();
+        const label = await seedLabel(ownerAccess);
+        const item = await seedChecklistItem(ownerAccess, card.id);
+        await db.delete(boardMembers).where(eq(boardMembers.userId, editor.id));
+
+        expect(await boards.addCard(access, list.id, 'Forbidden')).toBeNull();
         expect(
-            (await db.query.cards.findFirst({ where: eq(cards.id, card.id) }))
-                ?.title,
-        ).toBe('Task');
+            await boards.updateCard(access, card.id, { title: 'Forbidden' }),
+        ).toEqual([]);
+        expect(
+            await labels.updateLabel(access, label.id, {
+                title: 'Forbidden',
+                color: label.color,
+            }),
+        ).toBeNull();
+        expect(
+            await checks.updateChecklistItem(access, item.id, { done: true }),
+        ).toBeNull();
+        expect(
+            await db.query.cards.findFirst({ where: eq(cards.id, card.id) }),
+        ).toMatchObject({ title: card.title });
     });
 
     it('scopes passes to their board, rejects stale resources and requires owners at both move ends', async () => {

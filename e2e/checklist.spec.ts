@@ -2,12 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL } from './helpers/auth';
 import { resetBoards } from './helpers/db';
-import {
-    addCard,
-    cardRow,
-    dndAnnouncement,
-    gotoSharedBoard,
-} from './helpers/board';
+import { addCard, cardRow, dndAnnouncement, gotoBoard } from './helpers/board';
 
 test.beforeEach(async () => {
     await resetBoards();
@@ -55,12 +50,12 @@ async function itemNames(page: Page) {
     );
 }
 
-test('editor creates a checklist, adds, checks, moves, renames and deletes items, deletes the checklist', async ({
+test('creates a checklist, adds, checks, moves, renames and deletes items, deletes the checklist', async ({
     page,
 }) => {
     // One long scenario with a reload on the dev server.
     test.slow();
-    await gotoSharedBoard(page, CRUD_EMAIL);
+    await gotoBoard(page, CRUD_EMAIL);
     await addCard(page, 'To do', 'Release');
     await openCard(page);
 

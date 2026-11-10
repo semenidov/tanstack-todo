@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { db } from '../../src/db';
 import { user } from '../../src/db/schema';
-import { seedBoardMember, seedBoard  } from './db';
+import { seedBoard, seedBoardMember } from './db';
 import { expect } from '@playwright/test';
 import type { Locator, Page, Response } from '@playwright/test';
 import { gotoHydrated } from './auth';
@@ -172,8 +172,8 @@ export async function popoverPosition(popover: Locator) {
     };
 }
 
-/** Temporary membership fixture: the browser user edits another user's board. */
-export async function gotoSharedBoard(page: Page, email: string) {
+/** Seeds another user's board with the given user as a member. */
+export async function seedSharedBoard(email: string) {
     const ownerId = randomUUID();
     const ownerEmail = `${ownerId}@example.com`;
     await db
@@ -181,6 +181,11 @@ export async function gotoSharedBoard(page: Page, email: string) {
         .values({ id: ownerId, name: 'Board owner', email: ownerEmail });
     const boardId = await seedBoard(ownerEmail);
     await seedBoardMember(boardId, email);
+    return boardId;
+}
+
+export async function gotoSharedBoard(page: Page, email: string) {
+    const boardId = await seedSharedBoard(email);
     await gotoHydrated(page, `/b/${boardId}`);
     return boardId;
 }
