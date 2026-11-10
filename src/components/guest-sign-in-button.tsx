@@ -8,7 +8,7 @@ import { UserRoundIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-export function GuestSignInButton() {
+export function GuestSignInButton({ redirect }: { redirect?: string }) {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [isPending, setIsPending] = useState(false);
@@ -23,6 +23,10 @@ export function GuestSignInButton() {
             return;
         }
         queryClient.clear();
+        if (redirect) {
+            await router.navigate({ href: redirect });
+            return;
+        }
         let demoId: string | undefined;
         try {
             demoId = (await listBoardsServer()).at(0)?.id;

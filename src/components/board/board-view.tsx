@@ -1,3 +1,5 @@
+import { ShareDialog } from '#/components/board/share/share-dialog';
+import { Action, can } from '#/lib/permissions';
 import { AddList } from '#/components/board/add-list';
 import { BoardDnd } from '#/components/board/board-dnd';
 import { ListColumn } from '#/components/board/list-column';
@@ -71,24 +73,39 @@ export function BoardView({ board, lists }: BoardData) {
                         </Link>
                     </Button>
                     <h1 className="min-w-0">
-                        <EditableTitle
-                            title={board.title}
-                            isEditing={isEditing}
-                            aria-label="Board title"
-                            className="block h-9 max-w-full truncate rounded-sm px-2 text-xl leading-9 font-semibold tracking-tight"
-                            inputClassName="h-9 px-2 text-xl leading-9 font-semibold tracking-tight md:text-xl"
-                            onStartEditing={() => setIsEditing(true)}
-                            onCancelEditing={() => setIsEditing(false)}
-                            onSave={(title) =>
-                                renameBoard.mutate(
-                                    { boardId: board.id, title },
-                                    { onSettled: () => router.invalidate() },
-                                )
-                            }
-                        />
+                        {can(board.myRole, Action.BoardRename) ? (
+                            <EditableTitle
+                                title={board.title}
+                                isEditing={isEditing}
+                                aria-label="Board title"
+                                className="block h-9 max-w-full truncate rounded-sm px-2 text-xl leading-9 font-semibold tracking-tight"
+                                inputClassName="h-9 px-2 text-xl leading-9 font-semibold tracking-tight md:text-xl"
+                                onStartEditing={() => setIsEditing(true)}
+                                onCancelEditing={() => setIsEditing(false)}
+                                onSave={(title) =>
+                                    renameBoard.mutate(
+                                        { boardId: board.id, title },
+                                        {
+                                            onSettled: () =>
+                                                router.invalidate(),
+                                        },
+                                    )
+                                }
+                            />
+                        ) : (
+                            <span
+                                title={board.title}
+                                className="block h-9 max-w-full truncate px-2 text-xl leading-9 font-semibold tracking-tight"
+                            >
+                                {board.title}
+                            </span>
+                        )}
                     </h1>
                 </div>
                 <div className="flex items-center gap-2">
+                    {can(board.myRole, Action.MembersManage) && (
+                        <ShareDialog boardId={board.id} title={board.title} />
+                    )}
                     <ThemeToggle />
                     <SignOutButton />
                 </div>

@@ -19,7 +19,9 @@ test('a user cannot see another user board', async ({ browser }) => {
 
     await pageB.goto(boardUrlA);
     await expect(
-        pageB.getByRole('heading', { name: 'Board not found' }),
+        pageB.getByRole('heading', {
+            name: "Board not found or you don't have access",
+        }),
     ).toBeVisible();
 
     await ctxA.close();

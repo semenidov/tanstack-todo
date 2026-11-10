@@ -115,7 +115,7 @@ function zonedMoment(dateKey: string, time: string, timeZone: string) {
     return new Date(wall - zoneOffset(first, timeZone));
 }
 
-export function parseTime(raw: string): string | null {
+function parseTime(raw: string): string | null {
     const match = /^(\d{1,2}):?(\d{2})$/.exec(raw.trim());
     if (!match) return null;
     const hour = Number(match[1]);

@@ -157,7 +157,7 @@ export function useDeleteChecklist(boardId: string, cardId: string) {
     });
 }
 
-export interface UpdateChecklistItemVars {
+interface UpdateChecklistItemVars {
     itemId: string;
     title?: string;
     done?: boolean;
@@ -183,7 +183,7 @@ export function useDeleteChecklistItem(boardId: string, cardId: string) {
     });
 }
 
-export interface MoveChecklistItemVars extends ChecklistItemNeighbors {
+interface MoveChecklistItemVars extends ChecklistItemNeighbors {
     itemId: string;
     toIndex: number;
 }

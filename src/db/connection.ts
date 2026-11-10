@@ -7,7 +7,7 @@ export function isLocalDatabaseUrl(url: string): boolean {
     return LOCAL_HOSTS.has(new URL(url).hostname);
 }
 
-export const LOCAL_DB_UNREACHABLE_HINT =
+const LOCAL_DB_UNREACHABLE_HINT =
     'Local Postgres is unreachable. Start it with `docker compose up -d` ' +
     '(and run migrations on a fresh volume, see README.md).';
 

@@ -12,9 +12,9 @@ export type Quotas = Record<QuotaKind, number>;
 export const MAX_BOARDS_PER_USER = 20;
 export const MAX_LISTS_PER_BOARD = 30;
 export const MAX_CARDS_PER_LIST = 200;
-export const MAX_LABELS_PER_BOARD = 50;
-export const MAX_LABELS_PER_CARD = 10;
-export const MAX_ITEMS_PER_CHECKLIST = 100;
+const MAX_LABELS_PER_BOARD = 50;
+const MAX_LABELS_PER_CARD = 10;
+const MAX_ITEMS_PER_CHECKLIST = 100;
 
 export const USER_QUOTAS: Quotas = {
     [QuotaKind.Boards]: MAX_BOARDS_PER_USER,

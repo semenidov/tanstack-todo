@@ -1,3 +1,6 @@
+import { repoAccess } from '#/test/access';
+import { authorizeBoard } from '#/server/authorize';
+import { Action } from '#/lib/permissions';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { db } from '#/db';
@@ -44,7 +47,7 @@ describe('lists.position backfill (migration 0011)', () => {
         const a = await seedUser();
         const first = await seedBoardByCreatedAt(a.id, 3);
         const second = await seedBoardByCreatedAt(a.id, 2);
-        await deleteList(a.id, first.ids[1]);
+        await deleteList(await repoAccess(a.id, first.ids[1]), first.ids[1]);
 
         await runBackfill();
 
@@ -58,7 +61,9 @@ describe('lists.position backfill (migration 0011)', () => {
             { id: first.ids[1], position: 'a1' },
             { id: first.ids[2], position: 'a2' },
         ]);
-        const visible = await getBoard(a.id, second.board.id);
+        const visible = await getBoard(
+            await authorizeBoard(a.id, second.board.id, Action.BoardRead),
+        );
         expect(visible?.lists.map((l) => [l.id, l.position])).toEqual([
             [second.ids[0], 'a0'],
             [second.ids[1], 'a1'],
@@ -71,7 +76,9 @@ describe('lists.position backfill (migration 0011)', () => {
 
         await runBackfill();
 
-        const result = await getBoard(a.id, board.id);
+        const result = await getBoard(
+            await authorizeBoard(a.id, board.id, Action.BoardRead),
+        );
         expect(result?.lists.map((l) => l.id)).toEqual(ids);
         expect(result?.lists.slice(60).map((l) => l.position)).toEqual([
             'ay',

@@ -2,7 +2,7 @@ import { createIsomorphicFn } from '@tanstack/react-start';
 import { getCookie } from '@tanstack/react-start/server';
 import { UTC, deviceTimeZone, isTimeZone } from '#/lib/due-date';
 
-export const TIME_ZONE_COOKIE = 'tz';
+const TIME_ZONE_COOKIE = 'tz';
 const YEAR_S = 365 * 24 * 60 * 60;
 
 function validTimeZone(value: string | null | undefined): string {

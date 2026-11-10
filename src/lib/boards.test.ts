@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { describe, expect, it } from 'vitest';
 import {
     addCardToList,
@@ -62,6 +63,8 @@ function makeBoard(lists: Array<ListWithCards>): BoardData {
         board: {
             id: 'board-1',
             ownerId: 'user-1',
+            myRole: Role.Owner,
+            ownerName: 'Owner',
             title: 'My tasks',
             createdAt: new Date(0),
             updatedAt: new Date(0),
@@ -389,8 +392,22 @@ describe('cardLinkId', () => {
 
 describe('boards list cache', () => {
     const boards = [
-        { id: 'a', title: 'A', listCount: 2, cardCount: 0 },
-        { id: 'b', title: 'B', listCount: 1, cardCount: 3 },
+        {
+            id: 'a',
+            title: 'A',
+            listCount: 2,
+            cardCount: 0,
+            myRole: Role.Owner,
+            ownerName: 'Owner',
+        },
+        {
+            id: 'b',
+            title: 'B',
+            listCount: 1,
+            cardCount: 3,
+            myRole: Role.Owner,
+            ownerName: 'Owner',
+        },
     ];
 
     it('renames only the target board without mutating the input', () => {
