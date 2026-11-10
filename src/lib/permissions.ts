@@ -15,7 +15,7 @@ export enum Action {
     BoardLeave = 'boardLeave',
 }
 
-export const PERMISSIONS: Record<Action, readonly Role[]> = {
+const PERMISSIONS: Record<Action, readonly Role[]> = {
     [Action.BoardRead]: [Role.Owner, Role.Editor],
     [Action.ContentEdit]: [Role.Owner, Role.Editor],
     [Action.BoardRename]: [Role.Owner],

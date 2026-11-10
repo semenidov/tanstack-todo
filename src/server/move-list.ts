@@ -8,7 +8,7 @@ import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
 
-export interface MoveListInput {
+interface MoveListInput {
     listId: string;
     toBoardId: string;
     prevListId: string | null;

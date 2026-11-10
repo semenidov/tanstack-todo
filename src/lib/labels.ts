@@ -30,7 +30,7 @@ export function isDuplicateLabelTitle(
     );
 }
 
-export function compareLabelOrder(
+function compareLabelOrder(
     a: Pick<Label, 'id' | 'createdAt'>,
     b: Pick<Label, 'id' | 'createdAt'>,
 ): number {

@@ -20,7 +20,7 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-export interface MoveListVars extends ListMoveNeighbors {
+interface MoveListVars extends ListMoveNeighbors {
     listId: string;
     toBoardId: string;
     toBoardTitle: string;

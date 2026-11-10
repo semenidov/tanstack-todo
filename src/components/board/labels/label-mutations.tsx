@@ -120,7 +120,7 @@ export function useDeleteLabel(boardId: string) {
     });
 }
 
-export interface ToggleCardLabelVars {
+interface ToggleCardLabelVars {
     labelId: string;
     on: boolean;
 }

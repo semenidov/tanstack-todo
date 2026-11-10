@@ -78,7 +78,7 @@ export function useAddCard(boardId: string, listId: string) {
     });
 }
 
-export interface UpdateCardVars {
+interface UpdateCardVars {
     title?: string;
     description?: string | null;
     completed?: boolean;
@@ -136,7 +136,7 @@ export function useUpdateCard(boardId: string, cardId: string) {
     });
 }
 
-export interface MoveCardVars {
+interface MoveCardVars {
     cardId: string;
     fromListId: string;
     toListId: string;

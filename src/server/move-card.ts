@@ -4,7 +4,7 @@ import type { SessionUser } from '#/lib/auth-server';
 import { quotasFor } from '#/lib/quotas';
 import * as repo from '#/server/boards-repo';
 
-export interface MoveCardInput {
+interface MoveCardInput {
     cardId: string;
     toListId: string;
     prevCardId: string | null;
