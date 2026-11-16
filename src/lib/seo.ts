@@ -1,4 +1,4 @@
-export const APP_NAME = 'Todo List';
+const APP_NAME = 'Todo List';
 
 const DESCRIPTION = 'A simple task list: add, edit and complete your tasks.';
 const OG_IMAGE = `${import.meta.env.VITE_SITE_URL ?? ''}/og-image.png`;

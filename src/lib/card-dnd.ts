@@ -6,7 +6,7 @@ import type {
 import type { Coordinates } from '@dnd-kit/utilities';
 import type { ListWithCards } from '#/lib/boards-query';
 
-export interface CardSpot {
+interface CardSpot {
     listId: string;
     index: number;
 }

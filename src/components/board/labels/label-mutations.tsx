@@ -47,6 +47,12 @@ export function useCreateLabel(boardId: string) {
             );
         },
         onError: (error) => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
+            void queryClient.invalidateQueries({
+                queryKey: labelsQueryOptions(boardId).queryKey,
+            });
             toast.error(
                 labelErrorMessage(
                     error,
@@ -73,6 +79,12 @@ export function useUpdateLabel(boardId: string) {
             );
         },
         onError: (error) => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
+            void queryClient.invalidateQueries({
+                queryKey: labelsQueryOptions(boardId).queryKey,
+            });
             toast.error(
                 labelErrorMessage(
                     error,
@@ -101,12 +113,14 @@ export function useDeleteLabel(boardId: string) {
             );
         },
         onError: () => {
+            void queryClient.invalidateQueries({ queryKey: boardKey });
+            void queryClient.invalidateQueries({ queryKey: labelsKey });
             toast.error("Couldn't delete the label. Please try again.");
         },
     });
 }
 
-export interface ToggleCardLabelVars {
+interface ToggleCardLabelVars {
     labelId: string;
     on: boolean;
 }
@@ -126,6 +140,12 @@ export function useToggleCardLabel(boardId: string, cardId: string) {
             );
         },
         onError: (error) => {
+            void queryClient.invalidateQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
+            void queryClient.invalidateQueries({
+                queryKey: labelsQueryOptions(boardId).queryKey,
+            });
             toast.error(
                 createErrorMessage(
                     error,

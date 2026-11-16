@@ -1,3 +1,4 @@
+import { BOARD_ACCESS_DENIED } from '#/lib/permissions';
 import { getBoardServer, listBoardsServer } from '#/server/boards';
 import { queryOptions } from '@tanstack/react-query';
 
@@ -5,6 +6,8 @@ export const boardQueryOptions = (boardId: string) =>
     queryOptions({
         queryKey: ['boards', boardId] as const,
         queryFn: () => getBoardServer({ data: boardId }),
+        retry: (failureCount, error) =>
+            error.message !== BOARD_ACCESS_DENIED && failureCount < 3,
     });
 
 export const boardsListQueryOptions = queryOptions({

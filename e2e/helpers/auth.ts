@@ -12,10 +12,8 @@ export const CRUD_EMAIL = 'crud@example.com';
 
 export async function gotoHydrated(page: Page, path: string) {
     await page.goto(path);
-    await page.waitForLoadState('networkidle');
-    // networkidle doesn't mean React has hydrated: on a cold dev server,
-    // inputs filled before hydration get reset. React marks hydrated DOM
-    // nodes with a `__reactFiber` key.
+    // Wait for React, not background dev-server traffic: inputs filled before
+    // hydration get reset. React marks hydrated DOM with a `__reactFiber` key.
     await page.waitForFunction(() =>
         Object.keys(document.body).some((k) => k.startsWith('__reactFiber')),
     );

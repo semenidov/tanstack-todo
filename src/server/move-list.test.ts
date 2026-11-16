@@ -1,11 +1,34 @@
+import type * as Authorization from '#/server/authorize';
+import { BOARD_ACCESS_DENIED } from '#/lib/permissions';
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GUEST_QUOTAS, USER_QUOTAS } from '#/lib/quotas';
 import { moveListOrThrow } from '#/server/move-list';
 
+vi.mock('#/db', () => ({ db: {} }));
+
 const { moveListRepo } = vi.hoisted(() => ({
     moveListRepo: vi.fn<(...args: Array<unknown>) => Promise<unknown>>(),
 }));
+
+vi.mock('#/server/authorize', async (importOriginal) => {
+    const actual = await importOriginal<typeof Authorization>();
+    return {
+        ...actual,
+        authorizeCard: vi.fn(async (userId: string) => ({
+            userId,
+            boardId: 'source',
+        })),
+        authorizeList: vi.fn(async (userId: string) => ({
+            userId,
+            boardId: 'source',
+        })),
+        authorizeBoard: vi.fn(async (userId: string, boardId: string) => ({
+            userId,
+            boardId,
+        })),
+    };
+});
 
 vi.mock('#/lib/auth-server', () => ({ requireUser: vi.fn() }));
 
@@ -31,12 +54,12 @@ describe('moveListOrThrow (moveListServer)', () => {
         moveListRepo.mockResolvedValue(null);
 
         await expect(moveListOrThrow(user, data)).rejects.toThrow(
-            'List was not moved',
+            BOARD_ACCESS_DENIED,
         );
         expect(moveListRepo).toHaveBeenCalledWith(
-            'user-1',
+            expect.objectContaining({ userId: 'user-1' }),
             data.listId,
-            data.toBoardId,
+            expect.objectContaining({ boardId: data.toBoardId }),
             null,
             data.nextListId,
             USER_QUOTAS,
@@ -54,9 +77,9 @@ describe('moveListOrThrow (moveListServer)', () => {
 
         await moveListOrThrow({ id: 'guest-1', isAnonymous: true }, data);
         expect(moveListRepo).toHaveBeenCalledWith(
-            'guest-1',
+            expect.objectContaining({ userId: 'guest-1' }),
             data.listId,
-            data.toBoardId,
+            expect.objectContaining({ boardId: data.toBoardId }),
             null,
             data.nextListId,
             GUEST_QUOTAS,

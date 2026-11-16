@@ -58,7 +58,7 @@ function previousScreen(state: ScreenState): ScreenState | undefined {
     return LIST;
 }
 
-export interface LabelsPopoverProps extends Omit<
+interface LabelsPopoverProps extends Omit<
     ComponentProps<typeof ResponsivePopover>,
     'children'
 > {

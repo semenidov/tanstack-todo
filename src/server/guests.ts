@@ -14,7 +14,7 @@ function expiryCutoff(now: Date) {
 }
 
 /** Both conditions are required: without `isAnonymous` this deletes real accounts. */
-export function deleteExpiredGuests(now = new Date()) {
+function deleteExpiredGuests(now = new Date()) {
     return db
         .delete(user)
         .where(

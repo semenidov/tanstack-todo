@@ -1,4 +1,4 @@
-export interface RateLimitRule {
+interface RateLimitRule {
     window: number;
     max: number;
 }

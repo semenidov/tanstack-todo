@@ -1,6 +1,6 @@
 import { LabelColor } from '#/lib/label-colors';
 
-export interface DemoCard {
+interface DemoCard {
     title: string;
     description: string;
     completed?: boolean;
@@ -9,17 +9,17 @@ export interface DemoCard {
     checklist?: DemoChecklist;
 }
 
-export interface DemoChecklist {
+interface DemoChecklist {
     title: string;
     items: Array<{ title: string; done?: boolean }>;
 }
 
-export interface DemoLabel {
+interface DemoLabel {
     title: string;
     color: LabelColor;
 }
 
-export interface DemoList {
+interface DemoList {
     title: string;
     cards: Array<DemoCard>;
 }

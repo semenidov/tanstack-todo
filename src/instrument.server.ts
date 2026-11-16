@@ -1,3 +1,4 @@
+import { redactInviteData } from '#/lib/invite-privacy';
 import * as Sentry from '@sentry/tanstackstart-react';
 import { sentryDataCollection } from '#/lib/sentry';
 
@@ -7,4 +8,6 @@ Sentry.init({
     release: process.env.VERCEL_GIT_COMMIT_SHA,
     dataCollection: sentryDataCollection,
     tracesSampleRate: 0,
+    beforeSend: (event) => redactInviteData(event),
+    beforeBreadcrumb: (breadcrumb) => redactInviteData(breadcrumb),
 });

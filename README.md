@@ -24,13 +24,11 @@ Full-stack task board on TanStack Start - Trello-like boards, lists and cards. [
 
 ## Engineering highlights
 
-- CI runs against an ephemeral Neon branch per run, not a shared test DB - [decision #26](DECISIONS.md#26-2026-09-19--тесты-в-ci---на-временной-neon-ветке-на-прогон)
-- Migrations run on ephemeral CI branches before tests, on preview via `vercel-build`, and on `master` in CI - [decision #45](DECISIONS.md#45-2026-09-28--миграции-на-временных-ci-ветках-перед-тестами-30), [decision #47](DECISIONS.md#47-2026-09-28--миграции-на-превью---при-сборке)
-- Previews share one Neon `staging` branch, migrated by `vercel-build` before the build - [decision #57](DECISIONS.md#57-2026-10-02--общая-превью-база-для-всех-pr)
-- Ownership is checked on every request via a join, not a separate query, with integration tests covering IDOR - [decision #48](DECISIONS.md#48-2026-09-28--проверка-владельца---часть-каждого-запроса-34)
+- Integration and E2E each migrate an isolated Neon branch before running in CI. Previews share `staging` and migrate it before building. Production migrations run in CI after checks pass on `master`. [Decision #26](DECISIONS.md#26-2026-09-19--тесты-в-ci---на-временной-neon-ветке-на-прогон), [decision #57](DECISIONS.md#57-2026-10-02--общая-превью-база-для-всех-pr), [decision #27](DECISIONS.md#27-2026-09-19--миграции-прода---шагом-ci-после-зелёных-проверок)
+- Board operations check the user's role before accessing the repository. SQL also limits access to boards the user owns or has joined. Integration tests cover access isolation. [Decision #83](DECISIONS.md#83-2026-10-27--доступ-к-доске---шлюз-по-роли-карта-прав-пропуск-в-репозиторий-140)
 - Optimistic edits, server-confirmed creation and immediate soft delete with Undo - [decision #55](DECISIONS.md#55-2026-09-30--мягкое-удаление-колонок-и-карточек-49), [decision #56](DECISIONS.md#56-2026-09-30--создание-без-оптимизма---в-кэше-только-то-что-есть-на-сервере-59)
 - Sentry wired with source maps via the Vite plugin, plus Vercel Analytics with normalized URLs - [decision #38](DECISIONS.md#38-2026-09-25--vercel-web-analytics--speed-insights)
-- E2E coverage on Playwright for auth, route guards and data isolation, run as its own CI job - [decision #28](DECISIONS.md#28-2026-09-23--e2e-на-playwright), [decision #31](DECISIONS.md#31-2026-09-23--e2e-в-ci-на-каждый-pr)
+- Playwright covers auth, route guards and data isolation in a separate CI job. [Decision #28](DECISIONS.md#28-2026-09-23--e2e-на-playwright), [decision #81](DECISIONS.md#81-2026-11-07--integration-и-e2e-параллельно-155)
 - Agent-assisted workflow: the owner approves a spec and accepts the PR on preview; an implementer subagent builds the feature and CI checks it - [`CONTRIBUTING.md`](CONTRIBUTING.md#процесс-фичи), [`CODING.md`](CODING.md)
 
 ## Architecture

@@ -19,7 +19,7 @@ export const MAX_CHECKLIST_TEXT_LENGTH = 500;
 
 export const DEFAULT_CHECKLIST_TITLE = 'Checklist';
 
-export interface ChecklistProgress {
+interface ChecklistProgress {
     done: number;
     total: number;
 }

@@ -15,11 +15,8 @@ function useAddList(boardId: string, onCreated: (listId: string) => void) {
     const key = boardQueryOptions(boardId).queryKey;
 
     return useMutation({
-        mutationFn: async (title: string) => {
-            const list = await addListServer({ data: { boardId, title } });
-            if (!list) throw new Error('List was not created');
-            return list;
-        },
+        mutationFn: (title: string) =>
+            addListServer({ data: { boardId, title } }),
         onSuccess: async (list) => {
             await queryClient.cancelQueries({ queryKey: key });
             queryClient.setQueryData(key, (old) =>

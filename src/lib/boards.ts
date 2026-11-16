@@ -219,7 +219,7 @@ export function removeCardFromBoard(
     };
 }
 
-export function compareCardOrder(
+function compareCardOrder(
     a: Pick<Card, 'id' | 'position'>,
     b: Pick<Card, 'id' | 'position'>,
 ): number {

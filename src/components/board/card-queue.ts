@@ -1,6 +1,6 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 
-export const cardMutationKey = (cardId: string) => ['card', cardId] as const;
+const cardMutationKey = (cardId: string) => ['card', cardId] as const;
 
 export const cardMutationOptions = (cardId: string) => ({
     mutationKey: cardMutationKey(cardId),

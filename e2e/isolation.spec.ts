@@ -1,27 +1,28 @@
 import { expect, test } from '@playwright/test';
-import { signup, uniqueEmail } from './helpers/auth';
-import { gotoBoard } from './helpers/board';
+import { gotoHydrated, signup, uniqueEmail } from './helpers/auth';
+import { addCard, cardRow, gotoBoard } from './helpers/board';
 
-test('a user cannot see another user board', async ({ browser }) => {
-    const ctxA = await browser.newContext();
-    const pageA = await ctxA.newPage();
-    const emailA = uniqueEmail('a');
-    await signup(pageA, emailA);
-    await gotoBoard(pageA, emailA);
-    await expect(
-        pageA.getByRole('heading', { name: 'My tasks' }),
-    ).toBeVisible();
-    const boardUrlA = pageA.url();
+test('a stranger cannot open another user’s board', async ({
+    browser,
+    page: owner,
+}) => {
+    const email = uniqueEmail('owner');
+    await signup(owner, email);
+    const boardId = await gotoBoard(owner, email);
+    const title = 'Private card';
+    await addCard(owner, 'To do', title);
 
-    const ctxB = await browser.newContext();
-    const pageB = await ctxB.newPage();
-    await signup(pageB, uniqueEmail('b'));
+    const stranger = await browser.newPage();
+    try {
+        await signup(stranger, uniqueEmail('stranger'));
+        await gotoHydrated(stranger, `/b/${boardId}`);
+        const back = stranger.getByRole('link', { name: 'Back', exact: true });
+        await expect(back).toBeVisible();
+        await expect(cardRow(stranger, title)).toHaveCount(0);
 
-    await pageB.goto(boardUrlA);
-    await expect(
-        pageB.getByRole('heading', { name: 'Board not found' }),
-    ).toBeVisible();
-
-    await ctxA.close();
-    await ctxB.close();
+        await back.click();
+        await expect(stranger).toHaveURL('/boards');
+    } finally {
+        await stranger.close();
+    }
 });

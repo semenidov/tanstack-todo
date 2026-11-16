@@ -1,3 +1,4 @@
+import { leaveBoardServer } from '#/server/members';
 import { removeBoardFromList, renameBoardInList } from '#/lib/boards';
 import { boardQueryOptions, boardsListQueryOptions } from '#/lib/boards-query';
 import { deleteBoardServer, renameBoardServer } from '#/server/boards';
@@ -64,6 +65,32 @@ export function useDeleteBoard() {
         onError: (_error, _boardId, context) => {
             queryClient.setQueryData(key, context?.previous);
             toast.error("Couldn't delete the board. Please try again.");
+        },
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: key });
+        },
+    });
+}
+
+export function useLeaveBoard() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (boardId: string) =>
+            leaveBoardServer({ data: { boardId } }),
+        onSuccess: async (_data, boardId) => {
+            await queryClient.cancelQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+            });
+            queryClient.setQueryData(key, (old) =>
+                old ? removeBoardFromList(old, boardId) : old,
+            );
+            queryClient.removeQueries({
+                queryKey: boardQueryOptions(boardId).queryKey,
+                type: 'inactive',
+            });
+        },
+        onError: () => {
+            toast.error("Couldn't leave the board. Please try again.");
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: key });

@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BoardView } from '#/components/board/board-view';
 import type { BoardData, ListWithCards } from '#/lib/boards-query';
 
+vi.mock('#/components/board/share/share-dialog', () => ({
+    ShareDialog: () => null,
+}));
+
 vi.mock('@tanstack/react-router', () => ({
     useRouter: () => ({ invalidate: vi.fn(), navigate: vi.fn() }),
     Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,

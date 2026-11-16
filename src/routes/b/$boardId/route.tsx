@@ -16,10 +16,12 @@ import {
 } from '@tanstack/react-router';
 import { ArrowLeftIcon, SearchXIcon } from 'lucide-react';
 import z from 'zod';
+import { BOARD_ACCESS_DENIED } from '#/lib/permissions';
+import type { ErrorComponentProps } from '@tanstack/react-router';
 
 export const Route = createFileRoute('/b/$boardId')({
     component: BoardPage,
-    errorComponent: RouteError,
+    errorComponent: BoardError,
     notFoundComponent: BoardNotFound,
     pendingComponent: BoardSkeleton,
     pendingMs: 200,
@@ -46,7 +48,7 @@ export const Route = createFileRoute('/b/$boardId')({
     head: ({ match, loaderData }) => ({
         meta: pageMeta(
             match.status === 'notFound' || match._notFound
-                ? 'Board not found'
+                ? BOARD_ACCESS_DENIED
                 : loaderData?.board.title,
         ),
     }),
@@ -56,7 +58,7 @@ function BoardNotFound() {
     return (
         <MessageScreen
             icon={<SearchXIcon className="size-8 text-muted-foreground" />}
-            title="Board not found"
+            title={BOARD_ACCESS_DENIED}
             description="This board doesn't exist or you don't have access to it."
             action={
                 <Button asChild>
@@ -70,11 +72,21 @@ function BoardNotFound() {
     );
 }
 
+function BoardError(props: ErrorComponentProps) {
+    return props.error instanceof Error &&
+        props.error.message === BOARD_ACCESS_DENIED ? (
+        <BoardNotFound />
+    ) : (
+        <RouteError {...props} />
+    );
+}
+
 function BoardPage() {
     const { boardId } = Route.useParams();
-    const { data } = useSuspenseQuery(boardQueryOptions(boardId));
+    const { data, error } = useSuspenseQuery(boardQueryOptions(boardId));
 
-    if (!data) return <BoardNotFound />;
+    if (error?.message === BOARD_ACCESS_DENIED || !data)
+        return <BoardNotFound />;
 
     return (
         <>

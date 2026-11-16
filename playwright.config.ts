@@ -39,7 +39,7 @@ export default defineConfig({
         },
         {
             name: 'auth-flows',
-            testMatch: /(auth|guest|isolation)\.spec\.ts/,
+            testMatch: /(auth|guest|isolation|sharing)\.spec\.ts/,
             use: { ...devices['Desktop Chrome'] },
         },
     ],

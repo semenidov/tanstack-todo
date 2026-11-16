@@ -3,6 +3,7 @@ import { GuestSignInButton } from '#/components/guest-sign-in-button';
 import { authClient } from '#/lib/auth-client';
 import { SIGN_IN_LIMIT, authErrorMessage } from '#/lib/auth-rate-limit';
 import { pageMeta } from '#/lib/seo';
+import { safeRedirect } from '#/lib/safe-redirect';
 import {
     createFileRoute,
     Link,
@@ -14,14 +15,23 @@ import { toast } from 'sonner';
 
 export const Route = createFileRoute('/login')({
     head: () => ({ meta: pageMeta('Sign in') }),
+    validateSearch: (search): { redirect?: string } => ({
+        redirect: safeRedirect(search.redirect),
+    }),
     component: LoginPage,
-    beforeLoad: ({ context }) => {
-        if (context.session) throw redirect({ to: '/' });
+    beforeLoad: ({ context, search }) => {
+        if (context.session)
+            throw redirect(
+                search.redirect
+                    ? { to: '/', href: search.redirect }
+                    : { to: '/' },
+            );
     },
 });
 
 function LoginPage() {
     const router = useRouter();
+    const { redirect: returnPath } = Route.useSearch();
 
     async function handleSubmit(values: { email: string; password: string }) {
         const { error } = await authClient.signIn.email(values);
@@ -47,11 +57,12 @@ function LoginPage() {
                     onSubmit={handleSubmit}
                     icon={<LogInIcon />}
                 />
-                <GuestSignInButton />
+                <GuestSignInButton redirect={returnPath} />
                 <p className="text-center text-sm text-muted-foreground">
                     No account?{' '}
                     <Link
                         to="/signup"
+                        search={{ redirect: returnPath }}
                         onMouseDown={(e) => e.preventDefault()}
                         className="text-foreground underline"
                     >

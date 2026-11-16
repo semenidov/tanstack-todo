@@ -1,3 +1,4 @@
+import { Role } from '#/lib/permissions';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
@@ -133,6 +134,8 @@ function renderDialog() {
         board: {
             id: 'board-1',
             ownerId: 'user-1',
+            myRole: Role.Owner,
+            ownerName: 'Owner',
             title: 'Board',
             createdAt: new Date(0),
             updatedAt: new Date(0),

@@ -12,6 +12,7 @@ import {
     uuid,
 } from 'drizzle-orm/pg-core';
 import { user } from './auth-schema';
+import { Role } from '#/lib/permissions';
 
 export * from './auth-schema';
 
@@ -23,13 +24,36 @@ export const boards = pgTable(
             .notNull()
             .references(() => user.id, { onDelete: 'cascade' }),
         title: text('title').notNull(),
+        inviteToken: text('invite_token'),
         createdAt: timestamp({ withTimezone: true }).defaultNow().notNull(),
         updatedAt: timestamp({ withTimezone: true })
             .defaultNow()
             .notNull()
             .$onUpdate(() => new Date()),
     },
-    (t) => [index('boards_owner_id_idx').on(t.ownerId)],
+    (t) => [
+        index('boards_owner_id_idx').on(t.ownerId),
+        uniqueIndex('boards_invite_token_unique').on(t.inviteToken),
+    ],
+);
+
+export const boardMembers = pgTable(
+    'board_members',
+    {
+        boardId: uuid('board_id')
+            .notNull()
+            .references(() => boards.id, { onDelete: 'cascade' }),
+        userId: text('user_id')
+            .notNull()
+            .references(() => user.id, { onDelete: 'cascade' }),
+        role: text('role', { enum: [Role.Editor] })
+            .notNull()
+            .default(Role.Editor),
+    },
+    (t) => [
+        primaryKey({ columns: [t.boardId, t.userId] }),
+        index('board_members_user_id_idx').on(t.userId),
+    ],
 );
 
 export const lists = pgTable(
@@ -148,9 +172,19 @@ export const checklistItems = pgTable(
     ],
 );
 
-export const boardsRelations = relations(boards, ({ many }) => ({
+export const boardsRelations = relations(boards, ({ one, many }) => ({
+    owner: one(user, { fields: [boards.ownerId], references: [user.id] }),
+    members: many(boardMembers),
     lists: many(lists),
     labels: many(labels),
+}));
+
+export const boardMembersRelations = relations(boardMembers, ({ one }) => ({
+    board: one(boards, {
+        fields: [boardMembers.boardId],
+        references: [boards.id],
+    }),
+    user: one(user, { fields: [boardMembers.userId], references: [user.id] }),
 }));
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
