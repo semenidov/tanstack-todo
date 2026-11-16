@@ -27,13 +27,3 @@ export const requireUser = createServerFn({ method: 'GET' }).handler(
         };
     },
 );
-
-export const requireUserId = createServerFn({ method: 'GET' }).handler(
-    async () => {
-        const session = await auth.api.getSession({
-            headers: new Headers(getRequestHeaders()),
-        });
-        if (!session) throw new Error('Unauthorized');
-        return session.user.id;
-    },
-);
