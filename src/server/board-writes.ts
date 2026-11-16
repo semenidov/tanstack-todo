@@ -42,7 +42,6 @@ export async function addListAs(
     return requireChanged(
         await repo.addList(
             await authorizeBoard(user.id, boardId, Action.ContentEdit),
-            boardId,
             title,
             quotasFor(user),
         ),
@@ -92,7 +91,6 @@ export async function createLabelAs(
     return requireChanged(
         await labelsRepo.createLabel(
             await authorizeBoard(user.id, boardId, Action.ContentEdit),
-            boardId,
             input,
             quotasFor(user),
         ),

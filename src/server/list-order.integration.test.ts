@@ -72,11 +72,7 @@ describe('list order', () => {
         const { board, ids } = await seedLists(a.id, ['a0', 'a1']);
         await deleteList(await repoAccess(a.id, ids[1]), ids[1]);
 
-        const added = await addList(
-            await repoAccess(a.id, board.id),
-            board.id,
-            'new',
-        );
+        const added = await addList(await repoAccess(a.id, board.id), 'new');
         await restoreList(await repoAccess(a.id, ids[1]), ids[1]);
 
         expect(await listOrder(a.id, board.id)).toEqual([
@@ -90,11 +86,7 @@ describe('list order', () => {
         const a = await seedUser();
         const board = await createBoard(a.id, 'Board');
 
-        const added = await addList(
-            await repoAccess(a.id, board.id),
-            board.id,
-            'first',
-        );
+        const added = await addList(await repoAccess(a.id, board.id), 'first');
         expect(added?.position).toBe('a0');
     });
 });
@@ -384,7 +376,7 @@ describe('moveList', () => {
             const a = await seedUser();
             const mine = await seedLists(a.id, ['a0']);
             const gone = await createBoard(a.id, 'Gone');
-            await deleteBoard(await repoAccess(a.id, gone.id), gone.id);
+            await deleteBoard(await repoAccess(a.id, gone.id));
 
             await expectRefused(mine.ids[0], async () =>
                 moveList(

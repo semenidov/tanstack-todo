@@ -33,7 +33,6 @@ describe('board read authorization', () => {
         const { owner, editor, board } = await sharedBoard();
         const list = await addList(
             await repoAccess(owner.id, board.id),
-            board.id,
             'Tasks',
         );
         if (!list) throw new Error('Missing list');
@@ -43,7 +42,7 @@ describe('board read authorization', () => {
             'Task',
         );
         if (!card) throw new Error('Missing card');
-        await createLabel(await repoAccess(owner.id, board.id), board.id, {
+        await createLabel(await repoAccess(owner.id, board.id), {
             title: 'Label',
             color: 'red',
         });

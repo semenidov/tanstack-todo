@@ -109,7 +109,7 @@ describe('board quota', () => {
     it('creates a board again after one is deleted', async () => {
         const user = await seedUser();
         const [first] = await seedBoards(user.id, MAX_BOARDS_PER_USER);
-        await deleteBoard(await repoAccess(user.id, first.id), first.id);
+        await deleteBoard(await repoAccess(user.id, first.id));
 
         const board = await createBoard(user.id, 'Fits again');
         expect(board.title).toBe('Fits again');
@@ -132,7 +132,7 @@ describe('list quota', () => {
         await seedLists(board.id, MAX_LISTS_PER_BOARD);
 
         await expect(
-            addList(await repoAccess(user.id, board.id), board.id, 'One more'),
+            addList(await repoAccess(user.id, board.id), 'One more'),
         ).rejects.toThrow(
             new QuotaExceededError(QuotaKind.Lists, MAX_LISTS_PER_BOARD),
         );
@@ -146,7 +146,6 @@ describe('list quota', () => {
 
         const row = await addList(
             await repoAccess(user.id, board.id),
-            board.id,
             'Fits again',
         );
         expect(row?.title).toBe('Fits again');
@@ -206,11 +205,7 @@ describe('restore and quotas', () => {
         const [board] = await seedBoards(user.id, 1);
         const [first] = await seedLists(board.id, MAX_LISTS_PER_BOARD);
         await deleteList(await repoAccess(user.id, first.id), first.id);
-        await addList(
-            await repoAccess(user.id, board.id),
-            board.id,
-            'Took the place',
-        );
+        await addList(await repoAccess(user.id, board.id), 'Took the place');
 
         await expect(
             restoreList(await repoAccess(user.id, first.id), first.id),

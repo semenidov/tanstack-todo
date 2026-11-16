@@ -216,17 +216,12 @@ export async function seedDemoBoard(
     return board;
 }
 
-export function renameBoard(
-    access: BoardAccess,
-    boardId: string,
-    title: string,
-) {
+export function renameBoard(access: BoardAccess, title: string) {
     return db
         .update(boards)
         .set({ title })
         .where(
             and(
-                eq(boards.id, boardId),
                 eq(boards.id, access.boardId),
                 inArray(boards.id, accessibleBoardIds(access.userId)),
             ),
@@ -234,12 +229,11 @@ export function renameBoard(
         .returning();
 }
 
-export function deleteBoard(access: BoardAccess, boardId: string) {
+export function deleteBoard(access: BoardAccess) {
     return db
         .delete(boards)
         .where(
             and(
-                eq(boards.id, boardId),
                 eq(boards.id, access.boardId),
                 inArray(boards.id, accessibleBoardIds(access.userId)),
             ),
@@ -321,7 +315,6 @@ async function lastListPositionKey(boardId: string) {
 
 export async function addList(
     access: BoardAccess,
-    boardId: string,
     title: string,
     quotas: Quotas = USER_QUOTAS,
 ) {
@@ -334,28 +327,27 @@ export async function addList(
     });
     if (!board) return null;
     await assertBelowQuota(QuotaKind.Lists, quotas, () =>
-        countLiveLists(boardId),
+        countLiveLists(access.boardId),
     );
 
-    const position = await lastListPositionKey(boardId);
+    const position = await lastListPositionKey(access.boardId);
     const rows = await db
         .insert(lists)
         .select(
             db
                 .select({
-                    id: sql<string>`gen_random_uuid()`.as('id'),
+                    id: sql`gen_random_uuid()`.as('id'),
                     boardId: boards.id,
-                    title: sql<string>`${title}`.as('title'),
-                    position: sql<string>`${position}`.as('position'),
-                    createdAt: sql<Date>`now()`.as('createdAt'),
-                    updatedAt: sql<Date>`now()`.as('updatedAt'),
-                    deletedAt: sql<Date | null>`null`.as('deletedAt'),
+                    title: sql`${title}`.as('title'),
+                    position: sql`${position}`.as('position'),
+                    createdAt: sql`now()`.as('createdAt'),
+                    updatedAt: sql`now()`.as('updatedAt'),
+                    deletedAt: sql`null`.as('deletedAt'),
                 })
                 .from(boards)
                 .where(
                     and(
                         eq(boards.id, access.boardId),
-                        eq(boards.id, boardId),
                         inArray(boards.id, accessibleBoardIds(access.userId)),
                     ),
                 ),
@@ -446,11 +438,11 @@ async function readListNeighbors(
     return new Map(rows.map((r) => [r.id, r.position]));
 }
 
-async function renumberLists(access: BoardAccess, boardId: string) {
+async function renumberLists(access: BoardAccess) {
     const rows = await db
         .select({ id: lists.id })
         .from(lists)
-        .where(eq(lists.boardId, boardId))
+        .where(eq(lists.boardId, access.boardId))
         .orderBy(asc(lists.position), asc(lists.id));
     const keys = generateNKeysBetween(null, null, rows.length);
     for (const [i, row] of rows.entries()) {
@@ -510,7 +502,7 @@ export async function moveList(
         positionOf(neighbors, nextListId),
     );
     if (position === undefined) {
-        await renumberLists(targetAccess, toBoardId);
+        await renumberLists(targetAccess);
         neighbors = await readListNeighbors(toBoardId, neighborIds);
         if (!neighbors) return null;
         position = keyBetween(

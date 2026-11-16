@@ -204,10 +204,10 @@ describe('renameBoard', () => {
             Action.BoardRead,
         );
 
-        expect(await renameBoard(pass, board.id, 'New')).toHaveLength(1);
+        expect(await renameBoard(pass, 'New')).toHaveLength(1);
         await db.delete(boardMembers).where(eq(boardMembers.userId, editor.id));
-        expect(await renameBoard(pass, board.id, 'Stale')).toEqual([]);
-        expect(await deleteBoard(pass, board.id)).toEqual([]);
+        expect(await renameBoard(pass, 'Stale')).toEqual([]);
+        expect(await deleteBoard(pass)).toEqual([]);
         expect(
             (
                 await db.query.boards.findFirst({
@@ -221,11 +221,7 @@ describe('renameBoard', () => {
         const a = await seedUser();
         const board = await seedBoard(a.id, 'Old');
 
-        const rows = await renameBoard(
-            await repoAccess(a.id, board.id),
-            board.id,
-            'New',
-        );
+        const rows = await renameBoard(await repoAccess(a.id, board.id), 'New');
 
         expect(rows).toHaveLength(1);
         const [row] = await db
@@ -242,7 +238,6 @@ describe('renameBoard', () => {
 
         const rows = await renameBoard(
             await repoAccess(b.id, board.id),
-            board.id,
             'Hacked',
         );
 
@@ -258,11 +253,7 @@ describe('renameBoard', () => {
         const a = await seedUser();
 
         expect(
-            await renameBoard(
-                await repoAccess(a.id, MISSING_ID),
-                MISSING_ID,
-                'x',
-            ),
+            await renameBoard(await repoAccess(a.id, MISSING_ID), 'x'),
         ).toEqual([]);
     });
 });
@@ -282,10 +273,7 @@ describe('deleteBoard', () => {
             'card',
         );
 
-        const rows = await deleteBoard(
-            await repoAccess(a.id, board.id),
-            board.id,
-        );
+        const rows = await deleteBoard(await repoAccess(a.id, board.id));
 
         expect(rows).toHaveLength(1);
         expect(
@@ -304,10 +292,7 @@ describe('deleteBoard', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Mine');
 
-        const rows = await deleteBoard(
-            await repoAccess(b.id, board.id),
-            board.id,
-        );
+        const rows = await deleteBoard(await repoAccess(b.id, board.id));
 
         expect(rows).toEqual([]);
         const remaining = await db
@@ -325,9 +310,9 @@ describe('deleteBoard', () => {
     it('returns nothing for a non-existent board', async () => {
         const a = await seedUser();
 
-        expect(
-            await deleteBoard(await repoAccess(a.id, MISSING_ID), MISSING_ID),
-        ).toEqual([]);
+        expect(await deleteBoard(await repoAccess(a.id, MISSING_ID))).toEqual(
+            [],
+        );
     });
 });
 
@@ -387,7 +372,6 @@ describe('addList', () => {
 
         const row = await addList(
             await repoAccess(a.id, board.id),
-            board.id,
             'In progress',
         );
 
@@ -400,11 +384,7 @@ describe('addList', () => {
         const b = await seedUser();
         const board = await seedBoard(a.id, 'Board');
 
-        const row = await addList(
-            await repoAccess(b.id, board.id),
-            board.id,
-            'hacked',
-        );
+        const row = await addList(await repoAccess(b.id, board.id), 'hacked');
         expect(row).toBeNull();
     });
 });
@@ -906,14 +886,10 @@ describe('restoreCard', () => {
             list.id,
             'card',
         );
-        const label = await createLabel(
-            await repoAccess(a.id, board.id),
-            board.id,
-            {
-                title: 'Urgent',
-                color: 'green',
-            },
-        );
+        const label = await createLabel(await repoAccess(a.id, board.id), {
+            title: 'Urgent',
+            color: 'green',
+        });
         expect(
             await addCardLabel(
                 await repoAccess(a.id, card!.id),

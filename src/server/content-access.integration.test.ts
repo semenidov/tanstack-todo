@@ -33,9 +33,7 @@ async function fixture() {
         board.id,
         Action.ContentEdit,
     );
-    const list = requireChanged(
-        await boards.addList(ownerAccess, board.id, 'Tasks'),
-    );
+    const list = requireChanged(await boards.addList(ownerAccess, 'Tasks'));
     const card = requireChanged(
         await boards.addCard(ownerAccess, list.id, 'Task'),
     );
@@ -44,7 +42,7 @@ async function fixture() {
 
 async function seedLabel(access: BoardAccess) {
     return requireChanged(
-        await labels.createLabel(access, access.boardId, {
+        await labels.createLabel(access, {
             title: 'Label',
             color: 'red',
         }),

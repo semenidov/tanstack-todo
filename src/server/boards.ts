@@ -44,7 +44,6 @@ export const renameBoardServer = createServerFn({ method: 'POST' })
         requireChanged(
             await repo.renameBoard(
                 await authorizeBoard(userId, data.boardId, Action.BoardRename),
-                data.boardId,
                 data.title,
             ),
         );
@@ -57,7 +56,6 @@ export const deleteBoardServer = createServerFn({ method: 'POST' })
         requireChanged(
             await repo.deleteBoard(
                 await authorizeBoard(userId, data.boardId, Action.BoardDelete),
-                data.boardId,
             ),
         );
     });

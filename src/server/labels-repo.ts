@@ -52,7 +52,6 @@ export function listLabels(access: BoardAccess) {
 
 export async function createLabel(
     access: BoardAccess,
-    boardId: string,
     input: LabelInput,
     quotas: Quotas = USER_QUOTAS,
 ) {
@@ -66,7 +65,7 @@ export async function createLabel(
     const [{ n }] = await db
         .select({ n: count() })
         .from(labels)
-        .where(eq(labels.boardId, boardId));
+        .where(eq(labels.boardId, access.boardId));
     if (n >= quotas[QuotaKind.Labels]) {
         throw new QuotaExceededError(
             QuotaKind.Labels,
@@ -91,7 +90,6 @@ export async function createLabel(
                     .where(
                         and(
                             eq(boards.id, access.boardId),
-                            eq(boards.id, boardId),
                             inArray(
                                 boards.id,
                                 accessibleBoardIds(access.userId),

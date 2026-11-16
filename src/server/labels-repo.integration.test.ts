@@ -54,7 +54,7 @@ async function cardRow(id: string) {
 }
 
 async function newLabel(title: string | null, board = boardId) {
-    const label = await createLabel(await repoAccess(ownerId, board), board, {
+    const label = await createLabel(await repoAccess(ownerId, board), {
         title,
         color: 'green',
     });
@@ -87,7 +87,7 @@ describe('labels of a board', () => {
         await newLabel(null);
 
         await expect(
-            createLabel(await repoAccess(ownerId, boardId), boardId, {
+            createLabel(await repoAccess(ownerId, boardId), {
                 title: 'FRONTEND',
                 color: 'red',
             }),
@@ -114,7 +114,7 @@ describe('isolation', () => {
             authorizeBoard(stranger.id, boardId, Action.BoardRead),
         ).rejects.toThrow("Board not found or you don't have access");
         expect(
-            await createLabel(await repoAccess(stranger.id, boardId), boardId, {
+            await createLabel(await repoAccess(stranger.id, boardId), {
                 title: 'Theirs',
                 color: 'red',
             }),
@@ -242,7 +242,7 @@ describe('cascades', () => {
         const label = await newLabel('Frontend');
         await addCardLabel(await repoAccess(ownerId, cardId), cardId, label.id);
 
-        await deleteBoard(await repoAccess(ownerId, boardId), boardId);
+        await deleteBoard(await repoAccess(ownerId, boardId));
         const other = await seedBoardWithCard(ownerId, 'Other');
         expect(
             await listLabels(
