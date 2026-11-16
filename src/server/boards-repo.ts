@@ -5,6 +5,7 @@ import type { Quotas } from '#/lib/quotas';
 import { addDays, localDateKey } from '#/lib/due-date';
 import type { Due } from '#/lib/due-date';
 import {
+    boardMembers,
     boards,
     cardLabels,
     cards,
@@ -26,8 +27,10 @@ import {
     exists,
     inArray,
     isNull,
+    isNotNull,
     max,
     min,
+    or,
     sql,
 } from 'drizzle-orm';
 import type { AnyColumn } from 'drizzle-orm';
@@ -42,11 +45,18 @@ export function listBoards(userId: string) {
             title: boards.title,
             listCount: countDistinct(lists.id),
             cardCount: count(cards.id),
-            ownerId: boards.ownerId,
             ownerName: user.name,
+            myRole: sql<Role>`case when ${boards.ownerId} = ${userId} then ${Role.Owner} else ${boardMembers.role} end`,
         })
         .from(boards)
         .innerJoin(user, eq(boards.ownerId, user.id))
+        .leftJoin(
+            boardMembers,
+            and(
+                eq(boardMembers.boardId, boards.id),
+                eq(boardMembers.userId, userId),
+            ),
+        )
         .leftJoin(
             lists,
             and(eq(lists.boardId, boards.id), isNull(lists.deletedAt)),
@@ -55,15 +65,9 @@ export function listBoards(userId: string) {
             cards,
             and(eq(cards.listId, lists.id), isNull(cards.deletedAt)),
         )
-        .where(inArray(boards.id, accessibleBoardIds(userId)))
-        .groupBy(boards.id, user.id)
-        .orderBy(asc(boards.createdAt))
-        .then((rows) =>
-            rows.map(({ ownerId, ...row }) => ({
-                ...row,
-                myRole: ownerId === userId ? Role.Owner : Role.Editor,
-            })),
-        );
+        .where(or(eq(boards.ownerId, userId), isNotNull(boardMembers.userId)))
+        .groupBy(boards.id, user.id, boardMembers.role)
+        .orderBy(asc(boards.createdAt));
 }
 
 async function assertBelowQuota(
