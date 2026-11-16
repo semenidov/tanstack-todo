@@ -42,7 +42,6 @@ export async function authorizeBoard(
     return { userId, boardId, role } as BoardAccess;
 }
 
-// Reading a card's checklist needs the board permission too.
 export async function authorizeCard(
     userId: string,
     cardId: string,

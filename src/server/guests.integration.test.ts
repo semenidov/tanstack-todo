@@ -170,7 +170,7 @@ describe('guest sign-in', () => {
                         dueInDays: (Date.parse(c.dueDate) - today) / DAY_MS,
                     }),
                     ...(c.labelIds.length > 0 && {
-                        labels: c.labelIds.map((id) => titleOf.get(id)),
+                        labels: c.labelIds.map((id) => titleOf.get(id)).sort(),
                     }),
                     ...(checklistOf.get(c.id) && {
                         checklist: {
@@ -183,7 +183,16 @@ describe('guest sign-in', () => {
                     }),
                 })),
             })),
-        ).toEqual(DEMO_BOARD.lists);
+        ).toEqual(
+            DEMO_BOARD.lists.map((list) => ({
+                ...list,
+                cards: list.cards.map((card) =>
+                    card.labels
+                        ? { ...card, labels: [...card.labels].sort() }
+                        : card,
+                ),
+            })),
+        );
         // The checklist shows 2/4 on the card face.
         expect(demo?.lists[0].cards[1]).toMatchObject({
             checklistDone: 2,

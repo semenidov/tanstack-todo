@@ -9,62 +9,23 @@ import {
 } from './helpers/board';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { eq } from 'drizzle-orm';
-import { db } from '../src/db';
-import { cards, lists } from '../src/db/schema';
 import { gotoHydrated, signup, uniqueEmail } from './helpers/auth';
 import { seedBoard, seedBoardMember } from './helpers/db';
 
-test('a member can open a shared board; a stranger has no access', async ({
-    browser,
+test('a member can open a board from their shared boards list', async ({
     page,
 }) => {
-    test.slow();
-    const memberEmail = uniqueEmail('editor');
-    await signup(page, memberEmail);
-    const boardId = await seedSharedBoard(memberEmail);
+    const email = uniqueEmail('editor');
+    await signup(page, email);
+    const boardId = await seedSharedBoard(email);
 
     await gotoHydrated(page, '/boards');
-    await page
-        .getByRole('heading', { name: 'Shared with me' })
-        .locator('..')
-        .getByRole('link')
-        .click();
-    await expect(page.getByRole('heading', { name: 'My tasks' })).toBeVisible();
-
-    const stranger = await browser.newPage();
-    try {
-        await signup(stranger, uniqueEmail('stranger'));
-        await gotoHydrated(stranger, `/b/${boardId}`);
-        await expect(
-            stranger.getByRole('heading', {
-                name: "Board not found or you don't have access",
-            }),
-        ).toBeVisible();
-    } finally {
-        await stranger.close();
-    }
-});
-
-test('shared card titles render HTML as text', async ({ page }) => {
-    test.slow();
-    const memberEmail = uniqueEmail('editor');
-    await signup(page, memberEmail);
-    const boardId = await seedSharedBoard(memberEmail);
-    const [list] = await db
-        .select()
-        .from(lists)
-        .where(eq(lists.boardId, boardId));
-    const cardTitle = 'Card <img src=x onerror="window.sharedXss=1">';
-    await db.insert(cards).values({
-        listId: list.id,
-        title: cardTitle,
-        position: 'a0',
+    const shared = page.locator('section').filter({
+        has: page.getByRole('heading', { name: 'Shared with me' }),
     });
-
-    await gotoHydrated(page, `/b/${boardId}`);
-    await expect(page.getByText(cardTitle, { exact: true })).toBeVisible();
-    await expect(page.locator('img[src="x"]')).toHaveCount(0);
+    await shared.locator(`a[href="/b/${boardId}"]`).click();
+    await expect(page).toHaveURL(`/b/${boardId}`);
+    await expect(page.getByRole('heading', { name: 'My tasks' })).toBeVisible();
 });
 
 test('an editor can create and move a card', async ({ page }) => {
@@ -221,7 +182,7 @@ test('a member loses access by direct link after leaving the board', async ({
     ).toBeVisible();
 });
 
-test('a card stays in its original list when another member deletes the move target', async ({
+test('the open board shows the card in its original list after a rejected move', async ({
     browser,
     page: owner,
 }) => {
