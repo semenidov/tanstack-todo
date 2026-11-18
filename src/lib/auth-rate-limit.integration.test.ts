@@ -100,8 +100,15 @@ describe('auth rate limit', () => {
     });
 
     it('does not block one IP because of another', async () => {
-        await statuses(6, () => signIn('203.0.113.13'));
+        const blockedIp = '203.0.113.13';
+        await db.insert(rateLimit).values({
+            id: randomUUID(),
+            key: `${blockedIp}|/sign-in/email`,
+            count: 5,
+            lastRequest: Date.now(),
+        });
 
+        expect((await signIn(blockedIp)).status).toBe(429);
         expect((await signIn('203.0.113.14')).status).not.toBe(429);
     });
 
