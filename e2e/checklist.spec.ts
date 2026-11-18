@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL, gotoHydrated } from './helpers/auth';
 import { resetBoards, seedBoard, seedCards, seedChecklist } from './helpers/db';
-import { cardRow, dndAnnouncement } from './helpers/board';
+import { cardRow, dndAnnouncement, pickUpWithKeyboard } from './helpers/board';
 
 let boardId: string;
 let cardId: string;
@@ -94,8 +94,7 @@ test('reorders checklist items with the keyboard and persists the order', async 
     const handle = cardWindow(page).getByRole('button', {
         name: 'Move item A',
     });
-    await handle.focus();
-    await page.keyboard.press('Space');
+    await pickUpWithKeyboard(page, handle);
     await expect(handle).toHaveAttribute('aria-pressed', 'true');
     await announced(page, 'Item A is in position 1 of 3');
     await page.keyboard.press('ArrowDown');

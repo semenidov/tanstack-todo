@@ -12,6 +12,7 @@ import {
     listTitleButton,
     listTitles,
     moveCardTo,
+    pickUpWithKeyboard,
     pickUpWithMouse,
     waitForSavedMoves,
 } from './helpers/board';
@@ -368,8 +369,7 @@ test('a keyboard drag cancelled with Escape stays in place', async ({
     });
 
     // Keyboard: move down, then Esc.
-    await cardRow(page, 'Card 1').getByRole('link').focus();
-    await page.keyboard.press('Space');
+    await pickUpWithKeyboard(page, cardRow(page, 'Card 1').getByRole('link'));
     await expect(dndAnnouncement(page)).toHaveText('Picked up card Card 1');
     await page.keyboard.press('ArrowDown');
     await expect(dndAnnouncement(page)).toHaveText(
@@ -436,8 +436,7 @@ test('drags a list with the keyboard: Space picks it up instead of renaming', as
     await page.getByLabel('New list title').press('Escape');
     const saved = waitForSavedMoves(page, 1);
 
-    await listTitleButton(page, 'To do').focus();
-    await page.keyboard.press('Space');
+    await pickUpWithKeyboard(page, listTitleButton(page, 'To do'));
     await expect(dndAnnouncement(page)).toHaveText('Picked up list To do');
     await expect(
         page.getByRole('textbox', { name: 'List title', exact: true }),

@@ -107,6 +107,14 @@ export function waitForSavedMoves(page: Page, count: number) {
     });
 }
 
+export async function pickUpWithKeyboard(page: Page, handle: Locator) {
+    await handle.focus();
+    await page.keyboard.press('Space');
+    await page.evaluate(function waitForKeyboardSensor() {
+        return new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    });
+}
+
 /**
  * Drags a card with the keyboard: Space picks it up, `keys` move it (each waits
  * for its announcement), Space drops it.
@@ -116,8 +124,7 @@ export async function dragCardWithKeys(
     title: string,
     keys: Array<{ key: string; announcement: string }>,
 ) {
-    await cardRow(page, title).getByRole('link').focus();
-    await page.keyboard.press('Space');
+    await pickUpWithKeyboard(page, cardRow(page, title).getByRole('link'));
     await expect(dndAnnouncement(page)).toHaveText(`Picked up card ${title}`);
     for (const { key, announcement } of keys) {
         await page.keyboard.press(key);
