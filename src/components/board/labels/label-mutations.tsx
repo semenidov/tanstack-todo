@@ -139,19 +139,14 @@ export function useToggleCardLabel(boardId: string, cardId: string) {
                 old ? setCardLabelInBoard(old, cardId, labelId, on) : old,
             );
         },
-        onError: (error) => {
+        onError: () => {
             void queryClient.invalidateQueries({
                 queryKey: boardQueryOptions(boardId).queryKey,
             });
             void queryClient.invalidateQueries({
                 queryKey: labelsQueryOptions(boardId).queryKey,
             });
-            toast.error(
-                createErrorMessage(
-                    error,
-                    "Couldn't save the card's labels. Please try again.",
-                ),
-            );
+            toast.error("Couldn't save the card's labels. Please try again.");
             void queryClient.invalidateQueries({ queryKey: key });
         },
         onSettled: () =>

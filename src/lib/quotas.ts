@@ -3,7 +3,6 @@ export enum QuotaKind {
     Lists = 'lists',
     Cards = 'cards',
     Labels = 'labels',
-    CardLabels = 'card-labels',
     ChecklistItems = 'checklist-items',
 }
 
@@ -13,7 +12,6 @@ export const MAX_BOARDS_PER_USER = 20;
 export const MAX_LISTS_PER_BOARD = 30;
 export const MAX_CARDS_PER_LIST = 200;
 const MAX_LABELS_PER_BOARD = 50;
-const MAX_LABELS_PER_CARD = 10;
 const MAX_ITEMS_PER_CHECKLIST = 100;
 
 export const USER_QUOTAS: Quotas = {
@@ -21,7 +19,6 @@ export const USER_QUOTAS: Quotas = {
     [QuotaKind.Lists]: MAX_LISTS_PER_BOARD,
     [QuotaKind.Cards]: MAX_CARDS_PER_LIST,
     [QuotaKind.Labels]: MAX_LABELS_PER_BOARD,
-    [QuotaKind.CardLabels]: MAX_LABELS_PER_CARD,
     [QuotaKind.ChecklistItems]: MAX_ITEMS_PER_CHECKLIST,
 };
 
@@ -33,7 +30,6 @@ export const GUEST_QUOTAS: Quotas = {
     [QuotaKind.Lists]: 10,
     [QuotaKind.Cards]: 50,
     [QuotaKind.Labels]: 10,
-    [QuotaKind.CardLabels]: 10,
     [QuotaKind.ChecklistItems]: 20,
 };
 
@@ -69,7 +65,6 @@ const QUOTA_LIMIT_TEXT: Record<QuotaKind, (limit: number) => string> = {
     [QuotaKind.Lists]: (n) => `the limit of ${n} lists on this board`,
     [QuotaKind.Cards]: (n) => `the limit of ${n} cards in this list`,
     [QuotaKind.Labels]: (n) => `the limit of ${n} labels on this board`,
-    [QuotaKind.CardLabels]: (n) => `the limit of ${n} labels on this card`,
     [QuotaKind.ChecklistItems]: (n) =>
         `the limit of ${n} items in this checklist`,
 };

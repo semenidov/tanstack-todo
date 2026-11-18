@@ -163,7 +163,6 @@ export async function addCardLabel(
     access: BoardAccess,
     cardId: string,
     labelId: string,
-    quotas: Quotas = USER_QUOTAS,
 ) {
     const card = await findAccessibleCard(
         access.userId,
@@ -175,16 +174,6 @@ export async function addCardLabel(
         where: and(eq(labels.id, labelId), eq(labels.boardId, card.boardId)),
     });
     if (!label) return false;
-    const [{ n }] = await db
-        .select({ n: count() })
-        .from(cardLabels)
-        .where(eq(cardLabels.cardId, cardId));
-    if (n >= quotas[QuotaKind.CardLabels]) {
-        throw new QuotaExceededError(
-            QuotaKind.CardLabels,
-            quotas[QuotaKind.CardLabels],
-        );
-    }
     const inserted = await db
         .insert(cardLabels)
         .select(
