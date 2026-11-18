@@ -1,5 +1,5 @@
 import { Role } from '#/lib/permissions';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -109,7 +109,7 @@ describe('AddCard', () => {
         expect(input).toHaveValue('Buy milk');
         expect(queryClient.getQueryData(boardKey)?.lists[0]?.cards).toEqual([]);
 
-        pending.resolve(savedCard);
+        await act(async () => pending.resolve(savedCard));
         await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0));
         await vi.waitFor(() => expect(input).toHaveValue(''));
         expect(input).toHaveFocus();

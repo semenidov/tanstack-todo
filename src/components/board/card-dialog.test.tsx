@@ -83,11 +83,13 @@ vi.mock('#/components/ui/select', () => ({
     SelectContent: ({ children }: { children: ReactNode }) => <>{children}</>,
     SelectItem: ({
         value,
+        title,
         children,
     }: {
         value: string;
+        title?: string;
         children: ReactNode;
-    }) => <option value={value}>{children}</option>,
+    }) => <option value={value}>{title ?? children}</option>,
 }));
 
 const card: Card = {
