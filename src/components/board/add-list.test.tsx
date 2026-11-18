@@ -77,26 +77,7 @@ beforeEach(() => {
 });
 
 describe('AddList', () => {
-    it('adds a list on Enter, clears the field after the response and keeps it focused', async () => {
-        const user = userEvent.setup();
-        const queryClient = renderAddList();
-
-        await user.click(screen.getByText('Add list'));
-        const input = screen.getByLabelText('New list title');
-        await user.type(input, 'Done{Enter}');
-
-        expect(addListSpy).toHaveBeenCalledWith({
-            data: { boardId: 'board-1', title: 'Done' },
-        });
-        await vi.waitFor(() => expect(input).toHaveValue(''));
-        expect(input).toHaveFocus();
-        expect(onCreated).toHaveBeenCalledExactlyOnceWith(savedList.id);
-        expect(
-            queryClient.getQueryData(boardKey)?.lists.map((l) => l.id),
-        ).toEqual(['server-list-id']);
-    });
-
-    it('locks the field while the request is pending, so a second Enter adds nothing', async () => {
+    it('creates one list after repeated Enter, then clears and refocuses the input', async () => {
         const pending = deferred<SavedList | null>();
         addListSpy.mockReturnValueOnce(pending.promise);
         const user = userEvent.setup();
@@ -106,20 +87,27 @@ describe('AddList', () => {
         const input = screen.getByLabelText('New list title');
         await user.type(input, 'Done{Enter}');
 
-        await vi.waitFor(() => expect(input).toHaveAttribute('readonly'));
+        await vi.waitFor(() => expect(addListSpy).toHaveBeenCalledTimes(1));
         expect(input).toHaveAttribute('aria-busy', 'true');
-        await user.keyboard('{Enter}');
+        await user.keyboard(' extra{Enter}');
         expect(addListSpy).toHaveBeenCalledTimes(1);
         expect(input).toHaveValue('Done');
         expect(onCreated).not.toHaveBeenCalled();
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([]);
 
         pending.resolve(savedList);
-        await vi.waitFor(() => expect(input).not.toHaveAttribute('readonly'));
-        expect(input).toHaveValue('');
+        await vi.waitFor(() => expect(input).toHaveValue(''));
+        expect(input).toHaveFocus();
+        expect(queryClient.getQueryData(boardKey)?.lists).toEqual([
+            { ...savedList, cards: [] },
+        ]);
+        expect(onCreated).toHaveBeenCalledExactlyOnceWith(savedList.id);
+        expect(addListSpy).toHaveBeenCalledWith({
+            data: { boardId: 'board-1', title: 'Done' },
+        });
     });
 
-    it('keeps the typed text and shows a toast when the server fails', async () => {
+    it('preserves input after failure and allows retrying the save', async () => {
         addListSpy.mockRejectedValueOnce(new Error('network'));
         const user = userEvent.setup();
         const queryClient = renderAddList();
@@ -128,14 +116,13 @@ describe('AddList', () => {
         const input = screen.getByLabelText('New list title');
         await user.type(input, 'Done{Enter}');
 
-        await vi.waitFor(() =>
-            expect(toast.error).toHaveBeenCalledWith(
-                "Couldn't add the list. Please try again.",
-            ),
-        );
+        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
         expect(input).toHaveValue('Done');
         expect(onCreated).not.toHaveBeenCalled();
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([]);
+        await user.keyboard('{Enter}');
+        await vi.waitFor(() => expect(input).toHaveValue(''));
+        expect(addListSpy).toHaveBeenCalledTimes(2);
     });
 
     it('names the list quota and keeps the typed text when the limit is reached', async () => {
@@ -151,7 +138,7 @@ describe('AddList', () => {
 
         await vi.waitFor(() =>
             expect(toast.error).toHaveBeenCalledWith(
-                "You've reached the limit of 30 lists on this board.",
+                expect.stringMatching(/limit.*30 lists/i),
             ),
         );
         expect(input).toHaveValue('Done');

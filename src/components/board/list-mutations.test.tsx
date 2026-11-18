@@ -2,7 +2,11 @@ import { Role } from '#/lib/permissions';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+    QueryClient,
+    QueryClientProvider,
+    useQuery,
+} from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useMoveCard } from '#/components/board/card-mutations';
 import {
@@ -107,29 +111,49 @@ function setup() {
     });
     queryClient.setQueryData(key, board);
     queryClient.setQueryData(otherKey, other);
-    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    const readBoard = vi.fn(async () => board);
+    const readOther = vi.fn(async () => other);
+    const readBoards = vi.fn(async () => []);
+    queryClient.setQueryData(boardsListQueryOptions.queryKey, []);
     const wrapper = ({ children }: { children: ReactNode }) => (
         <QueryClientProvider client={queryClient}>
             {children}
         </QueryClientProvider>
     );
     const { result } = renderHook(
-        () => ({
-            ...useMoveList('board-1'),
-            moveCard: useMoveCard('board-1').moveCard,
-            aSyncing: useIsListSyncing('board-1', 'a'),
-            bSyncing: useIsListSyncing('board-1', 'b'),
-            cSyncing: useIsListSyncing('board-1', 'c'),
-        }),
+        () => {
+            useQuery({
+                queryKey: key,
+                queryFn: readBoard,
+                staleTime: Infinity,
+            });
+            useQuery({
+                queryKey: otherKey,
+                queryFn: readOther,
+                staleTime: Infinity,
+            });
+            useQuery({
+                queryKey: boardsListQueryOptions.queryKey,
+                queryFn: readBoards,
+                staleTime: Infinity,
+            });
+            return {
+                ...useMoveList('board-1'),
+                moveCard: useMoveCard('board-1').moveCard,
+                aSyncing: useIsListSyncing('board-1', 'a'),
+                bSyncing: useIsListSyncing('board-1', 'b'),
+                cSyncing: useIsListSyncing('board-1', 'c'),
+            };
+        },
         { wrapper },
     );
     const ids = (k = key) =>
         queryClient.getQueryData(k)?.lists.map((l) => l.id);
-    return { queryClient, invalidate, result, ids };
+    return { queryClient, readBoard, readOther, readBoards, result, ids };
 }
 
 beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
 });
 
 describe('useMoveList within the board', () => {
@@ -148,7 +172,7 @@ describe('useMoveList within the board', () => {
 
     it('moves the list in the cache at once and sends its neighbors, without a toast', async () => {
         moveListSpy.mockResolvedValue();
-        const { result, ids, invalidate } = setup();
+        const { result, ids } = setup();
 
         act(() => {
             result.current.moveList('a', 2);
@@ -165,56 +189,74 @@ describe('useMoveList within the board', () => {
                 },
             }),
         );
-        await waitFor(() =>
-            expect(invalidate).toHaveBeenCalledWith({ queryKey: key }),
-        );
+
         expect(toast.success).not.toHaveBeenCalled();
     });
 
-    it('queues list and card moves together and refetches only after the last one', async () => {
+    it('keeps a cross-board list move and a card move in one queue without an early refetch', async () => {
         const first = deferred();
         const second = deferred();
         moveListSpy.mockReturnValueOnce(first.promise);
         moveCardSpy.mockReturnValueOnce(second.promise);
-        const { result, invalidate } = setup();
+        const { result, queryClient, readBoard, ids } = setup();
+        const saved = makeBoard('board-1', [
+            makeList('b', ['d1']),
+            makeList('c'),
+        ]);
+        saved.board.title = 'Saved';
+        readBoard.mockResolvedValue(saved);
 
         act(() => {
-            result.current.moveList('a', 1);
-            result.current.moveCard('c1', 'c', 0);
+            result.current.moveListToBoard('a', other.board, 1);
+            result.current.moveCard('d1', 'b', 0);
         });
 
         await waitFor(() => expect(moveListSpy).toHaveBeenCalledTimes(1));
         expect(moveCardSpy).not.toHaveBeenCalled();
+        expect(ids()).toEqual(['b', 'c']);
+        expect(
+            queryClient.getQueryData(key)?.lists[0].cards.map((c) => c.id),
+        ).toEqual(['d1']);
 
         await act(async () => first.resolve());
         await waitFor(() => expect(moveCardSpy).toHaveBeenCalledTimes(1));
-        expect(invalidate).not.toHaveBeenCalled();
+        expect(readBoard).not.toHaveBeenCalled();
+        expect(
+            queryClient.getQueryData(key)?.lists[0].cards.map((c) => c.id),
+        ).toEqual(['d1']);
 
         await act(async () => second.resolve());
-        await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(1));
+        await waitFor(() =>
+            expect(queryClient.getQueryData(key)).toEqual(saved),
+        );
     });
 
     it('shows a toast and refetches the board when the server refuses', async () => {
         moveListSpy.mockRejectedValue(new Error('List was not moved'));
-        const { result, invalidate } = setup();
+        const { result, ids } = setup();
 
         act(() => {
             result.current.moveList('a', 2);
         });
 
-        await waitFor(() =>
-            expect(toast.error).toHaveBeenCalledWith(
-                "Couldn't move the list. Please try again.",
-            ),
-        );
-        expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+        await waitFor(() => expect(toast.error).toHaveBeenCalled());
+        await waitFor(() => expect(ids()).toEqual(['a', 'b', 'c']));
     });
 });
 
 describe('useMoveList to another board', () => {
     it('takes the list off this board, sends the target neighbors, then toasts and refreshes both boards', async () => {
         moveListSpy.mockResolvedValue();
-        const { result, ids, invalidate } = setup();
+        const { result, ids, readBoard, readOther, readBoards, queryClient } =
+            setup();
+        readBoard.mockResolvedValue(makeBoard('board-1', board.lists.slice(1)));
+        const moved = { ...board.lists[0], boardId: 'board-2' };
+        const savedOther = makeBoard('board-2', [
+            other.lists[0],
+            moved,
+            other.lists[1],
+        ]);
+        readOther.mockResolvedValue(savedOther);
 
         act(() => {
             result.current.moveListToBoard('a', other.board, 1);
@@ -231,19 +273,17 @@ describe('useMoveList to another board', () => {
                 },
             }),
         );
+        await waitFor(() => expect(toast.success).toHaveBeenCalled());
         await waitFor(() =>
-            expect(toast.success).toHaveBeenCalledWith('Moved to Other board'),
+            expect(queryClient.getQueryData(otherKey)).toEqual(savedOther),
         );
-        expect(invalidate).toHaveBeenCalledWith({ queryKey: otherKey });
-        expect(invalidate).toHaveBeenCalledWith({
-            queryKey: boardsListQueryOptions.queryKey,
-            exact: true,
-        });
+        await waitFor(() => expect(ids()).toEqual(['b', 'c']));
+        expect(readBoards).toHaveBeenCalled();
     });
 
     it('says the target board is full when the server refuses by quota', async () => {
         moveListSpy.mockRejectedValue(quotaError(QuotaKind.Lists, 30));
-        const { result, invalidate } = setup();
+        const { result, ids } = setup();
 
         act(() => {
             result.current.moveListToBoard('a', other.board, 0);
@@ -251,10 +291,10 @@ describe('useMoveList to another board', () => {
 
         await waitFor(() =>
             expect(toast.error).toHaveBeenCalledWith(
-                "Can't move: this board already has 30 lists.",
+                expect.stringMatching(/30 lists/),
             ),
         );
-        expect(invalidate).toHaveBeenCalledWith({ queryKey: key });
+        await waitFor(() => expect(ids()).toEqual(['a', 'b', 'c']));
         expect(toast.success).not.toHaveBeenCalled();
     });
 

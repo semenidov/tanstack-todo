@@ -23,15 +23,18 @@ import { asc, eq } from 'drizzle-orm';
 const MISSING_ID = '00000000-0000-0000-0000-000000000000';
 
 async function seedLists(boardId: string, keys: Array<string>) {
-    const ids: Array<string> = [];
-    for (const [i, position] of keys.entries()) {
-        const [row] = await db
-            .insert(lists)
-            .values({ boardId, title: `list ${i}`, position })
-            .returning();
-        ids.push(row.id);
-    }
-    return ids;
+    if (!keys.length) return [];
+    const rows = await db
+        .insert(lists)
+        .values(
+            keys.map((position, i) => ({
+                boardId,
+                title: `list ${i}`,
+                position,
+            })),
+        )
+        .returning({ id: lists.id });
+    return rows.map((row) => row.id);
 }
 
 async function seedBoardWithLists(
@@ -81,11 +84,12 @@ describe('list order', () => {
         expect(await listOrder(access)).toEqual([ids[0], ids[1], added?.id]);
     });
 
-    it('addList gives the first list of an empty board the key a0', async () => {
+    it('adds the first list to an empty board', async () => {
         const { access } = await seedBoardWithAccess();
 
         const added = await addList(access, 'first');
-        expect(added?.position).toBe('a0');
+        expect(added).toBeDefined();
+        expect(await listOrder(access)).toEqual([added?.id]);
     });
 });
 

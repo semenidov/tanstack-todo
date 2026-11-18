@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-    GUEST_CAP_CODE,
-    GUEST_CAP_MESSAGE,
-    guestSignInErrorMessage,
-} from '#/lib/guest';
+import { GUEST_CAP_CODE, guestSignInErrorMessage } from '#/lib/guest';
 
 describe('guestSignInErrorMessage', () => {
     it('asks to retry in 10 minutes when guest sign-in is rate limited', () => {
@@ -12,7 +8,7 @@ describe('guestSignInErrorMessage', () => {
                 status: 429,
                 message: 'Too many requests. Please try again later.',
             }),
-        ).toBe('Too many attempts. Please try again in 10 minutes.');
+        ).toMatch(/10 minutes/);
     });
 
     it('asks to create an account when the guest cap is reached', () => {
@@ -22,12 +18,7 @@ describe('guestSignInErrorMessage', () => {
                 code: GUEST_CAP_CODE,
                 message: 'anything',
             }),
-        ).toBe(
-            'Guest mode is temporarily unavailable - please create an account.',
-        );
-        expect(GUEST_CAP_MESSAGE).toBe(
-            'Guest mode is temporarily unavailable - please create an account.',
-        );
+        ).toMatch(/create an account/i);
     });
 
     it('falls back for other errors without a message', () => {

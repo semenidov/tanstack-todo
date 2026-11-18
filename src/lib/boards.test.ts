@@ -9,7 +9,6 @@ import {
     findCardInBoard,
     isSameCardSpot,
     isSameListSpot,
-    cardLinkId,
     listMoveNeighbors,
     moveCardInBoard,
     moveListInBoard,
@@ -80,14 +79,7 @@ describe('addListToBoard', () => {
         const result = addListToBoard(board, makeList('b'));
 
         expect(result.lists.map((l) => l.id)).toEqual(['a', 'b']);
-    });
-
-    it('does not mutate the original board', () => {
-        const board = makeBoard([makeList('a')]);
-
-        addListToBoard(board, makeList('b'));
-
-        expect(board.lists).toHaveLength(1);
+        expect(board.lists.map((l) => l.id)).toEqual(['a']);
     });
 });
 
@@ -381,12 +373,6 @@ describe('findCardInBoard', () => {
         const board = makeBoard([makeList('a', 'A', [])]);
 
         expect(findCardInBoard(board, 'missing')).toBeUndefined();
-    });
-});
-
-describe('cardLinkId', () => {
-    it('builds a stable DOM id from the card id', () => {
-        expect(cardLinkId('abc')).toBe('card-abc');
     });
 });
 

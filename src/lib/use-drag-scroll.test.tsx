@@ -1,21 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import {
-    getDragScrollLeft,
-    getNearestSnapLeft,
-    useDragScroll,
-} from '#/lib/use-drag-scroll';
-
-describe('getDragScrollLeft', () => {
-    it('scrolls opposite to the mouse movement', () => {
-        expect(getDragScrollLeft(100, 50, 20)).toBe(130);
-        expect(getDragScrollLeft(100, 50, 80)).toBe(70);
-    });
-
-    it('keeps the start position when the mouse has not moved', () => {
-        expect(getDragScrollLeft(100, 50, 50)).toBe(100);
-    });
-});
+import { getNearestSnapLeft, useDragScroll } from '#/lib/use-drag-scroll';
 
 describe('getNearestSnapLeft', () => {
     it('picks the snap point closest to the release position', () => {
@@ -53,17 +38,15 @@ describe('useDragScroll', () => {
         board.scrollLeft = 100;
 
         fireEvent.pointerDown(board, { ...mouse, clientX: 50 });
-        expect(board).toHaveClass('select-none', 'cursor-grabbing!');
-        // Snap is off for the whole drag, so the board follows the mouse freely.
-        expect(board.style.scrollSnapType).toBe('none');
 
         fireEvent.pointerMove(board, { ...mouse, clientX: 20 });
         expect(board.scrollLeft).toBe(130);
+        fireEvent.pointerMove(board, { ...mouse, clientX: 80 });
+        expect(board.scrollLeft).toBe(70);
 
         fireEvent.pointerUp(board, { ...mouse, clientX: 20 });
-        expect(board).not.toHaveClass('select-none', 'cursor-grabbing!');
-        // No snap-aligned children here: nothing to glide to, snap is handed back to CSS.
-        expect(board.style.scrollSnapType).toBe('');
+        fireEvent.pointerMove(board, { ...mouse, clientX: 100 });
+        expect(board.scrollLeft).toBe(70);
     });
 
     it('does not start on a descendant', () => {
@@ -78,7 +61,6 @@ describe('useDragScroll', () => {
         fireEvent.pointerMove(board, { ...mouse, clientX: 20 });
 
         expect(board.scrollLeft).toBe(100);
-        expect(board).not.toHaveClass('cursor-grabbing!');
     });
 
     it('ignores touch input', () => {

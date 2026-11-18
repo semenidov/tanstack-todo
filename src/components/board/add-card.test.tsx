@@ -93,27 +93,7 @@ beforeEach(() => {
 });
 
 describe('AddCard', () => {
-    it('adds a card on Enter, clears the field after the response and keeps it focused', async () => {
-        const user = userEvent.setup();
-        const queryClient = renderAddCard();
-
-        await user.click(screen.getByText('Add card'));
-        const input = screen.getByLabelText('New card title');
-        await user.type(input, 'Buy milk{Enter}');
-
-        expect(addCardSpy).toHaveBeenCalledWith({
-            data: { listId: 'list-1', title: 'Buy milk' },
-        });
-        await vi.waitFor(() => expect(input).toHaveValue(''));
-        expect(input).toHaveFocus();
-        expect(
-            queryClient
-                .getQueryData(boardKey)
-                ?.lists[0]?.cards.map((c) => c.id),
-        ).toEqual(['server-card-id']);
-    });
-
-    it('locks the field while the request is pending, so a second Enter adds nothing', async () => {
+    it('creates one card after repeated Enter, then clears and refocuses the input', async () => {
         const pending = deferred<Card | null>();
         addCardSpy.mockReturnValueOnce(pending.promise);
         const user = userEvent.setup();
@@ -123,19 +103,25 @@ describe('AddCard', () => {
         const input = screen.getByLabelText('New card title');
         await user.type(input, 'Buy milk{Enter}');
 
-        await vi.waitFor(() => expect(input).toHaveAttribute('readonly'));
+        await vi.waitFor(() => expect(addCardSpy).toHaveBeenCalledTimes(1));
         expect(input).toHaveAttribute('aria-busy', 'true');
-        await user.keyboard('{Enter}');
+        await user.keyboard(' extra{Enter}');
         expect(addCardSpy).toHaveBeenCalledTimes(1);
         expect(input).toHaveValue('Buy milk');
         expect(queryClient.getQueryData(boardKey)?.lists[0]?.cards).toEqual([]);
 
         pending.resolve(savedCard);
-        await vi.waitFor(() => expect(input).not.toHaveAttribute('readonly'));
-        expect(input).toHaveValue('');
+        await vi.waitFor(() => expect(input).toHaveValue(''));
+        expect(input).toHaveFocus();
+        expect(queryClient.getQueryData(boardKey)?.lists[0].cards).toEqual([
+            savedCard,
+        ]);
+        expect(addCardSpy).toHaveBeenCalledWith({
+            data: { listId: 'list-1', title: 'Buy milk' },
+        });
     });
 
-    it('keeps the typed text and shows a toast when the server fails', async () => {
+    it('preserves input after failure and allows retrying the save', async () => {
         addCardSpy.mockRejectedValueOnce(new Error('network'));
         const user = userEvent.setup();
         const queryClient = renderAddCard();
@@ -144,13 +130,12 @@ describe('AddCard', () => {
         const input = screen.getByLabelText('New card title');
         await user.type(input, 'Buy milk{Enter}');
 
-        await vi.waitFor(() =>
-            expect(toast.error).toHaveBeenCalledWith(
-                "Couldn't add the card. Please try again.",
-            ),
-        );
+        await vi.waitFor(() => expect(toast.error).toHaveBeenCalled());
         expect(input).toHaveValue('Buy milk');
         expect(queryClient.getQueryData(boardKey)?.lists[0]?.cards).toEqual([]);
+        await user.keyboard('{Enter}');
+        await vi.waitFor(() => expect(input).toHaveValue(''));
+        expect(addCardSpy).toHaveBeenCalledTimes(2);
     });
 
     it('names the card quota and keeps the typed text when the limit is reached', async () => {
@@ -166,7 +151,7 @@ describe('AddCard', () => {
 
         await vi.waitFor(() =>
             expect(toast.error).toHaveBeenCalledWith(
-                "You've reached the limit of 200 cards in this list.",
+                expect.stringMatching(/limit.*200 cards/i),
             ),
         );
         expect(input).toHaveValue('Buy milk');

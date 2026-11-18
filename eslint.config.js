@@ -22,6 +22,8 @@ export default [
             '.nitro/**',
             '.vercel/**',
             'dist/**',
+            'playwright-report/**',
+            'test-results/**',
             'src/routeTree.gen.ts',
         ],
     },
