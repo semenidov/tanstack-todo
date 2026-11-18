@@ -267,7 +267,9 @@ test('drags cards between lists with the keyboard, two moves in a row', async ({
             announcement: 'Card A2 is in position 2 of 2 in list Done',
         },
     ]);
-    // Right away, while the first move may still be saving: the same position.
+    await expect(
+        listColumn(page, 'Done').getByRole('link', { name: 'A2', exact: true }),
+    ).toBeFocused();
     await dragCardWithKeys(page, 'B1', [
         {
             key: 'ArrowLeft',
