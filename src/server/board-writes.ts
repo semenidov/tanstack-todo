@@ -107,7 +107,6 @@ export async function addCardLabelAs(
             await authorizeCard(user.id, cardId, Action.ContentEdit),
             cardId,
             labelId,
-            quotasFor(user),
         ),
     );
 }

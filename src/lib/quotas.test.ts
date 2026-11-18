@@ -27,7 +27,6 @@ describe('createErrorMessage', () => {
         [QuotaKind.Lists, /7 lists.*board/],
         [QuotaKind.Cards, /7 cards.*list/],
         [QuotaKind.Labels, /7 labels.*board/],
-        [QuotaKind.CardLabels, /7 labels.*card/],
         [QuotaKind.ChecklistItems, /7 items.*checklist/],
     ] as const)(
         'names the %s resource and the limit received from the server',

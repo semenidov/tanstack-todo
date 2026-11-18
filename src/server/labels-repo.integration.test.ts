@@ -4,8 +4,9 @@ import type { BoardAccess } from '#/server/authorize';
 import { Action } from '#/lib/permissions';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { db } from '#/db';
-import { cardLabels, cards, checklists, lists } from '#/db/schema';
+import { cardLabels, cards, checklists, labels, lists } from '#/db/schema';
 import { LABEL_EXISTS_MESSAGE } from '#/lib/labels';
+import { addCardLabelAs } from '#/server/board-writes';
 import { deleteBoard, getBoard, moveList } from '#/server/boards-repo';
 import {
     addCardLabel,
@@ -143,6 +144,31 @@ describe('isolation', () => {
 });
 
 describe('labels on a card', () => {
+    it('allows more than ten board labels on the same card', async () => {
+        const [extra, ...assigned] = await db
+            .insert(labels)
+            .values(
+                Array.from({ length: 11 }, () => ({
+                    boardId,
+                    color: 'green' as const,
+                })),
+            )
+            .returning();
+        await db
+            .insert(cardLabels)
+            .values(assigned.map(({ id }) => ({ cardId, labelId: id })));
+
+        await addCardLabelAs(
+            { id: access.userId, isAnonymous: false },
+            cardId,
+            extra.id,
+        );
+
+        const labelIds = await labelIdsOf(cardId);
+        expect(labelIds).toHaveLength(11);
+        expect(labelIds).toContain(extra.id);
+    });
+
     it('puts and takes off a label, bumps updated_at, getBoard returns the ids', async () => {
         const label = await newLabel('Frontend');
         const before = (await cardRow(cardId)).updatedAt;
