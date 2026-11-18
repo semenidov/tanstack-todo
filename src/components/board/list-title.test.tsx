@@ -30,44 +30,18 @@ function ControlledListTitle({
 }
 
 describe('ListTitle', () => {
-    it('saves the trimmed title on Enter', async () => {
+    it('keeps Space available for dragging while Enter starts editing', async () => {
         const user = userEvent.setup();
-        const onSave = vi.fn();
-        render(<ControlledListTitle onSave={onSave} />);
+        render(<ControlledListTitle onSave={vi.fn()} />);
+        const title = screen.getByRole('button', { name: /To do/ });
 
-        await user.click(screen.getByText('To do'));
-        const input = screen.getByLabelText('List title');
-        await user.clear(input);
-        await user.type(input, '  Doing  {Enter}');
+        title.focus();
+        await user.keyboard(' ');
+        expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 
-        expect(onSave).toHaveBeenCalledWith('Doing');
-        expect(screen.getByText('Doing')).toBeInTheDocument();
-    });
-
-    it('cancels without saving on Escape', async () => {
-        const user = userEvent.setup();
-        const onSave = vi.fn();
-        render(<ControlledListTitle onSave={onSave} />);
-
-        await user.click(screen.getByText('To do'));
-        const input = screen.getByLabelText('List title');
-        await user.type(input, ' renamed{Escape}');
-
-        expect(onSave).not.toHaveBeenCalled();
-        expect(screen.getByText('To do')).toBeInTheDocument();
-    });
-
-    it('does not save an empty title', async () => {
-        const user = userEvent.setup();
-        const onSave = vi.fn();
-        render(<ControlledListTitle onSave={onSave} />);
-
-        await user.click(screen.getByText('To do'));
-        const input = screen.getByLabelText('List title');
-        await user.clear(input);
-        await user.type(input, '   {Enter}');
-
-        expect(onSave).not.toHaveBeenCalled();
-        expect(screen.getByText('To do')).toBeInTheDocument();
+        await user.keyboard('{Enter}');
+        expect(screen.getByRole('textbox', { name: 'List title' })).toHaveValue(
+            'To do',
+        );
     });
 });

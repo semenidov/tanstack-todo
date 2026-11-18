@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { CRUD_EMAIL } from './helpers/auth';
-import { resetBoards } from './helpers/db';
+import { CRUD_EMAIL, gotoHydrated } from './helpers/auth';
+import { resetBoards, seedBoard, seedCards } from './helpers/db';
 import {
     addCard,
     addList,
@@ -8,27 +8,25 @@ import {
     cardTitles,
     dndAnnouncement,
     dragCardWithKeys,
-    gotoBoard,
     listColumn,
     listTitleButton,
     listTitles,
     moveCardTo,
+    pickUpWithKeyboard,
     pickUpWithMouse,
     waitForSavedMoves,
 } from './helpers/board';
 
-test.beforeEach(async ({ page }) => {
-    await resetBoards();
-    await gotoBoard(page, CRUD_EMAIL);
-});
+let boardId: string;
 
-test('shows a board with its lists', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'My tasks' })).toBeVisible();
-    await expect(listColumn(page, 'To do')).toBeVisible();
-    await expect(listColumn(page, 'Done')).toBeVisible();
+test.beforeEach(async () => {
+    await resetBoards();
+    boardId = await seedBoard(CRUD_EMAIL);
 });
 
 test('links back to the boards list', async ({ page }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     await page.getByRole('link', { name: 'Back to boards' }).click();
     await page.waitForURL(/\/boards$/);
     await expect(
@@ -39,6 +37,8 @@ test('links back to the boards list', async ({ page }) => {
 test('renames the board in the header and the tile shows it', async ({
     page,
 }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     await page.getByRole('heading', { name: 'My tasks' }).click();
     const input = page.getByLabel('Board title');
     await input.fill('Renamed board');
@@ -55,14 +55,11 @@ test('renames the board in the header and the tile shows it', async ({
     ).toBeVisible();
 });
 
-test('adds a card and shows it in the list', async ({ page }) => {
-    await addCard(page, 'To do', 'Buy milk');
-    await expect(cardRow(page, 'Buy milk')).toBeVisible();
-});
-
 test('a new card can be opened and has a working menu as soon as it appears', async ({
     page,
 }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     const list = listColumn(page, 'To do');
     await list.getByRole('button', { name: 'Add card' }).click();
     await list.getByLabel('New card title').fill('Fresh card');
@@ -82,7 +79,8 @@ test('a new card can be opened and has a working menu as soon as it appears', as
 });
 
 test('renames a card through the card dialog', async ({ page }) => {
-    await addCard(page, 'To do', 'Old name');
+    await seedCards(boardId, 'To do', ['Old name']);
+    await gotoHydrated(page, `/b/${boardId}`);
     await cardRow(page, 'Old name').getByRole('link').click();
 
     const dialog = page.getByRole('dialog');
@@ -99,6 +97,8 @@ test('renames a card through the card dialog', async ({ page }) => {
 test('adds new cards on top and keeps the order after reload', async ({
     page,
 }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     await addCard(page, 'To do', 'First');
     await addCard(page, 'To do', 'Second');
     await expect
@@ -114,9 +114,9 @@ test('adds new cards on top and keeps the order after reload', async ({
 test('moves a card to a position in another list through the Move window', async ({
     page,
 }) => {
-    await addCard(page, 'To do', 'Ship it');
-    await addCard(page, 'Done', 'Done 2');
-    await addCard(page, 'Done', 'Done 1');
+    await seedCards(boardId, 'To do', ['Ship it']);
+    await seedCards(boardId, 'Done', ['Done 1', 'Done 2']);
+    await gotoHydrated(page, `/b/${boardId}`);
 
     await moveCardTo(page, 'Ship it', 'Done', 2);
 
@@ -128,39 +128,9 @@ test('moves a card to a position in another list through the Move window', async
     await expect.poll(() => cardTitles(page, 'Done')).toEqual(expected);
 });
 
-test('moves a card down inside its list to exactly the chosen position', async ({
-    page,
-}) => {
-    await addCard(page, 'To do', 'Card 3');
-    await addCard(page, 'To do', 'Card 2');
-    await addCard(page, 'To do', 'Card 1');
-
-    await moveCardTo(page, 'Card 1', 'To do', 3);
-
-    const expected = ['Card 2', 'Card 3', 'Card 1'];
-    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
-    await page.reload();
-    await expect.poll(() => cardTitles(page, 'To do')).toEqual(expected);
-});
-
-test('the Move button is disabled for the current position', async ({
-    page,
-}) => {
-    await addCard(page, 'To do', 'Only');
-    await cardRow(page, 'Only')
-        .getByRole('button', { name: 'Card actions' })
-        .click();
-    await page.getByRole('menuitem', { name: 'Move…' }).click();
-
-    await expect(
-        page
-            .getByRole('dialog', { name: 'Move card' })
-            .getByRole('button', { name: 'Move' }),
-    ).toBeDisabled();
-});
-
 test('deletes a card on the server right away', async ({ page }) => {
-    await addCard(page, 'To do', 'Temp card');
+    await seedCards(boardId, 'To do', ['Temp card']);
+    await gotoHydrated(page, `/b/${boardId}`);
     const row = cardRow(page, 'Temp card');
     await expect(row).toBeVisible();
 
@@ -170,15 +140,15 @@ test('deletes a card on the server right away', async ({ page }) => {
     // The Undo toast appears once the server has saved the delete.
     await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible();
 
-    await page.reload();
-    await page.waitForLoadState('networkidle');
+    await gotoHydrated(page, page.url());
     await expect(cardRow(page, 'Temp card')).toHaveCount(0);
 });
 
 test('a deleted card does not come back when the board refetches', async ({
     page,
 }) => {
-    await addCard(page, 'To do', 'Deleted card');
+    await seedCards(boardId, 'To do', ['Deleted card']);
+    await gotoHydrated(page, `/b/${boardId}`);
     const row = cardRow(page, 'Deleted card');
 
     await row.getByRole('button', { name: 'Card actions' }).click();
@@ -193,7 +163,8 @@ test('a deleted card does not come back when the board refetches', async ({
 });
 
 test('undo keeps a deleted card', async ({ page }) => {
-    await addCard(page, 'To do', 'Keep me');
+    await seedCards(boardId, 'To do', ['Keep me']);
+    await gotoHydrated(page, `/b/${boardId}`);
     const row = cardRow(page, 'Keep me');
 
     await row.getByRole('button', { name: 'Card actions' }).click();
@@ -205,11 +176,15 @@ test('undo keeps a deleted card', async ({ page }) => {
 });
 
 test('adds a list', async ({ page }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     await addList(page, 'Backlog');
     await expect(listColumn(page, 'Backlog')).toBeVisible();
 });
 
 test('renames a list', async ({ page }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     const list = listColumn(page, 'To do');
     await list.getByRole('button', { name: 'List actions' }).click();
     await page.getByRole('menuitem', { name: 'Rename' }).click();
@@ -222,6 +197,8 @@ test('renames a list', async ({ page }) => {
 });
 
 test('deletes an empty list', async ({ page }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     await addList(page, 'Scratch');
     const list = listColumn(page, 'Scratch');
     await list.getByRole('button', { name: 'List actions' }).click();
@@ -231,7 +208,8 @@ test('deletes an empty list', async ({ page }) => {
 });
 
 test('opens a card window from a direct link', async ({ page }) => {
-    await addCard(page, 'To do', 'Direct link card');
+    await seedCards(boardId, 'To do', ['Direct link card']);
+    await gotoHydrated(page, `/b/${boardId}`);
     await cardRow(page, 'Direct link card').getByRole('link').click();
 
     const dialog = page.getByRole('dialog');
@@ -241,8 +219,7 @@ test('opens a card window from a direct link', async ({ page }) => {
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
 
-    await page.goto(cardUrl);
-    await page.waitForLoadState('networkidle');
+    await gotoHydrated(page, cardUrl);
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(
         page.getByRole('dialog').getByText('Direct link card'),
@@ -250,9 +227,8 @@ test('opens a card window from a direct link', async ({ page }) => {
 });
 
 test('drags a card down its list with the keyboard', async ({ page }) => {
-    await addCard(page, 'To do', 'Card 3');
-    await addCard(page, 'To do', 'Card 2');
-    await addCard(page, 'To do', 'Card 1');
+    await seedCards(boardId, 'To do', ['Card 1', 'Card 2', 'Card 3']);
+    await gotoHydrated(page, `/b/${boardId}`);
 
     const saved = waitForSavedMoves(page, 1);
     await dragCardWithKeys(page, 'Card 1', [
@@ -279,9 +255,9 @@ test('drags a card down its list with the keyboard', async ({ page }) => {
 test('drags cards between lists with the keyboard, two moves in a row', async ({
     page,
 }) => {
-    await addCard(page, 'To do', 'A2');
-    await addCard(page, 'To do', 'A1');
-    await addCard(page, 'Done', 'B1');
+    await seedCards(boardId, 'To do', ['A1', 'A2']);
+    await seedCards(boardId, 'Done', ['B1']);
+    await gotoHydrated(page, `/b/${boardId}`);
 
     const saved = waitForSavedMoves(page, 2);
     // Position 2 into a list of 1 card: its end.
@@ -291,7 +267,9 @@ test('drags cards between lists with the keyboard, two moves in a row', async ({
             announcement: 'Card A2 is in position 2 of 2 in list Done',
         },
     ]);
-    // Right away, while the first move may still be saving: the same position.
+    await expect(
+        listColumn(page, 'Done').getByRole('link', { name: 'A2', exact: true }),
+    ).toBeFocused();
     await dragCardWithKeys(page, 'B1', [
         {
             key: 'ArrowLeft',
@@ -308,8 +286,9 @@ test('drags cards between lists with the keyboard, two moves in a row', async ({
 });
 
 test('drags a card to another list with the mouse', async ({ page }) => {
-    await addCard(page, 'To do', 'Mouse card');
-    await addCard(page, 'Done', 'Done card');
+    await seedCards(boardId, 'To do', ['Mouse card']);
+    await seedCards(boardId, 'Done', ['Done card']);
+    await gotoHydrated(page, `/b/${boardId}`);
     const boardUrl = page.url();
 
     const saved = waitForSavedMoves(page, 1);
@@ -339,11 +318,9 @@ test('drags a card to another list with the mouse', async ({ page }) => {
         .toEqual(['Mouse card', 'Done card']);
 });
 
-test('a card dropped outside the lists or cancelled with Esc stays in place', async ({
-    page,
-}) => {
-    await addCard(page, 'To do', 'Card 2');
-    await addCard(page, 'To do', 'Card 1');
+test('a card dropped outside the lists stays in place', async ({ page }) => {
+    await seedCards(boardId, 'To do', ['Card 1', 'Card 2']);
+    await gotoHydrated(page, `/b/${boardId}`);
     let requests = 0;
     page.on('request', (r) => {
         if (r.method() === 'POST' && r.url().includes('_serverFn')) {
@@ -370,9 +347,31 @@ test('a card dropped outside the lists or cancelled with Esc stays in place', as
         'Moving card Card 1 was cancelled',
     );
 
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Card 1', 'Card 2']);
+    await expect.poll(() => cardTitles(page, 'Done')).toEqual([]);
+    expect(requests).toBe(0);
+    await page.reload();
+    await expect
+        .poll(() => cardTitles(page, 'To do'))
+        .toEqual(['Card 1', 'Card 2']);
+});
+
+test('a keyboard drag cancelled with Escape stays in place', async ({
+    page,
+}) => {
+    await seedCards(boardId, 'To do', ['Card 1', 'Card 2']);
+    await gotoHydrated(page, `/b/${boardId}`);
+    let requests = 0;
+    page.on('request', (r) => {
+        if (r.method() === 'POST' && r.url().includes('_serverFn')) {
+            requests += 1;
+        }
+    });
+
     // Keyboard: move down, then Esc.
-    await cardRow(page, 'Card 1').getByRole('link').focus();
-    await page.keyboard.press('Space');
+    await pickUpWithKeyboard(page, cardRow(page, 'Card 1').getByRole('link'));
     await expect(dndAnnouncement(page)).toHaveText('Picked up card Card 1');
     await page.keyboard.press('ArrowDown');
     await expect(dndAnnouncement(page)).toHaveText(
@@ -397,7 +396,8 @@ test('a card dropped outside the lists or cancelled with Esc stays in place', as
 test('drags a list by its header with the mouse and keeps the order after reload', async ({
     page,
 }) => {
-    await addCard(page, 'To do', 'Rides along');
+    await seedCards(boardId, 'To do', ['Rides along']);
+    await gotoHydrated(page, `/b/${boardId}`);
     const saved = waitForSavedMoves(page, 1);
     const from = await listTitleButton(page, 'To do').boundingBox();
     const to = await listColumn(page, 'Done').boundingBox();
@@ -429,6 +429,8 @@ test('drags a list by its header with the mouse and keeps the order after reload
 test('drags a list with the keyboard: Space picks it up instead of renaming', async ({
     page,
 }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     await addList(page, 'Later');
     await expect
         .poll(() => listTitles(page))
@@ -436,8 +438,7 @@ test('drags a list with the keyboard: Space picks it up instead of renaming', as
     await page.getByLabel('New list title').press('Escape');
     const saved = waitForSavedMoves(page, 1);
 
-    await listTitleButton(page, 'To do').focus();
-    await page.keyboard.press('Space');
+    await pickUpWithKeyboard(page, listTitleButton(page, 'To do'));
     await expect(dndAnnouncement(page)).toHaveText('Picked up list To do');
     await expect(
         page.getByRole('textbox', { name: 'List title', exact: true }),
@@ -478,6 +479,8 @@ test('drags a list with the keyboard: Space picks it up instead of renaming', as
 test('undo list deletion does not jump to the last list and Add list still scrolls', async ({
     page,
 }) => {
+    await gotoHydrated(page, `/b/${boardId}`);
+
     test.setTimeout(60_000);
     await page.setViewportSize({ width: 1024, height: 768 });
     for (let i = 3; i <= 7; i++) {

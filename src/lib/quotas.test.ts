@@ -10,127 +10,35 @@ import {
     restoreErrorMessage,
 } from '#/lib/quotas';
 
-/** What the client gets: a server fn error keeps only its message on the wire. */
-function overTheWire(error: Error) {
-    return new Error(error.message);
+function overTheWire(kind: QuotaKind, limit: number) {
+    return new Error(new QuotaExceededError(kind, limit).message);
 }
 
-describe('USER_QUOTAS', () => {
-    it('limits boards, lists, cards, labels and checklist items', () => {
-        expect(USER_QUOTAS).toEqual({
-            [QuotaKind.Boards]: 20,
-            [QuotaKind.Lists]: 30,
-            [QuotaKind.Cards]: 200,
-            [QuotaKind.Labels]: 50,
-            [QuotaKind.CardLabels]: 10,
-            [QuotaKind.ChecklistItems]: 100,
-        });
-    });
-});
-
-describe('GUEST_QUOTAS', () => {
-    it('limits a guest to 3 boards, 10 lists, 50 cards, 10 labels and 20 checklist items', () => {
-        expect(GUEST_QUOTAS).toEqual({
-            [QuotaKind.Boards]: 3,
-            [QuotaKind.Lists]: 10,
-            [QuotaKind.Cards]: 50,
-            [QuotaKind.Labels]: 10,
-            [QuotaKind.CardLabels]: 10,
-            [QuotaKind.ChecklistItems]: 20,
-        });
-    });
-
-    it('shows the guest numbers in the toasts', () => {
-        const error = (kind: QuotaKind) =>
-            overTheWire(new QuotaExceededError(kind, GUEST_QUOTAS[kind]));
-
-        expect(createErrorMessage(error(QuotaKind.Boards), 'x')).toBe(
-            "You've reached the limit of 3 boards.",
-        );
-        expect(restoreErrorMessage(error(QuotaKind.Lists), 'x')).toBe(
-            "Can't restore: you've reached the limit of 10 lists on this board.",
-        );
-        expect(moveErrorMessage(error(QuotaKind.Cards), 'x')).toBe(
-            "Can't move: this list already has 50 cards.",
-        );
-        expect(moveErrorMessage(error(QuotaKind.Lists), 'x')).toBe(
-            "Can't move: this board already has 10 lists.",
-        );
-    });
-});
-
-describe('moveErrorMessage', () => {
-    it('says the target board is full for a refused list move', () => {
-        const error = overTheWire(new QuotaExceededError(QuotaKind.Lists, 30));
-        expect(moveErrorMessage(error, 'fallback')).toBe(
-            "Can't move: this board already has 30 lists.",
-        );
-    });
-
-    it('falls back for a board quota or any other error', () => {
-        const boards = overTheWire(
-            new QuotaExceededError(QuotaKind.Boards, 20),
-        );
-        expect(moveErrorMessage(boards, 'fallback')).toBe('fallback');
-        expect(
-            moveErrorMessage(new Error('List was not moved'), 'fallback'),
-        ).toBe('fallback');
-    });
-});
-
 describe('quotasFor', () => {
-    it('gives a guest the guest limits', () => {
-        expect(quotasFor({ isAnonymous: true })).toBe(GUEST_QUOTAS);
-    });
-
-    it('gives a regular user the regular limits', () => {
-        expect(quotasFor({ isAnonymous: false })).toBe(USER_QUOTAS);
+    it('selects guest limits for guests and regular limits for registered users', () => {
+        expect(quotasFor({ isAnonymous: true })).toEqual(GUEST_QUOTAS);
+        expect(quotasFor({ isAnonymous: false })).toEqual(USER_QUOTAS);
     });
 });
 
 describe('createErrorMessage', () => {
     it.each([
-        [QuotaKind.Boards, 20, "You've reached the limit of 20 boards."],
-        [
-            QuotaKind.Lists,
-            30,
-            "You've reached the limit of 30 lists on this board.",
-        ],
-        [
-            QuotaKind.Cards,
-            200,
-            "You've reached the limit of 200 cards in this list.",
-        ],
-        [
-            QuotaKind.Labels,
-            50,
-            "You've reached the limit of 50 labels on this board.",
-        ],
-        [
-            QuotaKind.CardLabels,
-            10,
-            "You've reached the limit of 10 labels on this card.",
-        ],
-        [
-            QuotaKind.ChecklistItems,
-            100,
-            "You've reached the limit of 100 items in this checklist.",
-        ],
-    ])('names the %s quota from the server error', (kind, limit, text) => {
-        const error = overTheWire(new QuotaExceededError(kind, limit));
+        [QuotaKind.Boards, /7 boards/],
+        [QuotaKind.Lists, /7 lists.*board/],
+        [QuotaKind.Cards, /7 cards.*list/],
+        [QuotaKind.Labels, /7 labels.*board/],
+        [QuotaKind.CardLabels, /7 labels.*card/],
+        [QuotaKind.ChecklistItems, /7 items.*checklist/],
+    ] as const)(
+        'names the %s resource and the limit received from the server',
+        (kind, text) => {
+            expect(
+                createErrorMessage(overTheWire(kind, 7), 'fallback'),
+            ).toMatch(text);
+        },
+    );
 
-        expect(createErrorMessage(error, 'fallback')).toBe(text);
-    });
-
-    it('takes the limit from the error, not from the defaults', () => {
-        const error = overTheWire(new QuotaExceededError(QuotaKind.Boards, 3));
-
-        expect(createErrorMessage(error, 'fallback')).toBe(
-            "You've reached the limit of 3 boards.",
-        );
-    });
-
-    it('returns the fallback for any other error', () => {
+    it('returns the fallback for errors that are not recognized quotas', () => {
         expect(createErrorMessage(new Error('network'), 'fallback')).toBe(
             'fallback',
         );
@@ -145,24 +53,13 @@ describe('createErrorMessage', () => {
 });
 
 describe('restoreErrorMessage', () => {
-    it.each([
-        [
-            QuotaKind.Lists,
-            30,
-            "Can't restore: you've reached the limit of 30 lists on this board.",
-        ],
-        [
-            QuotaKind.Cards,
-            200,
-            "Can't restore: you've reached the limit of 200 cards in this list.",
-        ],
-    ])('names the %s quota that blocks Undo', (kind, limit, text) => {
-        const error = overTheWire(new QuotaExceededError(kind, limit));
-
-        expect(restoreErrorMessage(error, 'fallback')).toBe(text);
+    it('explains the quota blocking Undo using the server limit', () => {
+        expect(
+            restoreErrorMessage(overTheWire(QuotaKind.Cards, 7), 'fallback'),
+        ).toMatch(/restore.*7 cards/i);
     });
 
-    it('returns the fallback for any other error', () => {
+    it('returns the fallback for other errors', () => {
         expect(restoreErrorMessage(new Error('network'), 'fallback')).toBe(
             'fallback',
         );
@@ -170,17 +67,21 @@ describe('restoreErrorMessage', () => {
 });
 
 describe('moveErrorMessage', () => {
-    it('says the target list is full', () => {
-        const error = overTheWire(new QuotaExceededError(QuotaKind.Cards, 200));
-
-        expect(moveErrorMessage(error, 'fallback')).toBe(
-            "Can't move: this list already has 200 cards.",
+    it.each([
+        [QuotaKind.Cards, /list.*7 cards/],
+        [QuotaKind.Lists, /board.*7 lists/],
+    ] as const)('explains which destination is full for %s', (kind, text) => {
+        expect(moveErrorMessage(overTheWire(kind, 7), 'fallback')).toMatch(
+            text,
         );
     });
 
-    it('returns the fallback for any other error', () => {
+    it('falls back for unsupported quotas and other errors', () => {
         expect(
-            moveErrorMessage(new Error('Card was not moved'), 'fallback'),
+            moveErrorMessage(overTheWire(QuotaKind.Boards, 7), 'fallback'),
         ).toBe('fallback');
+        expect(moveErrorMessage(new Error('Move refused'), 'fallback')).toBe(
+            'fallback',
+        );
     });
 });

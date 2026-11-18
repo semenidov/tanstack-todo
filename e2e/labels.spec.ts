@@ -1,14 +1,11 @@
+import { eq } from 'drizzle-orm';
+import { db } from '../src/db';
+import { cards, cardLabels } from '../src/db/schema';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL, gotoHydrated } from './helpers/auth';
-import { resetBoards, seedBoard } from './helpers/db';
-import {
-    addCard,
-    cardRow,
-    gotoBoard,
-    listColumn,
-    popoverPosition,
-} from './helpers/board';
+import { resetBoards, seedBoard, seedCards, seedLabels } from './helpers/db';
+import { cardRow, listColumn, popoverPosition } from './helpers/board';
 
 test.beforeEach(async () => {
     await resetBoards();
@@ -61,14 +58,12 @@ async function putLabel(page: Page, cardTitle: string, label: string) {
     await closePopoverAndWindow(page);
 }
 
-test('creates a label, puts it on cards, expands titles on the board and deletes it', async ({
+test('creates and assigns a label, expands its titles and persists it', async ({
     page,
 }) => {
-    // One long scenario with a reload on the dev server.
-    test.slow();
-    await gotoBoard(page, CRUD_EMAIL);
-    await addCard(page, 'To do', 'Ship it');
-    await addCard(page, 'To do', 'Write docs');
+    const boardId = await seedBoard(CRUD_EMAIL);
+    await seedCards(boardId, 'To do', ['Ship it', 'Write docs']);
+    await gotoHydrated(page, `/b/${boardId}`);
 
     await cardRow(page, 'Ship it').getByRole('link').click();
     await page
@@ -95,6 +90,21 @@ test('creates a label, puts it on cards, expands titles on the board and deletes
     await docsLabels.click();
     await expect(shipLabels).toHaveAttribute('aria-pressed', 'false');
 
+    await gotoHydrated(page, `/b/${boardId}`);
+    await expect(shipLabels).toBeVisible();
+    await expect(docsLabels).toBeVisible();
+});
+
+test('deleting a label removes it from all cards after reload', async ({
+    page,
+}) => {
+    const boardId = await seedBoard(CRUD_EMAIL);
+    const tagged = await seedCards(boardId, 'To do', ['Ship it', 'Write docs']);
+    const [label] = await seedLabels(boardId, ['Frontend']);
+    await db
+        .insert(cardLabels)
+        .values(tagged.map((card) => ({ cardId: card.id, labelId: label.id })));
+    await gotoHydrated(page, `/b/${boardId}`);
     // Delete: the confirmation counts the cards and starts on Cancel.
     await cardRow(page, 'Ship it').getByRole('link').click();
     await page
@@ -129,9 +139,10 @@ test('creates a label, puts it on cards, expands titles on the board and deletes
 test('the labels popover stays open and in place while labels go on and off the card', async ({
     page,
 }) => {
-    test.slow();
-    await gotoBoard(page, CRUD_EMAIL);
-    await addCard(page, 'To do', 'Ship it');
+    const boardId = await seedBoard(CRUD_EMAIL);
+    await seedCards(boardId, 'To do', ['Ship it']);
+    await seedLabels(boardId, ['Frontend', 'Backend']);
+    await gotoHydrated(page, `/b/${boardId}`);
 
     await cardRow(page, 'Ship it').getByRole('link').click();
     const window = page.getByRole('dialog', { name: 'Ship it' });
@@ -142,8 +153,6 @@ test('the labels popover stays open and in place while labels go on and off the 
     const editLabels = window.getByRole('button', { name: 'Edit labels' });
     await labelsButton.click();
     await expect(labelsButton).toHaveAttribute('aria-expanded', 'true');
-    await createLabel(page, 'Frontend');
-    await createLabel(page, 'Backend');
     const opened = await popoverPosition(labelsPopover(page));
 
     /** Toggles the label; the button row and the labels block swap or grow. */
@@ -181,20 +190,16 @@ test('the labels popover stays open and in place while labels go on and off the 
 test('moving a list to another board warns about its labels and takes them off; completion stays', async ({
     page,
 }) => {
-    test.slow();
     const otherBoardId = await seedBoard(CRUD_EMAIL, 'Other board');
-    await gotoBoard(page, CRUD_EMAIL);
-    await addCard(page, 'To do', 'Tagged');
-
-    await cardRow(page, 'Tagged').getByRole('link').click();
-    const window = page.getByRole('dialog', { name: 'Tagged' });
-    await saved(page, () =>
-        window.getByRole('checkbox', { name: 'Completed' }).click(),
-    );
-    await window.getByRole('button', { name: 'Labels' }).click();
-    await createLabel(page, 'Urgent');
-    await closePopoverAndWindow(page);
-    await putLabel(page, 'Tagged', 'Urgent');
+    const boardId = await seedBoard(CRUD_EMAIL);
+    const [card] = await seedCards(boardId, 'To do', ['Tagged']);
+    const [label] = await seedLabels(boardId, ['Urgent']);
+    await db.insert(cardLabels).values({ cardId: card.id, labelId: label.id });
+    await db
+        .update(cards)
+        .set({ completedAt: new Date() })
+        .where(eq(cards.id, card.id));
+    await gotoHydrated(page, `/b/${boardId}`);
 
     await listColumn(page, 'To do')
         .getByRole('button', { name: 'List actions' })

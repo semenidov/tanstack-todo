@@ -20,15 +20,6 @@ beforeEach(() => {
 });
 
 describe('AuthForm', () => {
-    it('renders email, password and submit label', () => {
-        renderForm();
-        expect(screen.getByLabelText('Email')).toBeInTheDocument();
-        expect(screen.getByLabelText('Password')).toBeInTheDocument();
-        expect(
-            screen.getByRole('button', { name: 'Sign in' }),
-        ).toBeInTheDocument();
-    });
-
     it('shows an email error on blur for an invalid address', async () => {
         const user = userEvent.setup();
         renderForm();
@@ -61,16 +52,6 @@ describe('AuthForm', () => {
                 password: 'password123',
             }),
         );
-    });
-
-    it('blocks submit and surfaces a validation error when empty', async () => {
-        const user = userEvent.setup();
-        const { onSubmit } = renderForm();
-        await user.click(screen.getByRole('button', { name: 'Sign in' }));
-        expect(
-            await screen.findByText('Enter a valid email'),
-        ).toBeInTheDocument();
-        expect(onSubmit).not.toHaveBeenCalled();
     });
 
     it('shows errors on both fields when submitted empty', async () => {

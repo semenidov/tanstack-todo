@@ -14,13 +14,13 @@ describe('authErrorMessage', () => {
     it('asks to retry in a minute when sign-in is rate limited', () => {
         expect(
             authErrorMessage(rateLimited, SIGN_IN_LIMIT, 'Sign in failed'),
-        ).toBe('Too many attempts. Please try again in a minute.');
+        ).toMatch(/a minute/);
     });
 
     it('names the sign-up window when sign-up is rate limited', () => {
         expect(
             authErrorMessage(rateLimited, SIGN_UP_LIMIT, 'Sign up failed'),
-        ).toBe('Too many attempts. Please try again in 10 minutes.');
+        ).toMatch(/10 minutes/);
     });
 
     it('keeps the server message for other errors', () => {

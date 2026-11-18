@@ -1,21 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { pageMeta, pageTitle } from '#/lib/seo';
-
-describe('pageTitle', () => {
-    it('formats a screen title with the app name', () => {
-        expect(pageTitle('New task')).toBe('New task · Todo List');
-    });
-
-    it('falls back to the app name', () => {
-        expect(pageTitle()).toBe('Todo List');
-    });
-});
+import { pageMeta } from '#/lib/seo';
 
 describe('pageMeta', () => {
-    it('sets the document and og titles', () => {
-        expect(pageMeta('Sign in')).toEqual([
-            { title: 'Sign in · Todo List' },
-            { property: 'og:title', content: 'Sign in · Todo List' },
-        ]);
+    it.each([
+        ['Sign in', 'Sign in · Todo List'],
+        [undefined, 'Todo List'],
+    ])('sets matching document and sharing titles for %s', (screen, title) => {
+        expect(pageMeta(screen)).toEqual(
+            expect.arrayContaining([
+                { title },
+                { property: 'og:title', content: title },
+            ]),
+        );
     });
 });

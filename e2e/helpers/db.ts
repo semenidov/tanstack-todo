@@ -1,7 +1,16 @@
-import { eq, sql } from 'drizzle-orm';
+import { generateNKeysBetween } from 'fractional-indexing';
+import { and, eq, sql } from 'drizzle-orm';
 import { user } from '../../src/db/auth-schema';
 import { db } from '../../src/db';
-import { boardMembers, boards, lists } from '../../src/db/schema';
+import {
+    boardMembers,
+    boards,
+    cards,
+    lists,
+    checklists,
+    checklistItems,
+    labels,
+} from '../../src/db/schema';
 
 // `sql` only for truncate: the query builder has no truncate.
 export async function resetDb() {
@@ -42,4 +51,48 @@ export async function seedBoardMember(boardId: string, email: string) {
     });
     if (!member) throw new Error(`E2E: no user with email ${email}`);
     await db.insert(boardMembers).values({ boardId, userId: member.id });
+}
+
+export async function seedCards(
+    boardId: string,
+    listTitle: string,
+    titles: string[],
+) {
+    const list = await db.query.lists.findFirst({
+        where: and(eq(lists.boardId, boardId), eq(lists.title, listTitle)),
+    });
+    if (!list) throw new Error(`Missing fixture list ${listTitle}`);
+    const positions = generateNKeysBetween(null, null, titles.length);
+    return db
+        .insert(cards)
+        .values(
+            titles.map((title, i) => ({
+                listId: list.id,
+                title,
+                position: positions[i],
+            })),
+        )
+        .returning();
+}
+
+export async function seedChecklist(cardId: string, titles: string[]) {
+    const [checklist] = await db
+        .insert(checklists)
+        .values({ cardId, title: 'Steps' })
+        .returning();
+    const positions = generateNKeysBetween(null, null, titles.length);
+    await db.insert(checklistItems).values(
+        titles.map((title, i) => ({
+            checklistId: checklist.id,
+            title,
+            position: positions[i],
+        })),
+    );
+}
+
+export async function seedLabels(boardId: string, titles: string[]) {
+    return db
+        .insert(labels)
+        .values(titles.map((title) => ({ boardId, title, color: 'blue' })))
+        .returning();
 }

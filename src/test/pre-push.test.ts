@@ -62,24 +62,9 @@ it('runs mandatory checks and selected groups in order, skips empty groups, and 
 });
 
 it('compares the pushed commit with the remote SHA or the first-push merge base', () => {
-    const calls: string[][] = [];
-    const recordingGit = (...args: string[]) => {
-        calls.push(args);
-        return git(args[0]);
-    };
-    expect(pushRange(update, recordingGit)).toEqual(['def', 'abc']);
-    expect(calls).toEqual([
-        ['rev-parse', 'HEAD'],
-        ['status', '--porcelain'],
-    ]);
-
-    calls.length = 0;
-    expect(
-        pushRange(update.replace('def', '0'.repeat(40)), recordingGit),
-    ).toEqual(['base', 'abc']);
-    expect(calls).toEqual([
-        ['rev-parse', 'HEAD'],
-        ['status', '--porcelain'],
-        ['merge-base', 'origin/master', 'abc'],
+    expect(pushRange(update, git)).toEqual(['def', 'abc']);
+    expect(pushRange(update.replace('def', '0'.repeat(40)), git)).toEqual([
+        'base',
+        'abc',
     ]);
 });

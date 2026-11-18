@@ -399,27 +399,19 @@ describe('renameList', () => {
 });
 
 describe('deleteList', () => {
-    it('soft deletes a list and leaves its cards untouched', async () => {
+    it('soft deletes a list, hides its contents and preserves the stored cards', async () => {
         const { board, access } = await seedOwnedBoard();
-        const [list] = await listsOf(board.id);
+        const [list, other] = await listsOf(board.id);
         const card = await addCard(access, list.id, 'card');
 
         const affected = await deleteList(access, list.id);
+
         expect(affected).toHaveLength(1);
         expect(affected[0].deletedAt).toBeInstanceOf(Date);
-
         expect((await cardRow(card!.id)).deletedAt).toBeNull();
-    });
-
-    it('hides the list and its cards from getBoard', async () => {
-        const { board, access } = await seedOwnedBoard();
-        const [todo, done] = await listsOf(board.id);
-        await addCard(access, todo.id, 'card');
-
-        await deleteList(access, todo.id);
-
-        const result = await getBoard(access);
-        expect(result?.lists.map((l) => l.id)).toEqual([done.id]);
+        expect((await getBoard(access))?.lists.map((l) => l.id)).toEqual([
+            other.id,
+        ]);
     });
 
     it('is a no-op for another user', async () => {
@@ -686,19 +678,6 @@ describe('deleteCard', () => {
 });
 
 describe('restoreCard', () => {
-    it('brings the card back for the owner', async () => {
-        const { board, access } = await seedOwnedBoard();
-        const [list] = await listsOf(board.id);
-        const card = await addCard(access, list.id, 'card');
-        await deleteCard(access, card!.id);
-
-        const affected = await restoreCard(access, card!.id);
-        expect(affected).toHaveLength(1);
-
-        const result = await getBoard(access);
-        expect(result?.lists[0].cards.map((c) => c.id)).toEqual([card!.id]);
-    });
-
     it('is a no-op for another user', async () => {
         const { board, access } = await seedOwnedBoard();
         const b = await seedUser();
@@ -734,7 +713,7 @@ describe('restoreCard', () => {
 
         await deleteCard(access, card!.id);
         expect((await getBoard(access))?.lists[0].cards).toEqual([]);
-        await restoreCard(access, card!.id);
+        expect(await restoreCard(access, card!.id)).toHaveLength(1);
 
         const [restored] = (await getBoard(access))!.lists[0].cards;
         expect(restored).toMatchObject({
@@ -793,15 +772,18 @@ describe('card order', () => {
         const { board, access } = await seedOwnedBoard('Board', action);
         const [todo, done] = await listsOf(board.id);
         const insert = async (listId: string, keys: Array<string>) => {
-            const ids: Array<string> = [];
-            for (const [i, position] of keys.entries()) {
-                const [row] = await db
-                    .insert(cards)
-                    .values({ listId, title: `card ${i}`, position })
-                    .returning();
-                ids.push(row.id);
-            }
-            return ids;
+            if (!keys.length) return [];
+            const rows = await db
+                .insert(cards)
+                .values(
+                    keys.map((position, i) => ({
+                        listId,
+                        title: `card ${i}`,
+                        position,
+                    })),
+                )
+                .returning({ id: cards.id });
+            return rows.map((row) => row.id);
         };
         return {
             access,

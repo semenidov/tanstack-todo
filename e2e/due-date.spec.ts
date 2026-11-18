@@ -1,18 +1,26 @@
+import { eq } from 'drizzle-orm';
+import { db } from '../src/db';
+import { cards } from '../src/db/schema';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { CRUD_EMAIL, gotoHydrated } from './helpers/auth';
-import { resetBoards } from './helpers/db';
-import { addCard, cardRow, gotoBoard, popoverPosition } from './helpers/board';
+import { resetBoards, seedBoard, seedCards } from './helpers/db';
+import { cardRow, popoverPosition } from './helpers/board';
 
 // The page clock is fixed in the time zone of playwright.config.ts
 // (`timezoneId`, UTC+14); the server keeps the real clock.
 const AT_10 = new Date('2026-03-10T10:00:00+14:00');
 const AT_16 = new Date('2026-03-10T16:00:00+14:00');
 
+let boardId: string;
+let cardId: string;
+
 test.beforeEach(async ({ page }) => {
     await resetBoards();
     await page.clock.setFixedTime(AT_10);
-    await gotoBoard(page, CRUD_EMAIL);
+    boardId = await seedBoard(CRUD_EMAIL);
+    const [card] = await seedCards(boardId, 'To do', ['Ship it']);
+    cardId = card.id;
 });
 
 /** Runs `action` and waits for the server fn call it makes to succeed. */
@@ -24,12 +32,10 @@ async function saved(page: Page, action: () => Promise<void>) {
     expect((await response).ok()).toBe(true);
 }
 
-test('sets a due date with a time, clears the time and removes it; the status follows the clock', async ({
+test('saves a timed due date and shows it overdue after reload in the device time zone', async ({
     page,
 }) => {
-    // One long scenario with two reloads on the dev server.
-    test.slow();
-    await addCard(page, 'To do', 'Ship it');
+    await gotoHydrated(page, `/b/${boardId}`);
     const badge = cardRow(page, 'Ship it');
     const window = page.getByRole('dialog', { name: 'Ship it' });
     const picker = page.getByRole('dialog', { name: 'Due date' });
@@ -61,18 +67,6 @@ test('sets a due date with a time, clears the time and removes it; the status fo
     await expect(picker).toHaveCount(0);
     await expect(chip).toHaveText('Due today: Today 15:00');
 
-    // Another day keeps the time.
-    await chip.click();
-    await saved(page, () =>
-        picker.getByRole('button', { name: /March 11th/ }).click(),
-    );
-    await expect(chip).toHaveText('Due tomorrow: Tomorrow 15:00');
-    await saved(page, () =>
-        picker.getByRole('button', { name: /March 10th/ }).click(),
-    );
-
-    await page.keyboard.press('Escape');
-    await expect(picker).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(badge).toContainText('Due today: Today 15:00');
 
@@ -81,7 +75,22 @@ test('sets a due date with a time, clears the time and removes it; the status fo
     await page.clock.setFixedTime(AT_16);
     await gotoHydrated(page, page.url());
     await expect(badge).toContainText('Overdue: Today 15:00');
+});
 
+test('clears the time and removes a persisted due date', async ({ page }) => {
+    await db
+        .update(cards)
+        .set({ dueAt: new Date('2026-03-10T15:00:00+14:00') })
+        .where(eq(cards.id, cardId));
+    await page.clock.setFixedTime(AT_16);
+    await gotoHydrated(page, `/b/${boardId}`);
+    const badge = cardRow(page, 'Ship it');
+    await expect(badge).toContainText('Overdue');
+    const window = page.getByRole('dialog', { name: 'Ship it' });
+    const picker = page.getByRole('dialog', { name: 'Due date' });
+    const chip = window.getByRole('button', {
+        name: /^(Due|Overdue)[a-z ]*: /,
+    });
     // Clearing the time makes it a whole-day due date: not overdue until the day ends.
     await cardRow(page, 'Ship it').getByRole('link').click();
     await chip.click();

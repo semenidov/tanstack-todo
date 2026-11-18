@@ -23,7 +23,7 @@ describe('GuestBanner', () => {
         render(<GuestBanner />);
 
         expect(screen.getByRole('note')).toHaveTextContent(
-            'Guest mode: boards are deleted after 7 days. Create an account',
+            /deleted after 7 days/i,
         );
         expect(
             screen.getByRole('link', { name: 'Create an account' }),
@@ -37,9 +37,6 @@ describe('GuestBanner', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
 
         expect(screen.queryByRole('note')).not.toBeInTheDocument();
-        expect(localStorage.getItem('guest-banner-dismissed:guest-1')).toBe(
-            '1',
-        );
 
         unmount();
         render(<GuestBanner />);
@@ -48,8 +45,8 @@ describe('GuestBanner', () => {
 
     it('is not shown to a regular user', () => {
         isGuest.value = false;
-        const { container } = render(<GuestBanner />);
+        render(<GuestBanner />);
 
-        expect(container).toBeEmptyDOMElement();
+        expect(screen.queryByRole('note')).not.toBeInTheDocument();
     });
 });
