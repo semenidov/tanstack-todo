@@ -90,19 +90,19 @@ describe('AddList', () => {
         await vi.waitFor(() => expect(addListSpy).toHaveBeenCalledTimes(1));
         expect(input).toHaveAttribute('aria-busy', 'true');
         await user.keyboard(' extra{Enter}');
-        expect(addListSpy).toHaveBeenCalledTimes(1);
         expect(input).toHaveValue('Done');
         expect(onCreated).not.toHaveBeenCalled();
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([]);
 
         pending.resolve(savedList);
+        await vi.waitFor(() => expect(queryClient.isMutating()).toBe(0));
         await vi.waitFor(() => expect(input).toHaveValue(''));
         expect(input).toHaveFocus();
         expect(queryClient.getQueryData(boardKey)?.lists).toEqual([
             { ...savedList, cards: [] },
         ]);
         expect(onCreated).toHaveBeenCalledExactlyOnceWith(savedList.id);
-        expect(addListSpy).toHaveBeenCalledWith({
+        expect(addListSpy).toHaveBeenCalledExactlyOnceWith({
             data: { boardId: 'board-1', title: 'Done' },
         });
     });
