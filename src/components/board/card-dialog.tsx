@@ -175,7 +175,7 @@ export function CardDialog({
                         e.preventDefault();
                     }
                 }}
-                className="max-md:inset-0 max-md:flex max-md:h-dvh max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-none max-md:p-4 md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto"
+                className="max-w-none max-md:inset-0 max-md:flex max-md:h-dvh max-md:translate-x-0 max-md:translate-y-0 max-md:flex-col max-md:overflow-y-auto max-md:rounded-none max-md:border-none max-md:p-4 sm:max-w-none md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto"
             >
                 {/* Header. Desktop: completed toggle → title and its list below
                     → menu and close. Mobile: ← list name ⋯, then toggle and title. */}
